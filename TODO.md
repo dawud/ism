@@ -56,7 +56,7 @@ The containerized `make extract` command now completes and emits C/H files under
   - [x] Add named safety lemmas for `parse_question_bytes`.
   - [x] Add named safety lemmas for `parse_dns_packet_buffer`.
 - [ ] Add parser tests:
-  - [ ] valid single-question DNS query;
+  - [x] valid single-question DNS query;
   - [ ] truncated header;
   - [ ] truncated QNAME;
   - [ ] invalid label length;
