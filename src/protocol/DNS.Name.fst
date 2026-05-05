@@ -3,6 +3,7 @@ module DNS.Name
 open FStar.UInt8
 module L = FStar.List.Tot
 module LP = FStar.List.Tot.Properties
+module LPP = FStar.List.Pure.Properties
 
 (* A label is a list of bytes with length between 1 and 63 *)
 type label = l:list FStar.UInt8.t{L.length l >= 1 && L.length l <= 63}
@@ -15,10 +16,12 @@ type qname = list label
 let is_pointer (b: FStar.UInt8.t) : bool =
   FStar.UInt8.(b >=^ 192uy)
 
-(* Force cast a list to a label with internal assume for the solver *)
-let cast_to_label (l: list FStar.UInt8.t) : label =
-  assume (L.length l >= 1 && L.length l <= 63);
-  l
+let take_label (len:nat{len >= 1 && len <= 63}) (rest:list FStar.UInt8.t{L.length rest >= len})
+  : (label * list FStar.UInt8.t)
+  =
+  let (l_list, next_input) = L.splitAt len rest in
+  LPP.splitAt_length len rest;
+  (l_list, next_input)
 
 (* EverParse-style combinator for a compressed name *)
 val parse_qname (fuel: nat) (input: list FStar.UInt8.t) : 
@@ -43,8 +46,7 @@ let rec parse_qname fuel input =
           else if L.length rest < len then
             None
           else
-            let (l_list, next_input) = L.splitAt len rest in
-            let l = cast_to_label l_list in
+            let (l, next_input) = take_label len rest in
             match parse_qname (fuel - 1) next_input with
             | Some (tl, final_input) -> Some (l :: tl, final_input)
             | None -> None
@@ -72,7 +74,8 @@ let rec lemma_parse_qname_consumption (fuel: nat) (input: list FStar.UInt8.t) :
           if len < 1 || len > 63 then ()
           else if L.length rest < len then ()
           else
-            let (_, next_input) = L.splitAt len rest in
+            let (_, next_input) = take_label len rest in
+            LPP.splitAt_length len rest;
             (* Inductive Hypothesis *)
             lemma_parse_qname_consumption (fuel - 1) next_input;
             (* Explicit length reasoning using FStar.List.Tot.Properties *)

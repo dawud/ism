@@ -50,7 +50,7 @@ The containerized `make extract` command now completes and emits C/H files under
   - [ ] Decide whether post-Low* migration means Pulse, EverParse-generated C boundaries, or a legacy Low* toolchain.
   - [ ] Promote a newer F* only after verification, extraction strategy, trusted-boundary review, and parser strategy are all clear.
 - [ ] Remove parser proof debt:
-  - [ ] Replace `DNS.Name.cast_to_label`'s `assume` with a checked constructor path.
+  - [x] Replace `DNS.Name.cast_to_label`'s `assume` with a checked constructor path.
   - [ ] Finish `DNS.Name.lemma_parser_rejecting` without `admit()`.
   - [ ] Add named safety lemmas for `parse_header_bytes`.
   - [ ] Add named safety lemmas for `parse_question_bytes`.
