@@ -42,29 +42,83 @@ let raw_header_to_header (r: raw_header) : header =
 let u16_from_be (hi:FStar.UInt8.t) (lo:FStar.UInt8.t) : FStar.UInt16.t =
   FStar.UInt16.uint_to_t (Prims.op_Addition (Prims.op_Multiply (FStar.UInt8.v hi) 256) (FStar.UInt8.v lo))
 
+val has_header_bytes :
+  need:nat ->
+  input:list FStar.UInt8.t ->
+  Tot bool (decreases need)
+
+let rec has_header_bytes need input =
+  if need = 0 then true
+  else
+    match input with
+    | [] -> false
+    | _ :: tl -> has_header_bytes (need - 1) tl
+
 val parse_header_bytes :
   input:list FStar.UInt8.t ->
   Tot (option (header * list FStar.UInt8.t))
 
 let parse_header_bytes input =
-  match input with
-  | id_hi :: id_lo ::
-    fl_hi :: fl_lo ::
-    qd_hi :: qd_lo ::
-    an_hi :: an_lo ::
-    ns_hi :: ns_lo ::
-    ar_hi :: ar_lo ::
-    rest ->
-      Some (
-        raw_header_to_header (
-          u16_from_be id_hi id_lo,
-          (u16_from_be fl_hi fl_lo,
-          (u16_from_be qd_hi qd_lo,
-          (u16_from_be an_hi an_lo,
-          (u16_from_be ns_hi ns_lo,
-           u16_from_be ar_hi ar_lo))))),
-        rest)
-  | _ -> None
+  if L.length input < 12 then
+    None
+  else
+    match input with
+    | id_hi :: id_lo ::
+      fl_hi :: fl_lo ::
+      qd_hi :: qd_lo ::
+      an_hi :: an_lo ::
+      ns_hi :: ns_lo ::
+      ar_hi :: ar_lo ::
+      rest ->
+        Some (
+          raw_header_to_header (
+            u16_from_be id_hi id_lo,
+            (u16_from_be fl_hi fl_lo,
+            (u16_from_be qd_hi qd_lo,
+            (u16_from_be an_hi an_lo,
+            (u16_from_be ns_hi ns_lo,
+             u16_from_be ar_hi ar_lo))))),
+          rest)
+    | _ -> None
+
+val lemma_parse_header_rejects_short :
+  input:list FStar.UInt8.t{L.length input < 12} ->
+  Lemma (ensures (parse_header_bytes input == None))
+
+val lemma_has_header_bytes_iff_length :
+  need:nat ->
+  input:list FStar.UInt8.t ->
+  Lemma (ensures (has_header_bytes need input == true <==> L.length input >= need))
+        (decreases need)
+
+let rec lemma_has_header_bytes_iff_length need input =
+  if need = 0 then ()
+  else
+    match input with
+    | [] -> ()
+    | _ :: tl -> lemma_has_header_bytes_iff_length (need - 1) tl
+
+let lemma_parse_header_rejects_short input =
+  ()
+
+val lemma_parse_header_success_length :
+  input:list FStar.UInt8.t ->
+  Lemma (ensures (match parse_header_bytes input with
+                  | Some _ -> L.length input >= 12
+                  | None -> True))
+
+let lemma_parse_header_success_length input =
+  ()
+
+val lemma_parse_header_success_not_short :
+  input:list FStar.UInt8.t ->
+  h:header ->
+  rest:list FStar.UInt8.t ->
+  Lemma (requires (parse_header_bytes input == Some (h, rest)))
+        (ensures (L.length input >= 12))
+
+let lemma_parse_header_success_not_short input h rest =
+  lemma_parse_header_success_length input
 
 val parse_question_bytes :
   input:list FStar.UInt8.t ->

@@ -52,7 +52,7 @@ The containerized `make extract` command now completes and emits C/H files under
 - [ ] Remove parser proof debt:
   - [x] Replace `DNS.Name.cast_to_label`'s `assume` with a checked constructor path.
   - [x] Finish `DNS.Name.lemma_parser_rejecting` without `admit()`.
-  - [ ] Add named safety lemmas for `parse_header_bytes`.
+  - [x] Add named safety lemmas for `parse_header_bytes`.
   - [ ] Add named safety lemmas for `parse_question_bytes`.
   - [ ] Add named safety lemmas for `parse_dns_packet_buffer`.
 - [ ] Add parser tests:
