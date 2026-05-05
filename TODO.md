@@ -51,7 +51,7 @@ The containerized `make extract` command now completes and emits C/H files under
   - [ ] Promote a newer F* only after verification, extraction strategy, trusted-boundary review, and parser strategy are all clear.
 - [ ] Remove parser proof debt:
   - [x] Replace `DNS.Name.cast_to_label`'s `assume` with a checked constructor path.
-  - [ ] Finish `DNS.Name.lemma_parser_rejecting` without `admit()`.
+  - [x] Finish `DNS.Name.lemma_parser_rejecting` without `admit()`.
   - [ ] Add named safety lemmas for `parse_header_bytes`.
   - [ ] Add named safety lemmas for `parse_question_bytes`.
   - [ ] Add named safety lemmas for `parse_dns_packet_buffer`.
@@ -98,9 +98,9 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 - [x] Define basic DNS types (Header, Flags, QType, QName).
 - [x] Implement RFC-assigned integer mapping for all 43+ record types.
 - [/] Implement `DNS.Protocol.header_validator` and `header_reader` using EverParse. Current code has pure byte-list header parsing plus a verified Low* buffer reader; no generated EverParse header reader is present yet.
-- [/] Implement recursive `parse_qname` with fuel-based termination for name compression. Current code parses uncompressed labels and rejects compression pointers; label casting uses `assume`, and `lemma_parser_rejecting` ends with `admit()`.
+- [/] Implement recursive `parse_qname` with fuel-based termination for name compression. Current code parses uncompressed labels, enforces the 255-byte DNS name length budget, and rejects compression pointers.
 - [/] Implement full `DNS_Packet` parser (Header + Question + RR sections). Current `DNS.Protocol.Parser` parses header and question sections from byte lists, rejects non-empty RR sections, and the gateway no longer returns a dummy zero header.
-- [/] **Validation:** Prove parser is "parser-rejecting" for malformed inputs. Current proofs cover only narrow header/name properties and still contain admitted proof obligations.
+- [/] **Validation:** Prove parser is "parser-rejecting" for malformed inputs. Current name/header proofs are admitted-free, but broader packet/RR parser obligations remain incomplete.
 
 ## Phase 2: DoQ Transport Layer (QUIC + TLS 1.3)
 *Goal: Secure transport tunnel using EverCrypt/EverQuic.*
