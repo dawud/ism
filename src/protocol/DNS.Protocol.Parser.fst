@@ -120,6 +120,11 @@ val lemma_parse_header_success_not_short :
 let lemma_parse_header_success_not_short input h rest =
   lemma_parse_header_success_length input
 
+let has_question_suffix (input:list FStar.UInt8.t) : bool =
+  match input with
+  | _qt_hi :: _qt_lo :: _qc_hi :: _qc_lo :: _ -> true
+  | _ -> false
+
 val parse_question_bytes :
   input:list FStar.UInt8.t ->
   Tot (option (question * list FStar.UInt8.t))
@@ -136,6 +141,46 @@ let parse_question_bytes input =
             qclass = u16_from_be qc_hi qc_lo;
           }, tail)
       | _ -> None
+
+val lemma_parse_question_success_qname :
+  input:list FStar.UInt8.t ->
+  q:question ->
+  tail:list FStar.UInt8.t ->
+  Lemma (requires (parse_question_bytes input == Some (q, tail)))
+        (ensures (exists rest. DNS.Name.parse_qname 128 input == Some (q.qname, rest) /\ has_question_suffix rest == true))
+
+let lemma_parse_question_success_qname input q tail =
+  match DNS.Name.parse_qname 128 input with
+  | None -> ()
+  | Some (name, rest) ->
+      match rest with
+      | _qt_hi :: _qt_lo :: _qc_hi :: _qc_lo :: _ -> ()
+      | _ -> ()
+
+val lemma_parse_question_consumption :
+  input:list FStar.UInt8.t ->
+  Lemma (ensures (match parse_question_bytes input with
+                  | Some (_, tail) -> L.length tail < L.length input
+                  | None -> True))
+
+let lemma_parse_question_consumption input =
+  DNS.Name.lemma_parse_qname_consumption 128 input;
+  match DNS.Name.parse_qname 128 input with
+  | None -> ()
+  | Some (_, rest) ->
+      match rest with
+      | _qt_hi :: _qt_lo :: _qc_hi :: _qc_lo :: _tail -> ()
+      | _ -> ()
+
+val lemma_parse_question_success_suffix :
+  input:list FStar.UInt8.t ->
+  q:question ->
+  tail:list FStar.UInt8.t ->
+  Lemma (requires (parse_question_bytes input == Some (q, tail)))
+        (ensures (exists rest. DNS.Name.parse_qname 128 input == Some (q.qname, rest) /\ L.length rest >= 4))
+
+let lemma_parse_question_success_suffix input q tail =
+  lemma_parse_question_success_qname input q tail
 
 val parse_questions_bytes :
   fuel:nat ->
