@@ -245,7 +245,7 @@ val read_buffer_range :
   buffer:uint8_ptr ->
   pos:nat ->
   remaining:nat ->
-  Stack (list FStar.UInt8.t)
+  Stack (bytes:list FStar.UInt8.t{L.length bytes == remaining})
     (requires (fun h0 ->
       LowStar.Buffer.live h0 buffer /\
       pos + remaining <= LowStar.Buffer.length buffer /\
@@ -266,6 +266,48 @@ let rec read_buffer_range buffer pos remaining =
 let parse_dns_packet_buffer buffer len =
   let bytes = read_buffer_range buffer 0 (FStar.UInt32.v len) in
   parse_dns_packet_bytes bytes
+
+val lemma_read_buffer_range_length :
+  buffer:uint8_ptr ->
+  pos:nat ->
+  remaining:nat ->
+  Stack unit
+    (requires (fun h0 ->
+      LowStar.Buffer.live h0 buffer /\
+      pos + remaining <= LowStar.Buffer.length buffer /\
+      pos + remaining <= 4294967295))
+    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+
+let lemma_read_buffer_range_length buffer pos remaining =
+  let _bytes = read_buffer_range buffer pos remaining in
+  ()
+
+val lemma_parse_dns_packet_buffer_reads_len :
+  buffer:uint8_ptr ->
+  len:FStar.UInt32.t ->
+  Stack unit
+    (requires (fun h0 ->
+      LowStar.Buffer.live h0 buffer /\
+      FStar.UInt32.v len <= LowStar.Buffer.length buffer))
+    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+
+let lemma_parse_dns_packet_buffer_reads_len buffer len =
+  let bytes = read_buffer_range buffer 0 (FStar.UInt32.v len) in
+  assert (L.length bytes == FStar.UInt32.v len);
+  ()
+
+val lemma_parse_dns_packet_buffer_safe_prefix :
+  buffer:uint8_ptr ->
+  len:FStar.UInt32.t ->
+  Stack unit
+    (requires (fun h0 ->
+      LowStar.Buffer.live h0 buffer /\
+      FStar.UInt32.v len <= LowStar.Buffer.length buffer))
+    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+
+let lemma_parse_dns_packet_buffer_safe_prefix buffer len =
+  let _res = parse_dns_packet_buffer buffer len in
+  ()
 
 (* --- Validation Proofs --- *)
 

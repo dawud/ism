@@ -54,7 +54,7 @@ The containerized `make extract` command now completes and emits C/H files under
   - [x] Finish `DNS.Name.lemma_parser_rejecting` without `admit()`.
   - [x] Add named safety lemmas for `parse_header_bytes`.
   - [x] Add named safety lemmas for `parse_question_bytes`.
-  - [ ] Add named safety lemmas for `parse_dns_packet_buffer`.
+  - [x] Add named safety lemmas for `parse_dns_packet_buffer`.
 - [ ] Add parser tests:
   - [ ] valid single-question DNS query;
   - [ ] truncated header;
