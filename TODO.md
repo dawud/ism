@@ -57,12 +57,13 @@ The containerized `make extract` command now completes and emits C/H files under
   - [x] Add named safety lemmas for `parse_dns_packet_buffer`.
 - [ ] Add parser tests:
   - [x] valid single-question DNS query;
-  - [ ] truncated header;
-  - [ ] truncated QNAME;
-  - [ ] invalid label length;
-  - [ ] trailing bytes rejected;
-  - [ ] nonzero answer/authority/additional counts rejected until RR parsing lands;
-  - [ ] unknown QTYPE accepted as `UNKNOWN`.
+  - [x] truncated header;
+  - [x] truncated QNAME;
+  - [x] invalid label length;
+  - [x] trailing bytes rejected;
+  - [x] nonzero answer/authority/additional counts rejected until RR parsing lands;
+  - [x] unknown QTYPE accepted as `UNKNOWN`;
+  - [x] malformed compression pointers rejected until compression support is implemented.
 - [/] Add extraction as a routine build gate:
   - [x] run `make extract` in the container;
   - [ ] separate extraction blockers from verification blockers;
