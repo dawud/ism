@@ -1,0 +1,13 @@
+# F* / KaRaMel artifacts
+obj/
+# Generated C/H files and KaRaMeL makefiles
+dist/
+.depend
+
+# OS / IDE
+.DS_Store
+.vscode/
+
+# Build
+*.exe
+*.out
