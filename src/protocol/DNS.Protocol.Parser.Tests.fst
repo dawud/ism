@@ -44,3 +44,19 @@ let valid_single_question_dns_packet : dns_packet =
 let valid_single_question_dns_query_test =
   assert_norm (parse_dns_packet_bytes valid_single_question_dns_query ==
                Some valid_single_question_dns_packet)
+
+let truncated_dns_header : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x01uy; 0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy
+  ]
+
+let truncated_dns_header_parse_header_test =
+  assert_norm (parse_header_bytes truncated_dns_header == None)
+
+let truncated_dns_header_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes truncated_dns_header == None)
