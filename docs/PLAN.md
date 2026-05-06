@@ -127,12 +127,14 @@ Maintain a compliance matrix for each protocol area. See [DECISIONS.md](DECISION
 
 | RFC | Section | Requirement | Status | Proof/Test Coverage | Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| RFC 1035 | Header format | 12-byte DNS header | Partial | Parser verifies structurally | RR sections still rejected. |
-| RFC 1035 | QNAME labels | Labels are length-prefixed | Partial | Pure parser and Low* buffer path | Compression is rejected for now. |
-| RFC 3597 | Unknown RR types | Preserve unknown types | Partial | QTYPE maps to `UNKNOWN` | Full RR parsing not implemented. |
+| RFC 1035 | Header format | 12-byte DNS header | Partial | Pure parser tests cover valid and truncated headers; Low* buffer boundary reads the checked length. | EverParse boundary delegates to the reference parser; generated parser not integrated yet. |
+| RFC 1035 | QNAME labels | Labels are length-prefixed | Partial | Tests cover valid root QNAMEs, truncated QNAMEs, invalid label length, trailing bytes, and rejected compression pointers. | Compression is rejected for now; RR sections still rejected. |
+| RFC 3597 | Unknown RR types | Preserve unknown types | Partial | Executable parser test maps an unknown QTYPE to `UNKNOWN`. | Full RR parsing not implemented. |
 | RFC 6891 | EDNS0 OPT | OPT pseudo-RR | Partial | Padding helper verifies | OPT parsing/serialization incomplete. |
-| RFC 9250 | DoQ framing | Two-octet length prefix | Not implemented | None | Planned in Phase 2A. |
+| RFC 9250 | DoQ framing | Two-octet length prefix | Not implemented | None | Stream state types exist, but length parsing and accumulation are placeholders. |
 | RFC 8446 | TLS 1.3 | Authenticated transport | Mocked | None | Mock AEAD and handshake remain. |
+
+Extraction status: containerized `make extract` is now a CI smoke gate. It verifies all F*/spec modules first, then extracts the current protocol/security/transport boundary while Phase 3/4 scaffolds remain verification-only.
 
 ## 8. Threat Model Summary
 - **Spoofing:** Mitigated by TLS 1.3 identity and verified Bailiwick checks.
