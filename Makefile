@@ -26,6 +26,13 @@ ALL_FST_FILES = $(wildcard src/protocol/*.fst) \
                 $(wildcard src/concurrency/*.fst) \
                 $(wildcard spec/*.fsti)
 
+# Extraction is narrower than verification while Phase 3/4 scaffolds still
+# contain specification-oriented lists, admits, and Steel placeholders.
+EXTRACT_FST_FILES = $(filter-out src/protocol/%.Tests.fst, $(wildcard src/protocol/*.fst)) \
+                    $(wildcard src/security/*.fst) \
+                    $(wildcard src/transport/*.fst) \
+                    $(wildcard spec/*.fsti)
+
 .PHONY: all verify extract clean
 
 all: extract
@@ -42,7 +49,7 @@ verify:
 extract: verify
 	@echo "Extracting to C in $(DIST_DIR)..."
 	mkdir -p $(DIST_DIR)
-	$(KRML_HOME)/krml $(KRML_OPTS) $(ALL_FST_FILES)
+	$(KRML_HOME)/krml $(KRML_OPTS) $(EXTRACT_FST_FILES)
 
 # 4. Cleanup
 clean:

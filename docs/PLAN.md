@@ -94,12 +94,13 @@ The accepted stack decision is recorded in [DECISIONS.md](DECISIONS.md).
 
 ## 5. Verification, Extraction, and CI
 
-Verification and extraction are separate gates. Current extraction is a generated-artifact smoke test until warning-15 debt is classified and reduced. See [DECISIONS.md](DECISIONS.md).
+Verification and extraction are separate gates. Current extraction is a generated-artifact smoke test until the remaining warning-15 debt is acceptable for CI. See [DECISIONS.md](DECISIONS.md).
 
-The current warning-15 debt is concentrated in the executable scaffold rather than the proof-only obligations:
-- GC-backed lists and other specification types in `DNS.Name`, `DNS.Protocol`, `DNS.Recursive.*`, `DNS.Zone.*`, and `DNS.Cache.*`;
-- mathematical integers and runtime-checking helpers in shard, cache, zone, and recursive-security code;
-- compatibility-header dependencies that KaRaMeL still pulls in from the F* standard library;
+The extraction gate verifies all scaffold modules but only sends the current protocol/security/transport boundary to KaRaMeL. Verification-only parser tests and Phase 3/4 logic/concurrency scaffolds stay out of extraction until they are rewritten into Low* or explicitly marked as trusted/specification-only boundaries.
+
+The remaining warning-15 debt is concentrated in the protocol model:
+- GC-backed list representations in `DNS.Name` and `DNS.Protocol`;
+- `dns_packet`, `question`, and `resource_record` records that still carry list-backed fields;
 - trusted-adapter boundaries that should stay visible until the generated EverParse or Low* replacement exists.
 
 ### F* Release Policy

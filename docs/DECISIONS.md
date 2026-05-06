@@ -105,7 +105,9 @@ in `docs/TODO.md` and the threat model.
 
 **Context:** Containerized `make extract` completes and emits C/H files under
 `dist/`, but KaRaMeL reports warning-15 diagnostics for GC-backed lists,
-mathematical integers, and specification-oriented definitions.
+mathematical integers, and specification-oriented definitions. The current
+extraction gate verifies all scaffold modules but only sends the active
+protocol/security/transport boundary to KaRaMeL.
 
 **Decision:** Treat current extraction as a generated-artifact smoke test, not
 proof that generated output is production C. Classify warning-15 debt as

@@ -67,8 +67,10 @@ The containerized `make extract` command now completes and emits C/H files under
 - [/] Add extraction as a routine build gate:
   - [x] run `make extract` in the container;
   - [x] separate extraction blockers from verification blockers;
-  - [ ] classify and reduce warning-15 non-Low* extraction debt;
+  - [x] classify and reduce warning-15 non-Low* extraction debt;
   - [ ] add extraction to CI once warning debt is understood and acceptable.
+
+  Extraction currently verifies all scaffold modules but only sends the current protocol/security/transport boundary to KaRaMeL. Verification-only parser tests and Phase 3/4 logic/concurrency scaffolds stay out of extraction until they are rewritten into Low* or explicitly marked as trusted/specification-only boundaries.
 - [ ] Replace local mock specs with real dependencies or documented trusted interfaces:
   - [ ] EverCrypt AEAD;
   - [ ] EverCrypt cipher/helper interfaces;
