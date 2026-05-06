@@ -72,7 +72,7 @@ The containerized `make extract` command now completes and emits C/H files under
 
   Extraction currently verifies all scaffold modules but only sends the current protocol/security/transport boundary to KaRaMeL. Verification-only parser tests and Phase 3/4 logic/concurrency scaffolds stay out of extraction until they are rewritten into Low* or explicitly marked as trusted/specification-only boundaries.
 - [ ] Replace local mock specs with real dependencies or documented trusted interfaces:
-  - [ ] EverCrypt AEAD;
+  - [x] EverCrypt AEAD;
   - [ ] EverCrypt cipher/helper interfaces;
   - [x] LowParse/Low* parser interfaces;
   - [x] Steel memory and Steel utility interfaces.
