@@ -92,21 +92,17 @@ let advance_message expected current incoming =
       ReadingMessage (expected, FStar.UInt32.uint_to_t total_len)
     end
 
-(* Stateful accumulation of QUIC frames into DNS messages *)
-val handle_stream_data : 
-    ctx_ptr:buffer stream_context -> 
-    data:buffer FStar.UInt8.t -> 
-    len:FStar.UInt32.t -> 
-    ST stream_phase
+val next_stream_phase :
+    ctx:stream_context ->
+    data:buffer FStar.UInt8.t ->
+    len:FStar.UInt32.t ->
+    Stack stream_phase
       (requires (fun h0 ->
-        live h0 ctx_ptr /\
-        LowStar.Buffer.length ctx_ptr >= 1 /\
         live h0 data /\
         FStar.UInt32.v len <= LowStar.Buffer.length data))
       (ensures (fun h0 _ h1 -> modifies_none h0 h1))
 
-let handle_stream_data ctx_ptr data len =
-  let ctx = LowStar.Buffer.index ctx_ptr 0ul in
+let next_stream_phase ctx data len =
   match ctx.sc_phase with
   | ReadingLength acc ->
       if FStar.UInt32.v acc > 0 then
@@ -138,3 +134,25 @@ let handle_stream_data ctx_ptr data len =
   | ReadingMessage (expected, current) ->
       advance_message expected current len
   | _ -> ctx.sc_phase
+
+(* Stateful accumulation of QUIC frames into DNS messages *)
+val handle_stream_data :
+    ctx_ptr:buffer stream_context ->
+    data:buffer FStar.UInt8.t ->
+    len:FStar.UInt32.t ->
+    ST stream_phase
+      (requires (fun h0 ->
+        live h0 ctx_ptr /\
+        LowStar.Buffer.length ctx_ptr >= 1 /\
+        live h0 data /\
+        FStar.UInt32.v len <= LowStar.Buffer.length data))
+      (ensures (fun h0 _ h1 ->
+        modifies (loc_buffer ctx_ptr) h0 h1 /\
+        live h1 ctx_ptr))
+
+let handle_stream_data ctx_ptr data len =
+  let ctx = LowStar.Buffer.index ctx_ptr 0ul in
+  let phase = next_stream_phase ctx data len in
+  let next_ctx = { ctx with sc_phase = phase } in
+  LowStar.Buffer.upd ctx_ptr 0ul next_ctx;
+  phase
