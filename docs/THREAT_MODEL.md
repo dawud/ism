@@ -33,6 +33,7 @@ This inventory must be kept current as proof debt is removed. A passing F* verif
 | Boundary | Current Status | Risk | Required Closure |
 | :--- | :--- | :--- | :--- |
 | Local `spec/*.fsti` interfaces | Mocked Project Everest / Low* / Steel interfaces exist in the repository. | Verification may prove against weaker local contracts than the real libraries provide. | Replace with real dependencies or document each local interface as a trusted adapter with its exact contract. |
+| LowParse bootstrap adapter | `spec/LowParse.Low.Base.fsti` documents a trusted adapter for `uint8_ptr` and the unused placeholder `parser` type. | Parser proofs rely on a local LowParse surface until the real EverParse/LowParse dependency is wired in. | Replace with the real LowParse interface when integrating the generated EverParse parser. |
 | AEAD decrypt | `DNS.Security.Gateway.decrypt` currently returns `Success`. | Authenticated plaintext is assumed, so tampering protection is not established by the current code. | Integrate EverCrypt AEAD or expose a narrow trusted decrypt interface with a stated authenticity theorem. |
 | TLS client hello validation | `verify_client_hello` currently accepts all inputs. | Client authentication and protocol negotiation are not enforced. | Replace with miTLS/EverQuic integration or a documented trusted handshake adapter. |
 | Plaintext allocation | Gateway plaintext buffer allocation is admitted. | Buffer size, ownership, and lifetime are assumed. | Implement allocation/copying with Low* memory proofs and explicit bounds. |

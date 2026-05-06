@@ -74,7 +74,7 @@ The containerized `make extract` command now completes and emits C/H files under
 - [ ] Replace local mock specs with real dependencies or documented trusted interfaces:
   - [ ] EverCrypt AEAD;
   - [ ] EverCrypt cipher/helper interfaces;
-  - [ ] LowParse/Low* parser interfaces;
+  - [x] LowParse/Low* parser interfaces;
   - [ ] Steel memory and Steel utility interfaces.
 - [ ] Make gateway allocation real by replacing the admitted plaintext buffer with verified Low* allocation/copying and explicit size/ownership proofs.
 - [x] Maintain the RFC compliance matrix in `docs/PLAN.md` as parser, transport, EDNS0, and TLS work changes status.
