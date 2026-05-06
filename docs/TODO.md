@@ -35,7 +35,7 @@ The containerized `make extract` command now completes and emits C/H files under
 
 - [ ] Remove all remaining `admit()` calls from protocol proofs, security gateway allocation, QUIC stream handling, multiplexer operations, recursive cache operations, sharded cache operations, and worker processing.
 - [ ] Replace `assume` uses with real refinements or lemmas, especially label casting in `DNS.Name` and `shard_permission` in `DNS.Cache.Sharded`.
-- [ ] Replace local mock interfaces under `spec/` with real Project Everest / Low* / Steel dependencies or explicitly documented trusted interfaces.
+- [x] Replace local mock interfaces under `spec/` with real Project Everest / Low* / Steel dependencies or explicitly documented trusted interfaces.
 - [ ] Replace placeholder functions that return fixed values, including client hello verification, AEAD decrypt success, QUIC length parsing, zone parsing, wildcard lookup, and bailiwick suffix checks.
 - [ ] Add or document the unverified shell boundary for socket/QUIC I/O, buffer ownership transfer, and scheduler/thread integration.
 - [/] Run extraction with KaRaMeL after implementation gaps are reduced, not only `make verify`. Current `make extract` completes, but generated C still carries non-Low* warning debt.
@@ -71,9 +71,9 @@ The containerized `make extract` command now completes and emits C/H files under
   - [x] add extraction to CI once warning debt is understood and acceptable.
 
   Extraction currently verifies all scaffold modules but only sends the current protocol/security/transport boundary to KaRaMeL. Verification-only parser tests and Phase 3/4 logic/concurrency scaffolds stay out of extraction until they are rewritten into Low* or explicitly marked as trusted/specification-only boundaries.
-- [ ] Replace local mock specs with real dependencies or documented trusted interfaces:
+- [x] Replace local mock specs with real dependencies or documented trusted interfaces:
   - [x] EverCrypt AEAD;
-  - [ ] EverCrypt cipher/helper interfaces;
+  - [x] EverCrypt cipher/helper interfaces;
   - [x] LowParse/Low* parser interfaces;
   - [x] Steel memory and Steel utility interfaces.
 - [ ] Make gateway allocation real by replacing the admitted plaintext buffer with verified Low* allocation/copying and explicit size/ownership proofs.
@@ -109,7 +109,7 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 *Goal: Secure transport tunnel using EverCrypt/EverQuic.*
 
 - [x] Define `crypto_context` for session state.
-- [/] Integrate EverCrypt for TLS 1.3 Handshake. Current `DNS.Security.Handshake` defines the state type and transitions, but `verify_client_hello` is a mock that always returns `true`; EverCrypt specs are local mocks.
+- [/] Integrate EverCrypt for TLS 1.3 Handshake. Current `DNS.Security.Handshake` defines the state type and transitions, but `verify_client_hello` is a mock that always returns `true`; EverCrypt specs are documented trusted bootstrap adapters.
 - [/] Implement `DNS.Security.Gateway` for authenticated decryption and immediate parsing. Current decrypt function always returns `Success` and plaintext allocation is admitted, but successful validation now parses the plaintext buffer instead of returning a dummy header.
 - [/] Implement `DNS.QUIC.StreamMapping` state machine (ReadingLength, ReadingMessage). State types exist, but `parse_u16_from_fragment` returns `0` and `handle_stream_data` is admitted.
 - [/] Implement Stream ID Multiplexer to handle concurrent streams. Types exist, but `find_stream`, `allocate_stream`, and `close_stream` are admitted.
