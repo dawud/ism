@@ -227,6 +227,17 @@ let parse_rdata_bytes rdlen input =
     assert (FStar.UInt32.v len32 == len);
     Some (FStar.Bytes.init len32 (fun i -> L.index rdata (FStar.UInt32.v i)), tail)
 
+val valid_rdata_length :
+  rtype:qtype ->
+  rdlen:FStar.UInt16.t ->
+  Tot bool
+
+let valid_rdata_length rtype rdlen =
+  match rtype with
+  | A -> rdlen = 4us
+  | AAAA -> rdlen = 16us
+  | _ -> true
+
 val parse_resource_record_bytes :
   input:list FStar.UInt8.t ->
   Tot (option (resource_record * list FStar.UInt8.t))
@@ -245,17 +256,21 @@ let parse_resource_record_bytes input =
           rdlen_hi :: rdlen_lo ::
           rdata_input ->
             let rdlen = u16_from_be rdlen_hi rdlen_lo in
-            match parse_rdata_bytes rdlen rdata_input with
-            | None -> None
-            | Some (rdata, tail) ->
-                Some ({
-                  name = name;
-                  rtype = u16_to_qtype (u16_from_be rt_hi rt_lo);
-                  rclass = u16_from_be rc_hi rc_lo;
-                  ttl = u32_from_be ttl_0 ttl_1 ttl_2 ttl_3;
-                  rdlen = rdlen;
-                  rdata = rdata;
-                }, tail)
+            let rtype = u16_to_qtype (u16_from_be rt_hi rt_lo) in
+            if valid_rdata_length rtype rdlen then
+              match parse_rdata_bytes rdlen rdata_input with
+              | None -> None
+              | Some (rdata, tail) ->
+                  Some ({
+                    name = name;
+                    rtype = rtype;
+                    rclass = u16_from_be rc_hi rc_lo;
+                    ttl = u32_from_be ttl_0 ttl_1 ttl_2 ttl_3;
+                    rdlen = rdlen;
+                    rdata = rdata;
+                  }, tail)
+            else
+              None
         | _ -> None
 
 val parse_resource_records_bytes :

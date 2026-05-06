@@ -328,6 +328,50 @@ let unknown_rr_type_parse_packet_test =
          | _ -> false)
     | None -> false)
 
+let invalid_a_rdata_length_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x03uy;
+    0x01uy; 0x02uy; 0x03uy
+  ]
+
+let invalid_a_rdata_length_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes invalid_a_rdata_length_dns_response == None)
+
+let invalid_aaaa_rdata_length_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x1cuy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x1cuy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x04uy;
+    0x20uy; 0x01uy; 0x0duy; 0xb8uy
+  ]
+
+let invalid_aaaa_rdata_length_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes invalid_aaaa_rdata_length_dns_response == None)
+
 let boundary_valid_single_question_dns_query_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_single_question_dns_query ==
                parse_dns_packet_bytes valid_single_question_dns_query)
@@ -348,15 +392,15 @@ let boundary_trailing_bytes_test =
   assert_norm (parse_dns_packet_bytes_at_boundary trailing_bytes_dns_query ==
                parse_dns_packet_bytes trailing_bytes_dns_query)
 
-let boundary_rejects_nonzero_answer_count_test =
+let boundary_rejects_malformed_answer_section_test =
   assert_norm (parse_dns_packet_bytes_at_boundary nonzero_answer_count_dns_query ==
                parse_dns_packet_bytes nonzero_answer_count_dns_query)
 
-let boundary_rejects_nonzero_authority_count_test =
+let boundary_rejects_malformed_authority_section_test =
   assert_norm (parse_dns_packet_bytes_at_boundary nonzero_authority_count_dns_query ==
                parse_dns_packet_bytes nonzero_authority_count_dns_query)
 
-let boundary_rejects_nonzero_additional_count_test =
+let boundary_rejects_malformed_additional_section_test =
   assert_norm (parse_dns_packet_bytes_at_boundary nonzero_additional_count_dns_query ==
                parse_dns_packet_bytes nonzero_additional_count_dns_query)
 
@@ -383,6 +427,14 @@ let boundary_rejects_truncated_rdata_test =
 let boundary_accepts_unknown_rr_type_test =
   assert_norm (parse_dns_packet_bytes_at_boundary unknown_rr_type_dns_response ==
                parse_dns_packet_bytes unknown_rr_type_dns_response)
+
+let boundary_rejects_invalid_a_rdata_length_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary invalid_a_rdata_length_dns_response ==
+               parse_dns_packet_bytes invalid_a_rdata_length_dns_response)
+
+let boundary_rejects_invalid_aaaa_rdata_length_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary invalid_aaaa_rdata_length_dns_response ==
+               parse_dns_packet_bytes invalid_aaaa_rdata_length_dns_response)
 
 let boundary_backend_status_test =
   assert_norm (active_parser_backend == EverParseGeneratedSubset /\
