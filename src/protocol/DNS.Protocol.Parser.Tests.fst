@@ -221,6 +221,113 @@ let malformed_compression_pointer_parse_question_test =
 let malformed_compression_pointer_parse_packet_test =
   assert_norm (parse_dns_packet_bytes malformed_compression_pointer_dns_query == None)
 
+let valid_single_answer_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x04uy;
+    0x01uy; 0x02uy; 0x03uy; 0x04uy
+  ]
+
+let valid_single_answer_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes valid_single_answer_dns_response with
+    | Some p ->
+        p.header.ancount == 1us /\
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.rtype == A /\
+             rr.rclass == 1us /\
+             rr.ttl == 60ul /\
+             rr.rdlen == 4us /\
+             FStar.Bytes.length rr.rdata == 4
+         | _ -> false)
+    | None -> false)
+
+let truncated_rr_header_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy
+  ]
+
+let truncated_rr_header_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes truncated_rr_header_dns_response == None)
+
+let truncated_rdata_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x04uy;
+    0x01uy; 0x02uy
+  ]
+
+let truncated_rdata_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes truncated_rdata_dns_response == None)
+
+let unknown_rr_type_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0xffuy; 0xfeuy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x01uy;
+    0x00uy; 0x02uy;
+    0xabuy; 0xcduy
+  ]
+
+let unknown_rr_type_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes unknown_rr_type_dns_response with
+    | Some p ->
+        L.length p.questions == 0 /\
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.rtype == UNKNOWN 0xfffeus /\
+             rr.rdlen == 2us /\
+             FStar.Bytes.length rr.rdata == 2
+         | _ -> false)
+    | None -> false)
+
 let boundary_valid_single_question_dns_query_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_single_question_dns_query ==
                parse_dns_packet_bytes valid_single_question_dns_query)
@@ -260,6 +367,22 @@ let boundary_accepts_unknown_qtype_test =
 let boundary_rejects_malformed_compression_pointer_test =
   assert_norm (parse_dns_packet_bytes_at_boundary malformed_compression_pointer_dns_query ==
                parse_dns_packet_bytes malformed_compression_pointer_dns_query)
+
+let boundary_accepts_single_answer_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary valid_single_answer_dns_response ==
+               parse_dns_packet_bytes valid_single_answer_dns_response)
+
+let boundary_rejects_truncated_rr_header_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary truncated_rr_header_dns_response ==
+               parse_dns_packet_bytes truncated_rr_header_dns_response)
+
+let boundary_rejects_truncated_rdata_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary truncated_rdata_dns_response ==
+               parse_dns_packet_bytes truncated_rdata_dns_response)
+
+let boundary_accepts_unknown_rr_type_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary unknown_rr_type_dns_response ==
+               parse_dns_packet_bytes unknown_rr_type_dns_response)
 
 let boundary_backend_status_test =
   assert_norm (active_parser_backend == EverParseGeneratedSubset /\

@@ -17,23 +17,32 @@ let parse_dns_packet_bytes_generated input =
   match parse_header_bytes input with
   | None -> None
   | Some (h, rest) ->
-      if h.ancount <> 0us || h.nscount <> 0us || h.arcount <> 0us then
-        None
-      else
-        let qd = FStar.UInt16.v h.qdcount in
-        match parse_questions_bytes qd qd rest with
-        | None -> None
-        | Some (qs, tail) ->
-            if L.length tail = 0 then
-              Some {
-                header = h;
-                questions = qs;
-                answers = [];
-                authorities = [];
-                additionals = [];
-              }
-            else
-              None
+      let qd = FStar.UInt16.v h.qdcount in
+      let an = FStar.UInt16.v h.ancount in
+      let ns = FStar.UInt16.v h.nscount in
+      let ar = FStar.UInt16.v h.arcount in
+      match parse_questions_bytes qd qd rest with
+      | None -> None
+      | Some (qs, after_questions) ->
+          match parse_resource_records_bytes an an after_questions with
+          | None -> None
+          | Some (answers, after_answers) ->
+              match parse_resource_records_bytes ns ns after_answers with
+              | None -> None
+              | Some (authorities, after_authorities) ->
+                  match parse_resource_records_bytes ar ar after_authorities with
+                  | None -> None
+                  | Some (additionals, tail) ->
+                      if L.length tail = 0 then
+                        Some {
+                          header = h;
+                          questions = qs;
+                          answers = answers;
+                          authorities = authorities;
+                          additionals = additionals;
+                        }
+                      else
+                        None
 
 val validate_dns_packet_bytes_generated :
   input:list FStar.UInt8.t ->

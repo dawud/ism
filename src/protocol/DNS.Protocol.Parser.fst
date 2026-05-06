@@ -6,6 +6,7 @@ open LowParse.Low.Base
 open DNS.Protocol
 open DNS.Constants
 module L = FStar.List.Tot
+module LPP = FStar.List.Pure.Properties
 
 (* --- Flag Mapping --- *)
 
@@ -41,6 +42,16 @@ let raw_header_to_header (r: raw_header) : header =
 
 let u16_from_be (hi:FStar.UInt8.t) (lo:FStar.UInt8.t) : FStar.UInt16.t =
   FStar.UInt16.uint_to_t (Prims.op_Addition (Prims.op_Multiply (FStar.UInt8.v hi) 256) (FStar.UInt8.v lo))
+
+let u32_from_be (b0:FStar.UInt8.t) (b1:FStar.UInt8.t) (b2:FStar.UInt8.t) (b3:FStar.UInt8.t) : FStar.UInt32.t =
+  FStar.UInt32.uint_to_t (
+    Prims.op_Addition
+      (Prims.op_Multiply (FStar.UInt8.v b0) 16777216)
+      (Prims.op_Addition
+        (Prims.op_Multiply (FStar.UInt8.v b1) 65536)
+        (Prims.op_Addition
+          (Prims.op_Multiply (FStar.UInt8.v b2) 256)
+          (FStar.UInt8.v b3))))
 
 val has_header_bytes :
   need:nat ->
@@ -199,6 +210,71 @@ let rec parse_questions_bytes fuel count input =
         | None -> None
         | Some (qs, tail) -> Some (q :: qs, tail)
 
+val parse_rdata_bytes :
+  rdlen:FStar.UInt16.t ->
+  input:list FStar.UInt8.t ->
+  Tot (option (FStar.Bytes.bytes * list FStar.UInt8.t))
+
+let parse_rdata_bytes rdlen input =
+  let len = FStar.UInt16.v rdlen in
+  if L.length input < len then
+    None
+  else
+    let (rdata, tail) = L.splitAt len input in
+    LPP.splitAt_length len input;
+    assert (L.length rdata == len);
+    let len32 = FStar.UInt32.uint_to_t len in
+    assert (FStar.UInt32.v len32 == len);
+    Some (FStar.Bytes.init len32 (fun i -> L.index rdata (FStar.UInt32.v i)), tail)
+
+val parse_resource_record_bytes :
+  input:list FStar.UInt8.t ->
+  Tot (option (resource_record * list FStar.UInt8.t))
+
+let parse_resource_record_bytes input =
+  match DNS.Name.parse_qname 128 input with
+  | None -> None
+  | Some (name, rest) ->
+      if L.length rest < 10 then
+        None
+      else
+        match rest with
+        | rt_hi :: rt_lo ::
+          rc_hi :: rc_lo ::
+          ttl_0 :: ttl_1 :: ttl_2 :: ttl_3 ::
+          rdlen_hi :: rdlen_lo ::
+          rdata_input ->
+            let rdlen = u16_from_be rdlen_hi rdlen_lo in
+            match parse_rdata_bytes rdlen rdata_input with
+            | None -> None
+            | Some (rdata, tail) ->
+                Some ({
+                  name = name;
+                  rtype = u16_to_qtype (u16_from_be rt_hi rt_lo);
+                  rclass = u16_from_be rc_hi rc_lo;
+                  ttl = u32_from_be ttl_0 ttl_1 ttl_2 ttl_3;
+                  rdlen = rdlen;
+                  rdata = rdata;
+                }, tail)
+        | _ -> None
+
+val parse_resource_records_bytes :
+  fuel:nat ->
+  count:nat ->
+  input:list FStar.UInt8.t ->
+  Tot (option (list resource_record * list FStar.UInt8.t)) (decreases fuel)
+
+let rec parse_resource_records_bytes fuel count input =
+  if count = 0 then Some ([], input)
+  else if fuel = 0 then None
+  else
+    match parse_resource_record_bytes input with
+    | None -> None
+    | Some (rr, rest) ->
+        match parse_resource_records_bytes (fuel - 1) (count - 1) rest with
+        | None -> None
+        | Some (rrs, tail) -> Some (rr :: rrs, tail)
+
 val parse_dns_packet_bytes :
   input:list FStar.UInt8.t ->
   Tot (option dns_packet)
@@ -207,25 +283,32 @@ let parse_dns_packet_bytes input =
   match parse_header_bytes input with
   | None -> None
   | Some (h, rest) ->
-      (* This first concrete parser closes the header/question boundary.
-         RR section parsing remains intentionally rejected until implemented. *)
-      if h.ancount <> 0us || h.nscount <> 0us || h.arcount <> 0us then
-        None
-      else
-        let qd = FStar.UInt16.v h.qdcount in
-        match parse_questions_bytes qd qd rest with
-        | None -> None
-        | Some (qs, tail) ->
-            if L.length tail = 0 then
-              Some {
-                header = h;
-                questions = qs;
-                answers = [];
-                authorities = [];
-                additionals = [];
-              }
-            else
-              None
+      let qd = FStar.UInt16.v h.qdcount in
+      let an = FStar.UInt16.v h.ancount in
+      let ns = FStar.UInt16.v h.nscount in
+      let ar = FStar.UInt16.v h.arcount in
+      match parse_questions_bytes qd qd rest with
+      | None -> None
+      | Some (qs, after_questions) ->
+          match parse_resource_records_bytes an an after_questions with
+          | None -> None
+          | Some (answers, after_answers) ->
+              match parse_resource_records_bytes ns ns after_answers with
+              | None -> None
+              | Some (authorities, after_authorities) ->
+                  match parse_resource_records_bytes ar ar after_authorities with
+                  | None -> None
+                  | Some (additionals, tail) ->
+                      if L.length tail = 0 then
+                        Some {
+                          header = h;
+                          questions = qs;
+                          answers = answers;
+                          authorities = authorities;
+                          additionals = additionals;
+                        }
+                      else
+                        None
 
 let validate_dns_packet_bytes (input:list FStar.UInt8.t) : bool =
   match parse_dns_packet_bytes input with
