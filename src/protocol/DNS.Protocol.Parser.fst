@@ -10,18 +10,18 @@ module L = FStar.List.Tot
 (* --- Flag Mapping --- *)
 
 let uint16_to_flags (raw_flags: FStar.UInt16.t) : dns_flags =
-  let open FStar.UInt16 in
+  let raw = FStar.UInt16.v raw_flags in
   {
-    qr     = (raw_flags >>^ 15ul) = 1us;
-    opcode = (raw_flags >>^ 11ul) %^ 16us;
-    aa     = (raw_flags >>^ 10ul) %^ 2us = 1us;
-    tc     = (raw_flags >>^ 9ul) %^ 2us = 1us;
-    rd     = (raw_flags >>^ 8ul) %^ 2us = 1us;
-    ra     = (raw_flags >>^ 7ul) %^ 2us = 1us;
-    z      = (raw_flags >>^ 6ul) %^ 2us = 1us;
-    ad     = (raw_flags >>^ 5ul) %^ 2us = 1us;
-    cd     = (raw_flags >>^ 4ul) %^ 2us = 1us;
-    rcode  = raw_flags %^ 16us;
+    qr     = raw / 32768 = 1;
+    opcode = FStar.UInt16.uint_to_t ((raw / 2048) % 16);
+    aa     = (raw / 1024) % 2 = 1;
+    tc     = (raw / 512) % 2 = 1;
+    rd     = (raw / 256) % 2 = 1;
+    ra     = (raw / 128) % 2 = 1;
+    z      = (raw / 64) % 2 = 1;
+    ad     = (raw / 32) % 2 = 1;
+    cd     = (raw / 16) % 2 = 1;
+    rcode  = FStar.UInt16.uint_to_t (raw % 16);
   }
 
 (* --- Header Parser --- *)
@@ -313,22 +313,51 @@ let lemma_parse_dns_packet_buffer_safe_prefix buffer len =
 
 val flags_to_uint16 (f: dns_flags) : FStar.UInt16.t
 let flags_to_uint16 f =
-  let open FStar.UInt16 in
-  (if f.qr then 1us <<^ 15ul else 0us) |^
-  ((f.opcode %^ 16us) <<^ 11ul) |^
-  (if f.aa then 1us <<^ 10ul else 0us) |^
-  (if f.tc then 1us <<^ 9ul else 0us) |^
-  (if f.rd then 1us <<^ 8ul else 0us) |^
-  (if f.ra then 1us <<^ 7ul else 0us) |^
-  (if f.z  then 1us <<^ 6ul else 0us) |^
-  (if f.ad then 1us <<^ 5ul else 0us) |^
-  (if f.cd then 1us <<^ 4ul else 0us) |^
-  (f.rcode %^ 16us)
+  let qr     = if f.qr then 32768 else 0 in
+  let opcode = Prims.op_Multiply (FStar.UInt16.v f.opcode) 2048 in
+  let aa     = if f.aa then 1024 else 0 in
+  let tc     = if f.tc then 512 else 0 in
+  let rd     = if f.rd then 256 else 0 in
+  let ra     = if f.ra then 128 else 0 in
+  let z      = if f.z  then 64 else 0 in
+  let ad     = if f.ad then 32 else 0 in
+  let cd     = if f.cd then 16 else 0 in
+  FStar.UInt16.uint_to_t (qr + opcode + aa + tc + rd + ra + z + ad + cd + FStar.UInt16.v f.rcode)
 
 val lemma_flags_invertible : f_in:FStar.UInt16.t -> 
   Lemma (ensures (flags_to_uint16 (uint16_to_flags f_in) == f_in))
 let lemma_flags_invertible f_in =
-  admit()
+  let raw = FStar.UInt16.v f_in in
+  FStar.Math.Lemmas.euclidean_division_definition raw 32768;
+  FStar.Math.Lemmas.modulo_range_lemma raw 32768;
+  FStar.Math.Lemmas.modulo_division_lemma raw 2048 16;
+  FStar.Math.Lemmas.modulo_modulo_lemma raw 2048 16;
+  FStar.Math.Lemmas.euclidean_division_definition (raw % 32768) 2048;
+  FStar.Math.Lemmas.modulo_division_lemma raw 1024 2;
+  FStar.Math.Lemmas.modulo_modulo_lemma raw 1024 2;
+  FStar.Math.Lemmas.euclidean_division_definition (raw % 2048) 1024;
+  FStar.Math.Lemmas.modulo_division_lemma raw 512 2;
+  FStar.Math.Lemmas.modulo_modulo_lemma raw 512 2;
+  FStar.Math.Lemmas.euclidean_division_definition (raw % 1024) 512;
+  FStar.Math.Lemmas.modulo_division_lemma raw 256 2;
+  FStar.Math.Lemmas.modulo_modulo_lemma raw 256 2;
+  FStar.Math.Lemmas.euclidean_division_definition (raw % 512) 256;
+  FStar.Math.Lemmas.modulo_division_lemma raw 128 2;
+  FStar.Math.Lemmas.modulo_modulo_lemma raw 128 2;
+  FStar.Math.Lemmas.euclidean_division_definition (raw % 256) 128;
+  FStar.Math.Lemmas.modulo_division_lemma raw 64 2;
+  FStar.Math.Lemmas.modulo_modulo_lemma raw 64 2;
+  FStar.Math.Lemmas.euclidean_division_definition (raw % 128) 64;
+  FStar.Math.Lemmas.modulo_division_lemma raw 32 2;
+  FStar.Math.Lemmas.modulo_modulo_lemma raw 32 2;
+  FStar.Math.Lemmas.euclidean_division_definition (raw % 64) 32;
+  FStar.Math.Lemmas.modulo_division_lemma raw 16 2;
+  FStar.Math.Lemmas.modulo_modulo_lemma raw 16 2;
+  FStar.Math.Lemmas.euclidean_division_definition (raw % 32) 16;
+  assert (raw / 32768 == 0 \/ raw / 32768 == 1);
+  assert ((if raw / 32768 = 1 then 32768 else 0) == Prims.op_Multiply (raw / 32768) 32768);
+  assert (FStar.UInt16.v (flags_to_uint16 (uint16_to_flags f_in)) == raw);
+  FStar.UInt16.v_inj (flags_to_uint16 (uint16_to_flags f_in)) f_in
 
 let has_dns_header_length (len:FStar.UInt32.t) : bool =
   FStar.UInt32.v len >= 12

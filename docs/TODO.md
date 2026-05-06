@@ -33,7 +33,7 @@ The containerized `make extract` command now completes and emits C/H files under
 
 ## Proof Debt / Trusted Gaps
 
-- [ ] Remove all remaining `admit()` calls from protocol proofs, QUIC stream handling, multiplexer operations, recursive cache operations, sharded cache operations, and worker processing.
+- [ ] Remove all remaining `admit()` calls from QUIC stream handling, multiplexer operations, recursive cache operations, sharded cache operations, and worker processing.
 - [ ] Replace `assume` uses with real refinements or lemmas, especially label casting in `DNS.Name` and `shard_permission` in `DNS.Cache.Sharded`.
 - [x] Replace local mock interfaces under `spec/` with real Project Everest / Low* / Steel dependencies or explicitly documented trusted interfaces.
 - [ ] Replace placeholder functions that return fixed values, including client hello verification, AEAD decrypt success, QUIC length parsing, zone parsing, wildcard lookup, and bailiwick suffix checks.
@@ -92,7 +92,7 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 - [x] Parse DNS header fields from bytes instead of constructing dummy zero headers.
 - [x] Parse at least the question section with length-safe QNAME/QTYPE/QCLASS handling.
 - [x] Remove the dummy zero-header return from `DNS.Security.Gateway`; successful decrypt now parses the Low* plaintext buffer and returns the parsed packet header.
-- [/] Add proof obligations for header and question length safety. The parser is total and rejects short inputs structurally; stronger named lemmas remain to be added.
+- [x] Add proof obligations for header and question length safety. The parser is total, rejects short inputs structurally, and has admitted-free named lemmas for header, question, buffer parsing, and flag round-tripping.
 - [x] Re-run containerized `make verify` after each parser closure step.
 
 ## Phase 1: Formalized Wire Format & Verified Parsing
@@ -103,7 +103,7 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 - [/] Implement `DNS.Protocol.header_validator` and `header_reader` using EverParse. Current code has pure byte-list header parsing, a verified Low* buffer reader, and an `EverParseBoundary` module that delegates to the reference parser; no generated EverParse header reader is present yet.
 - [/] Implement recursive `parse_qname` with fuel-based termination for name compression. Current code parses uncompressed labels, enforces the 255-byte DNS name length budget, and rejects compression pointers.
 - [/] Implement full `DNS_Packet` parser (Header + Question + RR sections). Current `DNS.Protocol.Parser` parses header and question sections from byte lists, rejects non-empty RR sections, and the gateway no longer returns a dummy zero header.
-- [/] **Validation:** Prove parser is "parser-rejecting" for malformed inputs. Current name/header proofs are admitted-free, but broader packet/RR parser obligations remain incomplete.
+- [/] **Validation:** Prove parser is "parser-rejecting" for malformed inputs. Current name/header/question/buffer proofs are admitted-free, but broader RR parser obligations remain incomplete because RR parsing is not implemented yet.
 
 ## Phase 2: DoQ Transport Layer (QUIC + TLS 1.3)
 *Goal: Secure transport tunnel using EverCrypt/EverQuic.*
