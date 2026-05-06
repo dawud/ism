@@ -59,7 +59,7 @@ val close_stream :
     id:FStar.UInt64.t -> 
     ST unit
       (requires (fun h0 -> True))
-      (ensures (fun h0 _ h1 -> True))
+      (ensures (fun h0 _ h1 -> modifies_none h0 h1))
 
 let close_stream conn_ptr id =
-  admit()
+  ()
