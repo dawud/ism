@@ -2,21 +2,25 @@ module DNS.Protocol.Parser.EverParseBoundary
 
 open DNS.Protocol
 open DNS.Protocol.Parser
+open DNS.Protocol.Parser.EverParseGenerated
 
 type parser_backend =
   | ReferenceBootstrap
+  | EverParseGeneratedSubset
   | EverParseGenerated
 
-let active_parser_backend : parser_backend = ReferenceBootstrap
+let active_parser_backend : parser_backend = EverParseGeneratedSubset
 
 let everparse_generated_parser_available : bool = false
+
+let everparse_subset_boundary_available : bool = true
 
 val parse_dns_packet_bytes_at_boundary :
   input:list FStar.UInt8.t ->
   Tot (option dns_packet)
 
 let parse_dns_packet_bytes_at_boundary input =
-  parse_dns_packet_bytes input
+  parse_dns_packet_bytes_generated input
 
 val validate_dns_packet_bytes_at_boundary :
   input:list FStar.UInt8.t ->
@@ -33,4 +37,4 @@ val lemma_boundary_matches_reference :
                   parse_dns_packet_bytes input))
 
 let lemma_boundary_matches_reference input =
-  ()
+  lemma_generated_matches_reference input

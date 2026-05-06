@@ -229,10 +229,39 @@ let boundary_truncated_dns_header_test =
   assert_norm (parse_dns_packet_bytes_at_boundary truncated_dns_header ==
                parse_dns_packet_bytes truncated_dns_header)
 
+let boundary_truncated_qname_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary truncated_qname_dns_query ==
+               parse_dns_packet_bytes truncated_qname_dns_query)
+
+let boundary_invalid_label_length_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary invalid_label_length_dns_query ==
+               parse_dns_packet_bytes invalid_label_length_dns_query)
+
+let boundary_trailing_bytes_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary trailing_bytes_dns_query ==
+               parse_dns_packet_bytes trailing_bytes_dns_query)
+
+let boundary_rejects_nonzero_answer_count_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary nonzero_answer_count_dns_query ==
+               parse_dns_packet_bytes nonzero_answer_count_dns_query)
+
+let boundary_rejects_nonzero_authority_count_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary nonzero_authority_count_dns_query ==
+               parse_dns_packet_bytes nonzero_authority_count_dns_query)
+
+let boundary_rejects_nonzero_additional_count_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary nonzero_additional_count_dns_query ==
+               parse_dns_packet_bytes nonzero_additional_count_dns_query)
+
+let boundary_accepts_unknown_qtype_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary unknown_qtype_dns_query ==
+               parse_dns_packet_bytes unknown_qtype_dns_query)
+
 let boundary_rejects_malformed_compression_pointer_test =
   assert_norm (parse_dns_packet_bytes_at_boundary malformed_compression_pointer_dns_query ==
                parse_dns_packet_bytes malformed_compression_pointer_dns_query)
 
 let boundary_backend_status_test =
-  assert_norm (active_parser_backend == ReferenceBootstrap /\
+  assert_norm (active_parser_backend == EverParseGeneratedSubset /\
+               everparse_subset_boundary_available == true /\
                everparse_generated_parser_available == false)

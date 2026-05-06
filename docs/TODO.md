@@ -81,7 +81,7 @@ The containerized `make extract` command now completes and emits C/H files under
 - [ ] Execute parser strategy decision:
   - [x] Keep the handwritten F*/Low* parser as the bootstrap/reference parser.
   - [x] Add tests against the handwritten reference parser.
-  - [ ] Integrate an EverParse-generated parser/serializer as the production target.
+  - [/] Integrate an EverParse-generated parser/serializer as the production target. Current work adds a production-target boundary candidate for the implemented header/question subset and runs the shared parser fixtures through that boundary; external EverParse generation is not wired in yet.
   - [ ] Replace the handwritten parser or document/prove behavioral equivalence before Phase 1 is production-ready.
 
 ## Next Technical Milestone
@@ -100,7 +100,7 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 
 - [x] Define basic DNS types (Header, Flags, QType, QName).
 - [x] Implement RFC-assigned integer mapping for all 43+ record types.
-- [/] Implement `DNS.Protocol.header_validator` and `header_reader` using EverParse. Current code has pure byte-list header parsing, a verified Low* buffer reader, and an `EverParseBoundary` module that delegates to the reference parser; no generated EverParse header reader is present yet.
+- [/] Implement `DNS.Protocol.header_validator` and `header_reader` using EverParse. Current code has pure byte-list header parsing, a verified Low* buffer reader, and an `EverParseBoundary` module that routes through a production-target subset boundary matching the reference parser; no external generated EverParse header reader is present yet.
 - [/] Implement recursive `parse_qname` with fuel-based termination for name compression. Current code parses uncompressed labels, enforces the 255-byte DNS name length budget, and rejects compression pointers.
 - [/] Implement full `DNS_Packet` parser (Header + Question + RR sections). Current `DNS.Protocol.Parser` parses header and question sections from byte lists, rejects non-empty RR sections, and the gateway no longer returns a dummy zero header.
 - [/] **Validation:** Prove parser is "parser-rejecting" for malformed inputs. Current name/header/question/buffer proofs are admitted-free, but broader RR parser obligations remain incomplete because RR parsing is not implemented yet.
