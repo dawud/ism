@@ -11,7 +11,7 @@ This document outlines the design, architecture, and phased implementation of a 
 
 ## 2. High-Level Architecture
 
-The server follows a "Defensive Ring" architecture, separating the unverified I/O shell from the verified logic core.
+The server follows a "Defensive Ring" architecture, separating the unverified I/O shell from the verified logic core. See [DECISIONS.md](DECISIONS.md) for the accepted architecture and trusted-boundary decisions.
 
 ### Architectural Layers
 1. **Unverified Shell (C):** Handles POSIX sockets, thread scheduling, and initial UDP packet reception.
@@ -24,29 +24,15 @@ The server follows a "Defensive Ring" architecture, separating the unverified I/
 
 ## 3. Implementation Roadmap
 
-Roadmap status is tracked in terms of maturity, not only feature names. A feature can be modeled and verified while still relying on trusted assumptions, local mocks, or incomplete executable behavior.
-
-### Maturity Levels
-- **Modeled:** The F* types and high-level state transitions exist.
-- **Verified scaffold:** `make verify` succeeds for the obligations currently written.
-- **Implemented with caveats:** Executable behavior exists, but some `admit()`, `assume`, mocks, placeholders, or incomplete semantics remain.
-- **Extracted:** KaRaMeL extraction succeeds for the relevant code.
-- **Integrated:** The extracted code is connected to the unverified shell or external dependency boundary.
-- **Production-ready:** Trusted gaps are explicitly documented or removed, tests cover representative behavior, extraction is checked, and the feature has a clear audit trail.
+Roadmap status is tracked in terms of maturity, not only feature names. The maturity levels are defined in [DECISIONS.md](DECISIONS.md).
 
 ### Phase Definition of Done
-Each phase should only be considered complete when all of the following are true:
-- No phase-critical `admit()` or `assume` remains.
-- Any remaining trusted dependency is documented in the threat model.
-- The code verifies with the containerized `make verify` command.
-- The code extracts with KaRaMeL, or the non-extractable part is explicitly marked as specification-only.
-- Representative positive and negative tests exist.
-- The corresponding RFC compliance rows are updated.
+Phase completion gates are recorded in [DECISIONS.md](DECISIONS.md). Keep this roadmap aligned with those gates when updating phase status.
 
 ### Phase 1: Formalized Wire Format & Verified Parsing
 *Goal: Create a zero-copy, verified parser and serializer for modern DNS messages.*
 - **Scope:** RFC 1035 (Core), RFC 3597 (Unknown RRs), RFC 6891 (EDNS0).
-- **Parser Strategy:** EverParse is the long-term production parser/serializer target. The handwritten F*/Low* parser is a bootstrap/reference parser for closing DNS semantics, developing tests, and validating the Low* buffer boundary. Before Phase 1 is production-ready, the project must either replace the handwritten parser with an EverParse-generated parser or prove/document behavioral equivalence between the generated parser and the handwritten reference.
+- **Parser Strategy:** The handwritten parser is the bootstrap/reference parser; EverParse remains the production target. See [DECISIONS.md](DECISIONS.md).
 - **Tasks:**
   - Define `DNS_Packet`, `Header`, `Question`, and 43+ `Resource Record` types in F*.
   - Implement bidirectional mapping between F* sum types and IANA numeric constants.
@@ -102,54 +88,27 @@ Each phase should only be considered complete when all of the following are true
 ---
 
 ## 4. Technical Stack
-| Component | Technology | Rationale |
-| :--- | :--- | :--- |
-| **Language** | F* / Low* | Formal verification with C extraction capability. |
-| **Cryptography** | EverCrypt (HACL*) | Verified, constant-time primitives. |
-| **Parsing** | EverParse | Correct-by-construction parser generation. |
-| **QUIC/TLS** | EverQuic / miTLS | Verified implementations of transport security. |
-| **Concurrency** | Steel | Separation logic for thread safety proofs. |
-| **Compiler** | CompCert | High-assurance C compilation. |
+The accepted stack decision is recorded in [DECISIONS.md](DECISIONS.md).
 
 ---
 
 ## 5. Verification, Extraction, and CI
 
-The project should run verification and extraction as separate gates:
-- `make verify`: checks the F* obligations currently written.
-- `make extract`: checks that verified Low*/F* code can be emitted as C through KaRaMeL.
-- CI should run the containerized `make verify` on every change.
-- CI should add `make extract` as soon as extraction blockers are isolated or resolved.
-- A verification pass with `admit()`, `assume`, or local mocks is acceptable for scaffolding, but the corresponding proof debt must remain visible in `TODO.md` and the threat model.
+Verification and extraction are separate gates. Current extraction is a generated-artifact smoke test until warning-15 debt is classified and reduced. See [DECISIONS.md](DECISIONS.md).
 
-Current extraction status: `make extract` completes in the pinned container and emits generated C/H files under `dist/`. This is a useful smoke test, but KaRaMeL reports many warning-15 diagnostics because large parts of the scaffold use GC-backed lists, mathematical integers, or specification-oriented definitions that are not Low*. Before extraction becomes a production gate, classify each warning as one of:
-- intended specification-only code to mark `noextract` or remove from reachable bundles;
-- executable code that must be rewritten into the Low* subset;
-- code that can temporarily use KaRaMeL compatibility headers;
-- code that should move behind generated EverParse or trusted adapter boundaries.
+The current warning-15 debt is concentrated in the executable scaffold rather than the proof-only obligations:
+- GC-backed lists and other specification types in `DNS.Name`, `DNS.Protocol`, `DNS.Recursive.*`, `DNS.Zone.*`, and `DNS.Cache.*`;
+- mathematical integers and runtime-checking helpers in shard, cache, zone, and recursive-security code;
+- compatibility-header dependencies that KaRaMeL still pulls in from the F* standard library;
+- trusted-adapter boundaries that should stay visible until the generated EverParse or Low* replacement exists.
 
 ### F* Release Policy
 
-The main development lane is pinned to F* `v2026.03.24`. This is the project's legacy Low*/KaRaMeL compatibility baseline and should remain the default until the codebase no longer depends on the old Low* APIs.
-
-F* `v2026.04.17` removed the old Low* sublanguage and introduced Pulse as the new imperative separation-logic direction. Later weekly releases, including `v2026.05.03`, should be monitored, but adopting them is a migration project rather than a routine version bump.
-
-Release management should use two lanes:
-- **Stable lane:** pinned `v2026.03.24`, blocking for normal development, `make verify`, and eventually `make extract`.
-- **Next lane:** latest F* weekly release, non-blocking, allowed to fail while Low*/Pulse/EverParse migration work is open.
-
-Promotion from the next lane to the stable lane requires:
-- verification succeeds without relying on new undocumented assumptions;
-- extraction strategy is clear for all executable Low*/F*/Pulse code;
-- local mocks and trusted adapters are reviewed against the new library contracts;
-- the threat model's trusted-boundary inventory is updated;
-- parser strategy remains aligned with the EverParse production target.
-
-Review upstream F* releases on a scheduled cadence, such as quarterly, instead of automatically chasing weekly releases.
+The stable lane is pinned to F* `v2026.03.24` while old Low* APIs remain in use. Track newer F* releases in a non-blocking migration lane. See [DECISIONS.md](DECISIONS.md).
 
 ## 6. Parser and Protocol Test Plan
 
-The parser should have executable tests even while larger extraction and integration work is ongoing. Initial tests should cover:
+Parser-test policy is recorded in [DECISIONS.md](DECISIONS.md). Initial tests should cover:
 - valid single-question DNS query;
 - truncated header;
 - truncated QNAME;
@@ -163,7 +122,7 @@ These tests should eventually run against both the pure parser and the Low* buff
 
 ## 7. RFC Compliance Matrix
 
-Maintain a compliance matrix for each protocol area:
+Maintain a compliance matrix for each protocol area. See [DECISIONS.md](DECISIONS.md).
 
 | RFC | Section | Requirement | Status | Proof/Test Coverage | Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- |

@@ -44,18 +44,18 @@ The containerized `make extract` command now completes and emits C/H files under
 ## Near-Term Technical Work
 
 - [ ] Maintain F* release policy:
-  - [ ] Keep the stable container pinned to F* `v2026.03.24` while Low* APIs remain in use.
+  - [x] Keep the stable container pinned to F* `v2026.03.24` while Low* APIs remain in use.
   - [ ] Add a non-blocking latest-F* migration container or CI lane.
   - [ ] Test F* weekly releases in the migration lane on a scheduled cadence.
   - [ ] Decide whether post-Low* migration means Pulse, EverParse-generated C boundaries, or a legacy Low* toolchain.
   - [ ] Promote a newer F* only after verification, extraction strategy, trusted-boundary review, and parser strategy are all clear.
-- [ ] Remove parser proof debt:
+- [x] Remove parser proof debt:
   - [x] Replace `DNS.Name.cast_to_label`'s `assume` with a checked constructor path.
   - [x] Finish `DNS.Name.lemma_parser_rejecting` without `admit()`.
   - [x] Add named safety lemmas for `parse_header_bytes`.
   - [x] Add named safety lemmas for `parse_question_bytes`.
   - [x] Add named safety lemmas for `parse_dns_packet_buffer`.
-- [ ] Add parser tests:
+- [x] Add parser tests:
   - [x] valid single-question DNS query;
   - [x] truncated header;
   - [x] truncated QNAME;
@@ -66,7 +66,7 @@ The containerized `make extract` command now completes and emits C/H files under
   - [x] malformed compression pointers rejected until compression support is implemented.
 - [/] Add extraction as a routine build gate:
   - [x] run `make extract` in the container;
-  - [ ] separate extraction blockers from verification blockers;
+  - [x] separate extraction blockers from verification blockers;
   - [ ] classify and reduce warning-15 non-Low* extraction debt;
   - [ ] add extraction to CI once warning debt is understood and acceptable.
 - [ ] Replace local mock specs with real dependencies or documented trusted interfaces:
