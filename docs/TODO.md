@@ -33,7 +33,7 @@ The containerized `make extract` command now completes and emits C/H files under
 
 ## Proof Debt / Trusted Gaps
 
-- [ ] Remove all remaining `admit()` calls from protocol proofs, security gateway allocation, QUIC stream handling, multiplexer operations, recursive cache operations, sharded cache operations, and worker processing.
+- [ ] Remove all remaining `admit()` calls from protocol proofs, QUIC stream handling, multiplexer operations, recursive cache operations, sharded cache operations, and worker processing.
 - [ ] Replace `assume` uses with real refinements or lemmas, especially label casting in `DNS.Name` and `shard_permission` in `DNS.Cache.Sharded`.
 - [x] Replace local mock interfaces under `spec/` with real Project Everest / Low* / Steel dependencies or explicitly documented trusted interfaces.
 - [ ] Replace placeholder functions that return fixed values, including client hello verification, AEAD decrypt success, QUIC length parsing, zone parsing, wildcard lookup, and bailiwick suffix checks.
@@ -76,7 +76,7 @@ The containerized `make extract` command now completes and emits C/H files under
   - [x] EverCrypt cipher/helper interfaces;
   - [x] LowParse/Low* parser interfaces;
   - [x] Steel memory and Steel utility interfaces.
-- [ ] Make gateway allocation real by replacing the admitted plaintext buffer with verified Low* allocation/copying and explicit size/ownership proofs.
+- [x] Make gateway allocation real by replacing the admitted plaintext buffer with verified Low* allocation/copying and explicit size/ownership proofs.
 - [x] Maintain the RFC compliance matrix in `docs/PLAN.md` as parser, transport, EDNS0, and TLS work changes status.
 - [ ] Execute parser strategy decision:
   - [x] Keep the handwritten F*/Low* parser as the bootstrap/reference parser.
@@ -110,11 +110,11 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 
 - [x] Define `crypto_context` for session state.
 - [/] Integrate EverCrypt for TLS 1.3 Handshake. Current `DNS.Security.Handshake` defines the state type and transitions, but `verify_client_hello` is a mock that always returns `true`; EverCrypt specs are documented trusted bootstrap adapters.
-- [/] Implement `DNS.Security.Gateway` for authenticated decryption and immediate parsing. Current decrypt function always returns `Success` and plaintext allocation is admitted, but successful validation now parses the plaintext buffer instead of returning a dummy header.
+- [/] Implement `DNS.Security.Gateway` for authenticated decryption and immediate parsing. Current decrypt function always returns `Success`, but the gateway now copies the bounded ciphertext range into a concrete Low* plaintext workspace before parsing it instead of admitting allocation.
 - [/] Implement `DNS.QUIC.StreamMapping` state machine (ReadingLength, ReadingMessage). State types exist, but `parse_u16_from_fragment` returns `0` and `handle_stream_data` is admitted.
 - [/] Implement Stream ID Multiplexer to handle concurrent streams. Types exist, but `find_stream`, `allocate_stream`, and `close_stream` are admitted.
 - [x] Implement EDNS0 (OPT) handling with padding for traffic analysis protection. Current `calculate_padding_len` handles zero block size and computes block padding; OPT parsing/serialization is not implemented.
-- [/] **Validation:** Prove query authenticity (decryption success implies integrity). Current code models the boundary but uses mock AEAD success and admitted allocation, so authenticity is not proven against real crypto.
+- [/] **Validation:** Prove query authenticity (decryption success implies integrity). Current code models the boundary but uses mock AEAD success, so authenticity is not proven against real crypto.
 
 ## Phase 3: Verified Core Logic & Backend
 *Goal: Functional correctness of lookup and response generation.*
