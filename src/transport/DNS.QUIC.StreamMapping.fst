@@ -49,8 +49,23 @@ val handle_stream_data :
     data:buffer FStar.UInt8.t -> 
     len:FStar.UInt32.t -> 
     ST stream_phase
-      (requires (fun h0 -> True)) 
-      (ensures (fun h0 _ h1 -> True))
+      (requires (fun h0 ->
+        live h0 ctx_ptr /\
+        LowStar.Buffer.length ctx_ptr >= 1 /\
+        live h0 data /\
+        FStar.UInt32.v len <= LowStar.Buffer.length data))
+      (ensures (fun h0 _ h1 -> modifies_none h0 h1))
 
 let handle_stream_data ctx_ptr data len =
-  admit()
+  let ctx = LowStar.Buffer.index ctx_ptr 0ul in
+  match ctx.sc_phase with
+  | ReadingLength _ ->
+      if FStar.UInt32.v len >= 2 then
+        begin
+          assert (LowStar.Buffer.length data >= 2);
+          let expected = parse_u16_from_fragment data in
+          ReadingMessage (expected, 0ul)
+        end
+      else
+        ctx.sc_phase
+  | _ -> ctx.sc_phase
