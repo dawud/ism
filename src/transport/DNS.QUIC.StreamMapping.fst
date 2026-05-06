@@ -92,6 +92,22 @@ let advance_message expected current incoming =
       ReadingMessage (expected, FStar.UInt32.uint_to_t total_len)
     end
 
+val remaining_message : expected:FStar.UInt16.t -> current:FStar.UInt32.t -> Tot FStar.UInt32.t
+let remaining_message expected current =
+  if FStar.UInt32.v current >= FStar.UInt16.v expected then
+    0ul
+  else
+    begin
+      let n = FStar.UInt16.v expected - FStar.UInt32.v current in
+      assert (n <= FStar.UInt16.v expected);
+      assert (n < 65536);
+      FStar.UInt32.uint_to_t n
+    end
+
+val bounded_copy_len : available:FStar.UInt32.t -> wanted:FStar.UInt32.t -> Tot FStar.UInt32.t
+let bounded_copy_len available wanted =
+  if FStar.UInt32.v available < FStar.UInt32.v wanted then available else wanted
+
 val next_stream_phase :
     ctx:stream_context ->
     data:buffer FStar.UInt8.t ->
@@ -135,6 +151,81 @@ let next_stream_phase ctx data len =
       advance_message expected current len
   | _ -> ctx.sc_phase
 
+val copy_body_bytes :
+    ctx:stream_context ->
+    data:buffer FStar.UInt8.t ->
+    len:FStar.UInt32.t ->
+    ST unit
+      (requires (fun h0 ->
+        live h0 ctx.sc_buf /\
+        LowStar.Buffer.length ctx.sc_buf >= 65535 /\
+        live h0 data /\
+        disjoint data ctx.sc_buf /\
+        FStar.UInt32.v len <= LowStar.Buffer.length data))
+      (ensures (fun h0 _ h1 ->
+        modifies (loc_buffer ctx.sc_buf) h0 h1 /\
+        live h1 ctx.sc_buf))
+
+let copy_body_bytes ctx data len =
+  match ctx.sc_phase with
+  | ReadingLength acc ->
+      if FStar.UInt32.v acc > 0 then
+        if FStar.UInt32.v len >= 1 then
+          begin
+            assert (LowStar.Buffer.length data >= 1);
+            let lo = LowStar.Buffer.index data 0ul in
+            let expected = u16_from_stored_high acc lo in
+            let available = body_bytes_after_stored_prefix len in
+            let wanted = remaining_message expected 0ul in
+            let count = bounded_copy_len available wanted in
+            if FStar.UInt32.v count > 0 then
+              begin
+                assert (FStar.UInt32.v count <= FStar.UInt32.v available);
+                assert (FStar.UInt32.v count <= FStar.UInt16.v expected);
+                LowStar.Buffer.blit data 1ul ctx.sc_buf 0ul count
+              end
+            else
+              ()
+          end
+        else
+          ()
+      else if FStar.UInt32.v len >= 2 then
+        begin
+          assert (LowStar.Buffer.length data >= 2);
+          let expected = parse_u16_from_fragment data in
+          let available = body_bytes_after_prefix len in
+          let wanted = remaining_message expected 0ul in
+          let count = bounded_copy_len available wanted in
+          if FStar.UInt32.v count > 0 then
+            begin
+              assert (FStar.UInt32.v count <= FStar.UInt32.v available);
+              assert (FStar.UInt32.v count <= FStar.UInt16.v expected);
+              LowStar.Buffer.blit data 2ul ctx.sc_buf 0ul count
+            end
+          else
+            ()
+        end
+      else
+        ()
+  | ReadingMessage (expected, current) ->
+      if FStar.UInt32.v current < FStar.UInt16.v expected then
+        begin
+          let wanted = remaining_message expected current in
+          let count = bounded_copy_len len wanted in
+          if FStar.UInt32.v count > 0 then
+            begin
+              assert (FStar.UInt32.v count <= FStar.UInt32.v len);
+              assert (FStar.UInt32.v count <= FStar.UInt16.v expected - FStar.UInt32.v current);
+              assert (FStar.UInt32.v current + FStar.UInt32.v count <= FStar.UInt16.v expected);
+              LowStar.Buffer.blit data 0ul ctx.sc_buf current count
+            end
+          else
+            ()
+        end
+      else
+        ()
+  | _ -> ()
+
 (* Stateful accumulation of QUIC frames into DNS messages *)
 val handle_stream_data :
     ctx_ptr:buffer stream_context ->
@@ -145,14 +236,21 @@ val handle_stream_data :
         live h0 ctx_ptr /\
         LowStar.Buffer.length ctx_ptr >= 1 /\
         live h0 data /\
-        FStar.UInt32.v len <= LowStar.Buffer.length data))
+        FStar.UInt32.v len <= LowStar.Buffer.length data /\
+        (let ctx = FStar.Seq.index (LowStar.Buffer.as_seq h0 ctx_ptr) 0 in
+         live h0 ctx.sc_buf /\
+         LowStar.Buffer.length ctx.sc_buf >= 65535 /\
+         disjoint data ctx.sc_buf /\
+         loc_disjoint (loc_buffer ctx_ptr) (loc_buffer ctx.sc_buf))))
       (ensures (fun h0 _ h1 ->
-        modifies (loc_buffer ctx_ptr) h0 h1 /\
+        (let ctx = FStar.Seq.index (LowStar.Buffer.as_seq h0 ctx_ptr) 0 in
+         modifies (loc_union (loc_buffer ctx_ptr) (loc_buffer ctx.sc_buf)) h0 h1) /\
         live h1 ctx_ptr))
 
 let handle_stream_data ctx_ptr data len =
   let ctx = LowStar.Buffer.index ctx_ptr 0ul in
   let phase = next_stream_phase ctx data len in
+  copy_body_bytes ctx data len;
   let next_ctx = { ctx with sc_phase = phase } in
   LowStar.Buffer.upd ctx_ptr 0ul next_ctx;
   phase
