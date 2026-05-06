@@ -97,7 +97,7 @@ change and add extraction once blockers are isolated or resolved.
 
 **Consequences:** A verification pass with `admit()`, `assume`, or mocks is
 acceptable for scaffolding only when the corresponding proof debt stays visible
-in `TODO.md` and the threat model.
+in `docs/TODO.md` and the threat model.
 
 ## DR-0007: Treat Current Extraction as a Smoke Test
 

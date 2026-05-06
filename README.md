@@ -6,7 +6,7 @@ This project aims to implement a mathematically verified DNS server using F*, Lo
 - **[Architecture](docs/ARCHITECTURE.md)**: Layered security design and Mermaid diagrams.
 - **[Implementation Plan](docs/PLAN.md)**: High-level strategy and RFC roadmap.
 - **[Threat Model](docs/THREAT_MODEL.md)**: STRIDE analysis and Post-Quantum assessment.
-- **[Development Roadmap](TODO.md)**: Active task tracking and progress.
+- **[Development Roadmap](docs/TODO.md)**: Active task tracking and progress.
 
 ## Key Features
 - **Formal Verification:** Memory safety and functional correctness proven in F*.
