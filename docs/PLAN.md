@@ -127,12 +127,12 @@ Maintain a compliance matrix for each protocol area. See [DECISIONS.md](DECISION
 
 | RFC | Section | Requirement | Status | Proof/Test Coverage | Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| RFC 1035 | Header format | 12-byte DNS header | Partial | Pure parser tests cover valid and truncated headers; Low* buffer boundary reads the checked length. | EverParse boundary delegates to the reference parser; generated parser not integrated yet. |
-| RFC 1035 | QNAME labels | Labels are length-prefixed | Partial | Tests cover valid root QNAMEs, truncated QNAMEs, invalid label length, trailing bytes, and rejected compression pointers. | Compression is rejected for now; RR sections still rejected. |
-| RFC 3597 | Unknown RR types | Preserve unknown types | Partial | Executable parser test maps an unknown QTYPE to `UNKNOWN`. | Full RR parsing not implemented. |
-| RFC 6891 | EDNS0 OPT | OPT pseudo-RR | Partial | Padding helper verifies | OPT parsing/serialization incomplete. |
-| RFC 9250 | DoQ framing | Two-octet length prefix | Partial | Low* stream state verifies complete and split length-prefix parsing plus `ReadingMessage` progress to `Processing`. | Message-body copying is still incomplete. |
-| RFC 8446 | TLS 1.3 | Authenticated transport | Mocked | None | Mock AEAD and handshake remain. |
+| [RFC 1035](https://datatracker.ietf.org/doc/html/rfc1035) | Header format | 12-byte DNS header | Partial | Pure parser tests cover valid and truncated headers; Low* buffer boundary reads the checked length. | EverParse boundary delegates to the reference parser; generated parser not integrated yet. |
+| [RFC 1035](https://datatracker.ietf.org/doc/html/rfc1035) | QNAME labels | Labels are length-prefixed | Partial | Tests cover valid root QNAMEs, truncated QNAMEs, invalid label length, trailing bytes, and rejected compression pointers. | Compression is rejected for now; RR sections still rejected. |
+| [RFC 3597](https://datatracker.ietf.org/doc/html/rfc3597) | Unknown RR types | Preserve unknown types | Partial | Executable parser test maps an unknown QTYPE to `UNKNOWN`. | Full RR parsing not implemented. |
+| [RFC 6891](https://datatracker.ietf.org/doc/html/rfc6891) | EDNS0 OPT | OPT pseudo-RR | Partial | Padding helper verifies | OPT parsing/serialization incomplete. |
+| [RFC 9250](https://datatracker.ietf.org/doc/html/rfc9250) | DoQ framing | Two-octet length prefix | Partial | Low* stream state verifies complete and split length-prefix parsing plus `ReadingMessage` progress to `Processing`. | Message-body copying is still incomplete. |
+| [RFC 8446](https://datatracker.ietf.org/doc/html/rfc8446) | TLS 1.3 | Authenticated transport | Mocked | None | Mock AEAD and handshake remain. |
 
 Extraction status: containerized `make extract` is now a CI smoke gate. It verifies all F*/spec modules first, then extracts the current protocol/security/transport boundary while Phase 3/4 scaffolds remain verification-only.
 
