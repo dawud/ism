@@ -5,6 +5,7 @@ module L = FStar.List.Tot
 
 open DNS.Protocol
 open DNS.Protocol.Parser
+open DNS.Protocol.Parser.EverParseBoundary
 
 let valid_single_question_dns_query : list FStar.UInt8.t =
   [
@@ -219,3 +220,19 @@ let malformed_compression_pointer_parse_question_test =
 
 let malformed_compression_pointer_parse_packet_test =
   assert_norm (parse_dns_packet_bytes malformed_compression_pointer_dns_query == None)
+
+let boundary_valid_single_question_dns_query_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary valid_single_question_dns_query ==
+               parse_dns_packet_bytes valid_single_question_dns_query)
+
+let boundary_truncated_dns_header_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary truncated_dns_header ==
+               parse_dns_packet_bytes truncated_dns_header)
+
+let boundary_rejects_malformed_compression_pointer_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary malformed_compression_pointer_dns_query ==
+               parse_dns_packet_bytes malformed_compression_pointer_dns_query)
+
+let boundary_backend_status_test =
+  assert_norm (active_parser_backend == ReferenceBootstrap /\
+               everparse_generated_parser_available == false)
