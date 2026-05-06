@@ -33,7 +33,7 @@ The containerized `make extract` command now completes and emits C/H files under
 
 ## Proof Debt / Trusted Gaps
 
-- [ ] Remove all remaining `admit()` calls from multiplexer allocation operations, recursive cache operations, sharded cache operations, and worker processing.
+- [ ] Remove all remaining `admit()` calls from recursive cache operations, sharded cache operations, and worker processing.
 - [ ] Replace `assume` uses with real refinements or lemmas, especially label casting in `DNS.Name` and `shard_permission` in `DNS.Cache.Sharded`.
 - [x] Replace local mock interfaces under `spec/` with real Project Everest / Low* / Steel dependencies or explicitly documented trusted interfaces.
 - [ ] Replace placeholder functions that return fixed values, including client hello verification, AEAD decrypt success, zone parsing, wildcard lookup, and bailiwick suffix checks.
@@ -112,7 +112,7 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 - [/] Integrate EverCrypt for TLS 1.3 Handshake. Current `DNS.Security.Handshake` defines the state type and transitions, but `verify_client_hello` is a mock that always returns `true`; EverCrypt specs are documented trusted bootstrap adapters.
 - [/] Implement `DNS.Security.Gateway` for authenticated decryption and immediate parsing. Current decrypt function always returns `Success`, but the gateway now copies the bounded ciphertext range into a concrete Low* plaintext workspace before parsing it instead of admitting allocation.
 - [/] Implement `DNS.QUIC.StreamMapping` state machine (ReadingLength, ReadingMessage). State types exist, the two-byte DoQ length prefix parser reads a bounded Low* buffer, and `handle_stream_data` performs the first complete length-prefix transition. Partial-frame accumulation and message-body copying are not implemented yet.
-- [/] Implement Stream ID Multiplexer to handle concurrent streams. `find_stream` performs a verified conservative first-slot lookup with explicit ownership preconditions, and `close_stream` is an explicit verified no-op placeholder; `allocate_stream` and real close/removal semantics are still incomplete.
+- [/] Implement Stream ID Multiplexer to handle concurrent streams. `find_stream` performs a verified conservative first-slot lookup with explicit ownership preconditions; `allocate_stream` is an explicit verified no-allocation placeholder; and `close_stream` is an explicit verified no-op placeholder. Real allocation and close/removal semantics are still incomplete.
 - [x] Implement EDNS0 (OPT) handling with padding for traffic analysis protection. Current `calculate_padding_len` handles zero block size and computes block padding; OPT parsing/serialization is not implemented.
 - [/] **Validation:** Prove query authenticity (decryption success implies integrity). Current code models the boundary but uses mock AEAD success, so authenticity is not proven against real crypto.
 
