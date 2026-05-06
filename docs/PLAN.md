@@ -131,7 +131,7 @@ Maintain a compliance matrix for each protocol area. See [DECISIONS.md](DECISION
 | RFC 1035 | QNAME labels | Labels are length-prefixed | Partial | Tests cover valid root QNAMEs, truncated QNAMEs, invalid label length, trailing bytes, and rejected compression pointers. | Compression is rejected for now; RR sections still rejected. |
 | RFC 3597 | Unknown RR types | Preserve unknown types | Partial | Executable parser test maps an unknown QTYPE to `UNKNOWN`. | Full RR parsing not implemented. |
 | RFC 6891 | EDNS0 OPT | OPT pseudo-RR | Partial | Padding helper verifies | OPT parsing/serialization incomplete. |
-| RFC 9250 | DoQ framing | Two-octet length prefix | Not implemented | None | Stream state types exist, but length parsing and accumulation are placeholders. |
+| RFC 9250 | DoQ framing | Two-octet length prefix | Partial | Low* stream state verifies complete length-prefix parsing and `ReadingMessage` progress to `Processing`. | Split length-prefix accumulation and message-body copying are still incomplete. |
 | RFC 8446 | TLS 1.3 | Authenticated transport | Mocked | None | Mock AEAD and handshake remain. |
 
 Extraction status: containerized `make extract` is now a CI smoke gate. It verifies all F*/spec modules first, then extracts the current protocol/security/transport boundary while Phase 3/4 scaffolds remain verification-only.

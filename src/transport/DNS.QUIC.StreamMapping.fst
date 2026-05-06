@@ -43,6 +43,30 @@ let parse_u16_from_fragment data =
   let lo = LowStar.Buffer.index data 1ul in
   u16_from_be_bytes hi lo
 
+val body_bytes_after_prefix : len:FStar.UInt32.t -> Tot FStar.UInt32.t
+let body_bytes_after_prefix len =
+  if FStar.UInt32.v len >= 2 then
+    FStar.UInt32.uint_to_t (FStar.UInt32.v len - 2)
+  else
+    0ul
+
+val advance_message :
+    expected:FStar.UInt16.t ->
+    current:FStar.UInt32.t ->
+    incoming:FStar.UInt32.t ->
+    Tot stream_phase
+
+let advance_message expected current incoming =
+  let total_len = Prims.op_Addition (FStar.UInt32.v current) (FStar.UInt32.v incoming) in
+  if total_len >= FStar.UInt16.v expected then
+    Processing
+  else
+    begin
+      assert (total_len < FStar.UInt16.v expected);
+      assert (total_len < 65536);
+      ReadingMessage (expected, FStar.UInt32.uint_to_t total_len)
+    end
+
 (* Stateful accumulation of QUIC frames into DNS messages *)
 val handle_stream_data : 
     ctx_ptr:buffer stream_context -> 
@@ -64,8 +88,11 @@ let handle_stream_data ctx_ptr data len =
         begin
           assert (LowStar.Buffer.length data >= 2);
           let expected = parse_u16_from_fragment data in
-          ReadingMessage (expected, 0ul)
+          let body_len = body_bytes_after_prefix len in
+          advance_message expected 0ul body_len
         end
       else
         ctx.sc_phase
+  | ReadingMessage (expected, current) ->
+      advance_message expected current len
   | _ -> ctx.sc_phase
