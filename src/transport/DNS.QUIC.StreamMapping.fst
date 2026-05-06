@@ -26,8 +26,22 @@ type stream_context = {
 
 (* --- Stream Multiplexing Logic --- *)
 
-val parse_u16_from_fragment : data:buffer FStar.UInt8.t -> acc:FStar.UInt32.t -> Tot FStar.UInt16.t
-let parse_u16_from_fragment data acc = 0us
+val u16_from_be_bytes : hi:FStar.UInt8.t -> lo:FStar.UInt8.t -> Tot FStar.UInt16.t
+let u16_from_be_bytes hi lo =
+  FStar.UInt16.uint_to_t (Prims.op_Addition (Prims.op_Multiply (FStar.UInt8.v hi) 256) (FStar.UInt8.v lo))
+
+val parse_u16_from_fragment :
+    data:buffer FStar.UInt8.t ->
+    Stack FStar.UInt16.t
+      (requires (fun h0 ->
+        live h0 data /\
+        LowStar.Buffer.length data >= 2))
+      (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+
+let parse_u16_from_fragment data =
+  let hi = LowStar.Buffer.index data 0ul in
+  let lo = LowStar.Buffer.index data 1ul in
+  u16_from_be_bytes hi lo
 
 (* Stateful accumulation of QUIC frames into DNS messages *)
 val handle_stream_data : 
