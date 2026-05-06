@@ -1,0 +1,31 @@
+name: Verify and Extract
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify-extract:
+    name: Verify F* and extract C
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build pinned toolchain image
+        run: docker build -t localhost/verified-dns-server:latest -f Containerfile .
+
+      - name: Verify F* sources
+        run: |
+          docker run --rm \
+            -v "${PWD}:/workspace" \
+            localhost/verified-dns-server:latest \
+            bash -lc 'cd /workspace && eval $(opam env) && make verify'
+
+      - name: Extract C smoke test
+        run: |
+          docker run --rm \
+            -v "${PWD}:/workspace" \
+            localhost/verified-dns-server:latest \
+            bash -lc 'cd /workspace && eval $(opam env) && make extract'
