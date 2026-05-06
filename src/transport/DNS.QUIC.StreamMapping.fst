@@ -50,6 +50,31 @@ let body_bytes_after_prefix len =
   else
     0ul
 
+val body_bytes_after_stored_prefix : len:FStar.UInt32.t -> Tot FStar.UInt32.t
+let body_bytes_after_stored_prefix len =
+  if FStar.UInt32.v len >= 1 then
+    FStar.UInt32.uint_to_t (FStar.UInt32.v len - 1)
+  else
+    0ul
+
+val stored_prefix_high : hi:FStar.UInt8.t -> Tot FStar.UInt32.t
+let stored_prefix_high hi =
+  FStar.UInt32.uint_to_t (FStar.UInt8.v hi + 1)
+
+val stored_prefix_high_value : acc:FStar.UInt32.t -> Tot nat
+let stored_prefix_high_value acc =
+  if FStar.UInt32.v acc > 0 && FStar.UInt32.v acc <= 256 then
+    FStar.UInt32.v acc - 1
+  else
+    0
+
+val u16_from_stored_high : acc:FStar.UInt32.t -> lo:FStar.UInt8.t -> Tot FStar.UInt16.t
+let u16_from_stored_high acc lo =
+  let hi = stored_prefix_high_value acc in
+  assert (hi < 256);
+  assert (FStar.UInt8.v lo < 256);
+  FStar.UInt16.uint_to_t (Prims.op_Addition (Prims.op_Multiply hi 256) (FStar.UInt8.v lo))
+
 val advance_message :
     expected:FStar.UInt16.t ->
     current:FStar.UInt32.t ->
@@ -83,13 +108,30 @@ val handle_stream_data :
 let handle_stream_data ctx_ptr data len =
   let ctx = LowStar.Buffer.index ctx_ptr 0ul in
   match ctx.sc_phase with
-  | ReadingLength _ ->
-      if FStar.UInt32.v len >= 2 then
+  | ReadingLength acc ->
+      if FStar.UInt32.v acc > 0 then
+        if FStar.UInt32.v len >= 1 then
+          begin
+            assert (LowStar.Buffer.length data >= 1);
+            let lo = LowStar.Buffer.index data 0ul in
+            let expected = u16_from_stored_high acc lo in
+            let body_len = body_bytes_after_stored_prefix len in
+            advance_message expected 0ul body_len
+          end
+        else
+          ctx.sc_phase
+      else if FStar.UInt32.v len >= 2 then
         begin
           assert (LowStar.Buffer.length data >= 2);
           let expected = parse_u16_from_fragment data in
           let body_len = body_bytes_after_prefix len in
           advance_message expected 0ul body_len
+        end
+      else if FStar.UInt32.v len = 1 then
+        begin
+          assert (LowStar.Buffer.length data >= 1);
+          let hi = LowStar.Buffer.index data 0ul in
+          ReadingLength (stored_prefix_high hi)
         end
       else
         ctx.sc_phase
