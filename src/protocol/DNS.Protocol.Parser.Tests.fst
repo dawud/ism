@@ -648,6 +648,130 @@ let compressed_name_rdata_dns_response : list FStar.UInt8.t =
 let compressed_name_rdata_parse_packet_test =
   assert_norm (parse_dns_packet_bytes compressed_name_rdata_dns_response == None)
 
+let valid_mx_rdata_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x0fuy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x0fuy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x08uy;
+    0x00uy; 0x0auy;
+    0x04uy; 0x6duy; 0x61uy; 0x69uy; 0x6cuy; 0x00uy
+  ]
+
+let valid_mx_rdata_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes valid_mx_rdata_dns_response with
+    | Some p ->
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.rtype == MX /\
+             rr.rdlen == 8us /\
+             FStar.Bytes.length rr.rdata == 8
+         | _ -> false)
+    | None -> false)
+
+let truncated_mx_preference_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x0fuy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x0fuy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x01uy;
+    0x00uy
+  ]
+
+let truncated_mx_preference_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes truncated_mx_preference_dns_response == None)
+
+let truncated_mx_exchange_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x0fuy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x0fuy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x05uy;
+    0x00uy; 0x0auy;
+    0x04uy; 0x6duy; 0x61uy
+  ]
+
+let truncated_mx_exchange_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes truncated_mx_exchange_dns_response == None)
+
+let trailing_mx_exchange_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x0fuy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x0fuy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x04uy;
+    0x00uy; 0x0auy;
+    0x00uy; 0xffuy
+  ]
+
+let trailing_mx_exchange_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes trailing_mx_exchange_dns_response == None)
+
+let compressed_mx_exchange_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x0fuy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x0fuy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x04uy;
+    0x00uy; 0x0auy;
+    0xc0uy; 0x0cuy
+  ]
+
+let compressed_mx_exchange_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes compressed_mx_exchange_dns_response == None)
+
 let boundary_valid_single_question_dns_query_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_single_question_dns_query ==
                parse_dns_packet_bytes valid_single_question_dns_query)
@@ -755,6 +879,26 @@ let boundary_rejects_trailing_name_rdata_test =
 let boundary_rejects_compressed_name_rdata_test =
   assert_norm (parse_dns_packet_bytes_at_boundary compressed_name_rdata_dns_response ==
                parse_dns_packet_bytes compressed_name_rdata_dns_response)
+
+let boundary_accepts_mx_rdata_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary valid_mx_rdata_dns_response ==
+               parse_dns_packet_bytes valid_mx_rdata_dns_response)
+
+let boundary_rejects_truncated_mx_preference_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary truncated_mx_preference_dns_response ==
+               parse_dns_packet_bytes truncated_mx_preference_dns_response)
+
+let boundary_rejects_truncated_mx_exchange_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary truncated_mx_exchange_dns_response ==
+               parse_dns_packet_bytes truncated_mx_exchange_dns_response)
+
+let boundary_rejects_trailing_mx_exchange_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary trailing_mx_exchange_dns_response ==
+               parse_dns_packet_bytes trailing_mx_exchange_dns_response)
+
+let boundary_rejects_compressed_mx_exchange_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary compressed_mx_exchange_dns_response ==
+               parse_dns_packet_bytes compressed_mx_exchange_dns_response)
 
 let boundary_backend_status_test =
   assert_norm (active_parser_backend == EverParseGeneratedSubset /\

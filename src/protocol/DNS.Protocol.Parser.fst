@@ -287,6 +287,24 @@ let valid_name_rdata_payload rdlen input =
     | Some (_, tail) -> L.length tail = 0
     | None -> false
 
+val valid_mx_rdata_payload :
+  rdlen:FStar.UInt16.t ->
+  input:list FStar.UInt8.t ->
+  Tot bool
+
+let valid_mx_rdata_payload rdlen input =
+  let len = FStar.UInt16.v rdlen in
+  if len < 3 || L.length input < len then
+    false
+  else
+    let (payload, _) = L.splitAt len input in
+    match payload with
+    | _pref_hi :: _pref_lo :: exchange ->
+        match DNS.Name.parse_qname 128 exchange with
+        | Some (_, tail) -> L.length tail = 0
+        | None -> false
+    | _ -> false
+
 val valid_rdata_shape :
   rtype:qtype ->
   rdlen:FStar.UInt16.t ->
@@ -299,6 +317,7 @@ let valid_rdata_shape rtype rdlen input =
   | NS -> valid_name_rdata_payload rdlen input
   | CNAME -> valid_name_rdata_payload rdlen input
   | PTR -> valid_name_rdata_payload rdlen input
+  | MX -> valid_mx_rdata_payload rdlen input
   | _ -> true
 
 val parse_resource_record_bytes :
