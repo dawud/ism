@@ -772,6 +772,122 @@ let compressed_mx_exchange_dns_response : list FStar.UInt8.t =
 let compressed_mx_exchange_parse_packet_test =
   assert_norm (parse_dns_packet_bytes compressed_mx_exchange_dns_response == None)
 
+let valid_soa_rdata_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x1euy;
+    0x02uy; 0x6euy; 0x73uy; 0x00uy;
+    0x04uy; 0x68uy; 0x6fuy; 0x73uy; 0x74uy; 0x00uy;
+    0x00uy; 0x00uy; 0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x02uy;
+    0x00uy; 0x00uy; 0x00uy; 0x03uy;
+    0x00uy; 0x00uy; 0x00uy; 0x04uy;
+    0x00uy; 0x00uy; 0x00uy; 0x05uy
+  ]
+
+let valid_soa_rdata_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes valid_soa_rdata_dns_response with
+    | Some p ->
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.rtype == SOA /\
+             rr.rdlen == 30us /\
+             FStar.Bytes.length rr.rdata == 30
+         | _ -> false)
+    | None -> false)
+
+let truncated_soa_mname_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x03uy;
+    0x02uy; 0x6euy; 0x73uy
+  ]
+
+let truncated_soa_mname_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes truncated_soa_mname_dns_response == None)
+
+let trailing_soa_timers_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x17uy;
+    0x00uy;
+    0x00uy;
+    0x00uy; 0x00uy; 0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x02uy;
+    0x00uy; 0x00uy; 0x00uy; 0x03uy;
+    0x00uy; 0x00uy; 0x00uy; 0x04uy;
+    0x00uy; 0x00uy; 0x00uy; 0x05uy;
+    0xffuy
+  ]
+
+let trailing_soa_timers_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes trailing_soa_timers_dns_response == None)
+
+let compressed_soa_mname_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x16uy;
+    0xc0uy; 0x0cuy;
+    0x00uy; 0x00uy; 0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x02uy;
+    0x00uy; 0x00uy; 0x00uy; 0x03uy;
+    0x00uy; 0x00uy; 0x00uy; 0x04uy;
+    0x00uy; 0x00uy; 0x00uy; 0x05uy
+  ]
+
+let compressed_soa_mname_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes compressed_soa_mname_dns_response == None)
+
 let boundary_valid_single_question_dns_query_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_single_question_dns_query ==
                parse_dns_packet_bytes valid_single_question_dns_query)
@@ -899,6 +1015,22 @@ let boundary_rejects_trailing_mx_exchange_test =
 let boundary_rejects_compressed_mx_exchange_test =
   assert_norm (parse_dns_packet_bytes_at_boundary compressed_mx_exchange_dns_response ==
                parse_dns_packet_bytes compressed_mx_exchange_dns_response)
+
+let boundary_accepts_soa_rdata_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary valid_soa_rdata_dns_response ==
+               parse_dns_packet_bytes valid_soa_rdata_dns_response)
+
+let boundary_rejects_truncated_soa_mname_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary truncated_soa_mname_dns_response ==
+               parse_dns_packet_bytes truncated_soa_mname_dns_response)
+
+let boundary_rejects_trailing_soa_timers_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary trailing_soa_timers_dns_response ==
+               parse_dns_packet_bytes trailing_soa_timers_dns_response)
+
+let boundary_rejects_compressed_soa_mname_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary compressed_soa_mname_dns_response ==
+               parse_dns_packet_bytes compressed_soa_mname_dns_response)
 
 let boundary_backend_status_test =
   assert_norm (active_parser_backend == EverParseGeneratedSubset /\
