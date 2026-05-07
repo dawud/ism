@@ -510,6 +510,89 @@ let edns0_unknown_option_preserved_test =
         FStar.Bytes.length opt.data == 2
     | _ -> false)
 
+let serialized_unknown_edns_option_bytes : list FStar.UInt8.t =
+  let opt:OPT.edns_option = {
+    code = 65000us;
+    len = 0us;
+    data = FStar.Bytes.empty_bytes;
+  } in
+  OPT.serialize_edns_option_bytes opt
+
+let serialized_unknown_edns_option_bytes_test =
+  assert_norm (serialized_unknown_edns_option_bytes ==
+               [0xfduy; 0xe8uy; 0x00uy; 0x00uy])
+
+let serialized_unknown_edns_option_roundtrip_test =
+  assert_norm (
+    match OPT.parse_edns_options_bytes 4 serialized_unknown_edns_option_bytes with
+    | Some (opt :: []) ->
+        opt.code == 65000us /\
+        opt.len == 0us /\
+        FStar.Bytes.length opt.data == 0
+    | _ -> false)
+
+let serialized_padding_option_for_block_bytes : list FStar.UInt8.t =
+  match OPT.serialize_padding_option_for_block 10ul 16ul with
+  | Some bytes -> bytes
+  | None -> []
+
+let serialized_padding_option_for_block_test =
+  assert_norm (serialized_padding_option_for_block_bytes ==
+               [0x00uy; 0x0cuy; 0x00uy; 0x02uy; 0x00uy; 0x00uy])
+
+let serialized_padding_option_zero_block_test =
+  assert_norm (OPT.serialize_padding_option_for_block 10ul 0ul == Some [])
+
+let serialized_padding_opt_payload : list FStar.UInt8.t =
+  OPT.serialize_padding_option_bytes 4us
+
+let serialized_padding_opt_rr_bytes : list FStar.UInt8.t =
+  let flags:OPT.opt_flags = { do_bit = false; z = 0us } in
+  match OPT.serialize_opt_rr_bytes_with_payload
+          1232us
+          0uy
+          0uy
+          flags
+          serialized_padding_opt_payload with
+  | Some bytes -> bytes
+  | None -> []
+
+let serialized_padding_opt_rr_bytes_test =
+  assert_norm (serialized_padding_opt_rr_bytes ==
+               [
+                 0x00uy;
+                 0x00uy; 0x29uy;
+                 0x04uy; 0xd0uy;
+                 0x00uy; 0x00uy; 0x00uy; 0x00uy;
+                 0x00uy; 0x08uy;
+                 0x00uy; 0x0cuy;
+                 0x00uy; 0x04uy;
+                 0x00uy; 0x00uy; 0x00uy; 0x00uy
+               ])
+
+let serialized_padding_opt_dns_query : list FStar.UInt8.t =
+  L.append [
+    0x12uy; 0x34uy;
+    0x01uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x01uy
+  ] serialized_padding_opt_rr_bytes
+
+let serialized_padding_opt_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes serialized_padding_opt_dns_query with
+    | Some p ->
+        L.length p.additionals == 1 /\
+        (match p.additionals with
+         | rr :: [] ->
+             rr.rtype == OPT /\
+             rr.rdlen == 8us /\
+             FStar.Bytes.length rr.rdata == 8
+         | _ -> false)
+    | None -> false)
+
 let truncated_edns_option_header_dns_query : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;

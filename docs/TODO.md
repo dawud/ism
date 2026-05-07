@@ -72,6 +72,7 @@ The containerized `make extract` command now completes and emits C/H files under
   - [x] EDNS0 option headers and bounded option data parsed structurally;
   - [x] truncated EDNS0 option headers and option data rejected;
   - [x] EDNS0 padding and unknown option codes accepted structurally;
+  - [x] EDNS0 OPT option and padding bytes serialized with parser round-trip coverage;
   - [x] NS/CNAME/PTR RDATA accepted only when it is a single fully-consumed uncompressed domain name;
   - [x] MX RDATA accepted only when it has a two-byte preference and a single fully-consumed uncompressed exchange name;
   - [x] SOA RDATA accepted only when it has two fully-consumed uncompressed domain names plus five 32-bit timer fields;
@@ -127,7 +128,7 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 - [/] Implement `DNS.Security.Gateway` for authenticated decryption and immediate parsing. Current decrypt function always returns `Success`, but the gateway now copies the bounded ciphertext range into a concrete Low* plaintext workspace before parsing it instead of admitting allocation.
 - [/] Implement `DNS.QUIC.StreamMapping` state machine (ReadingLength, ReadingMessage). State types exist, the two-byte DoQ length prefix parser reads a bounded Low* buffer, `handle_stream_data` copies bounded body bytes into the stream buffer, persists stream phase updates, stores a one-byte partial length prefix, accounts for body bytes after a completed length prefix, advances `ReadingMessage` to `Processing` once enough bytes arrive, and transitions to `Done` for overlong body fragments. Real allocation and close/removal semantics are still incomplete.
 - [/] Implement Stream ID Multiplexer to handle concurrent streams. `find_stream` performs a verified conservative first-slot lookup with explicit ownership preconditions; `allocate_stream` is an explicit verified no-allocation placeholder; and `close_stream` is an explicit verified no-op placeholder. Real allocation and close/removal semantics are still incomplete.
-- [x] Implement EDNS0 (OPT) handling with padding for traffic analysis protection. Current `calculate_padding_len` handles zero block size and computes block padding; structural OPT parsing accepts version 0 in the additional section and structurally parses bounded EDNS options, but OPT option serialization is not implemented.
+- [x] Implement EDNS0 (OPT) handling with padding for traffic analysis protection. Current `calculate_padding_len` handles zero block size and computes block padding, structural OPT parsing accepts version 0 in the additional section and structurally parses bounded EDNS options, and basic OPT option/padding serialization round-trips through the parser. Full response-policy integration is not implemented.
 - [/] **Validation:** Prove query authenticity (decryption success implies integrity). Current code models the boundary but uses mock AEAD success, so authenticity is not proven against real crypto.
 
 ## Phase 3: Verified Core Logic & Backend
