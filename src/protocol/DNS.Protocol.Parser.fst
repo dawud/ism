@@ -7,6 +7,7 @@ open DNS.Protocol
 open DNS.Constants
 module L = FStar.List.Tot
 module LPP = FStar.List.Pure.Properties
+module OPT = DNS.Protocol.OPT
 
 (* --- Flag Mapping --- *)
 
@@ -256,6 +257,32 @@ let valid_rr_position_and_shape additional_section name rtype ttl =
       edns_version_from_ttl ttl = 0uy
   | _ -> true
 
+val valid_opt_options_payload :
+  rdlen:FStar.UInt16.t ->
+  input:list FStar.UInt8.t ->
+  Tot bool
+
+let valid_opt_options_payload rdlen input =
+  let len = FStar.UInt16.v rdlen in
+  if L.length input < len then
+    false
+  else
+    let (payload, _) = L.splitAt len input in
+    match OPT.parse_edns_options_bytes len payload with
+    | Some _ -> true
+    | None -> false
+
+val valid_rdata_shape :
+  rtype:qtype ->
+  rdlen:FStar.UInt16.t ->
+  input:list FStar.UInt8.t ->
+  Tot bool
+
+let valid_rdata_shape rtype rdlen input =
+  match rtype with
+  | OPT -> valid_opt_options_payload rdlen input
+  | _ -> true
+
 val parse_resource_record_bytes :
   additional_section:bool ->
   input:list FStar.UInt8.t ->
@@ -278,7 +305,8 @@ let parse_resource_record_bytes additional_section input =
             let rtype = u16_to_qtype (u16_from_be rt_hi rt_lo) in
             let ttl = u32_from_be ttl_0 ttl_1 ttl_2 ttl_3 in
             if valid_rr_position_and_shape additional_section name rtype ttl &&
-               valid_rdata_length rtype rdlen then
+               valid_rdata_length rtype rdlen &&
+               valid_rdata_shape rtype rdlen rdata_input then
               match parse_rdata_bytes rdlen rdata_input with
               | None -> None
               | Some (rdata, tail) ->

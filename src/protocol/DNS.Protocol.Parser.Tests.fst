@@ -6,6 +6,7 @@ module L = FStar.List.Tot
 open DNS.Protocol
 open DNS.Protocol.Parser
 open DNS.Protocol.Parser.EverParseBoundary
+module OPT = DNS.Protocol.OPT
 
 let valid_single_question_dns_query : list FStar.UInt8.t =
   [
@@ -443,6 +444,112 @@ let unsupported_edns_version_dns_query : list FStar.UInt8.t =
 let unsupported_edns_version_parse_packet_test =
   assert_norm (parse_dns_packet_bytes unsupported_edns_version_dns_query == None)
 
+let edns0_padding_option_dns_query : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x01uy; 0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x29uy;
+    0x04uy; 0xd0uy;
+    0x00uy; 0x00uy; 0x00uy; 0x00uy;
+    0x00uy; 0x08uy;
+    0x00uy; 0x0cuy;
+    0x00uy; 0x04uy;
+    0x00uy; 0x00uy; 0x00uy; 0x00uy
+  ]
+
+let edns0_padding_option_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes edns0_padding_option_dns_query with
+    | Some p ->
+        L.length p.additionals == 1 /\
+        (match p.additionals with
+         | rr :: [] ->
+             rr.rtype == OPT /\
+             rr.rdlen == 8us /\
+             FStar.Bytes.length rr.rdata == 8
+         | _ -> false)
+    | None -> false)
+
+let edns0_unknown_option_dns_query : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x01uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x29uy;
+    0x04uy; 0xd0uy;
+    0x00uy; 0x00uy; 0x00uy; 0x00uy;
+    0x00uy; 0x06uy;
+    0xfduy; 0xe8uy;
+    0x00uy; 0x02uy;
+    0xabuy; 0xcduy
+  ]
+
+let edns0_unknown_option_parse_packet_test =
+  assert_norm (match parse_dns_packet_bytes edns0_unknown_option_dns_query with
+               | Some _ -> true
+               | None -> false)
+
+let edns0_unknown_option_preserved_test =
+  assert_norm (
+    match OPT.parse_edns_options_bytes 6 [0xfduy; 0xe8uy; 0x00uy; 0x02uy; 0xabuy; 0xcduy] with
+    | Some (opt :: []) ->
+        opt.code == 65000us /\
+        opt.len == 2us /\
+        FStar.Bytes.length opt.data == 2
+    | _ -> false)
+
+let truncated_edns_option_header_dns_query : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x01uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x29uy;
+    0x04uy; 0xd0uy;
+    0x00uy; 0x00uy; 0x00uy; 0x00uy;
+    0x00uy; 0x03uy;
+    0x00uy; 0x0cuy; 0x00uy
+  ]
+
+let truncated_edns_option_header_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes truncated_edns_option_header_dns_query == None)
+
+let truncated_edns_option_data_dns_query : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x01uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x29uy;
+    0x04uy; 0xd0uy;
+    0x00uy; 0x00uy; 0x00uy; 0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x0cuy;
+    0x00uy; 0x04uy;
+    0x00uy; 0x00uy
+  ]
+
+let truncated_edns_option_data_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes truncated_edns_option_data_dns_query == None)
+
 let boundary_valid_single_question_dns_query_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_single_question_dns_query ==
                parse_dns_packet_bytes valid_single_question_dns_query)
@@ -518,6 +625,22 @@ let boundary_rejects_nonroot_edns0_opt_test =
 let boundary_rejects_unsupported_edns_version_test =
   assert_norm (parse_dns_packet_bytes_at_boundary unsupported_edns_version_dns_query ==
                parse_dns_packet_bytes unsupported_edns_version_dns_query)
+
+let boundary_accepts_edns0_padding_option_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary edns0_padding_option_dns_query ==
+               parse_dns_packet_bytes edns0_padding_option_dns_query)
+
+let boundary_accepts_edns0_unknown_option_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary edns0_unknown_option_dns_query ==
+               parse_dns_packet_bytes edns0_unknown_option_dns_query)
+
+let boundary_rejects_truncated_edns_option_header_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary truncated_edns_option_header_dns_query ==
+               parse_dns_packet_bytes truncated_edns_option_header_dns_query)
+
+let boundary_rejects_truncated_edns_option_data_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary truncated_edns_option_data_dns_query ==
+               parse_dns_packet_bytes truncated_edns_option_data_dns_query)
 
 let boundary_backend_status_test =
   assert_norm (active_parser_backend == EverParseGeneratedSubset /\

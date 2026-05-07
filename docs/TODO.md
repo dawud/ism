@@ -69,6 +69,9 @@ The containerized `make extract` command now completes and emits C/H files under
   - [x] unknown RR TYPE accepted as `UNKNOWN`;
   - [x] EDNS0 OPT pseudo-RR accepted in the additional section with root owner and version 0;
   - [x] non-root OPT owner and unsupported EDNS version rejected;
+  - [x] EDNS0 option headers and bounded option data parsed structurally;
+  - [x] truncated EDNS0 option headers and option data rejected;
+  - [x] EDNS0 padding and unknown option codes accepted structurally;
   - [x] malformed compression pointers rejected until compression support is implemented.
 - [/] Add extraction as a routine build gate:
   - [x] run `make extract` in the container;
@@ -108,8 +111,8 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 - [x] Implement RFC-assigned integer mapping for all 43+ record types.
 - [/] Implement `DNS.Protocol.header_validator` and `header_reader` using EverParse. Current code has pure byte-list header/RR parsing, a verified Low* buffer reader, and an `EverParseBoundary` module that routes through a production-target subset boundary matching the reference parser; no external generated EverParse header reader is present yet.
 - [/] Implement recursive `parse_qname` with fuel-based termination for name compression. Current code parses uncompressed labels, enforces the 255-byte DNS name length budget, and rejects compression pointers.
-- [/] Implement full `DNS_Packet` parser (Header + Question + RR sections). Current `DNS.Protocol.Parser` parses header, question, and RR sections from byte lists; RR parsing preserves bounded RDATA bytes, maps unknown types to `UNKNOWN`, validates A/AAAA RDATA lengths, and accepts structurally valid EDNS0 OPT pseudo-RRs in the additional section, but broader type-specific RDATA validation and compression-pointer support are not implemented yet.
-- [/] **Validation:** Prove parser is "parser-rejecting" for malformed inputs. Current name/header/question/buffer proofs are admitted-free, and tests cover RR truncation, A/AAAA RDATA length rejection, and malformed OPT rejection; broader type-specific RR parser obligations remain incomplete.
+- [/] Implement full `DNS_Packet` parser (Header + Question + RR sections). Current `DNS.Protocol.Parser` parses header, question, and RR sections from byte lists; RR parsing preserves bounded RDATA bytes, maps unknown types to `UNKNOWN`, validates A/AAAA RDATA lengths, and accepts structurally valid EDNS0 OPT pseudo-RRs/options in the additional section, but broader type-specific RDATA validation and compression-pointer support are not implemented yet.
+- [/] **Validation:** Prove parser is "parser-rejecting" for malformed inputs. Current name/header/question/buffer proofs are admitted-free, and tests cover RR truncation, A/AAAA RDATA length rejection, malformed OPT rejection, and malformed EDNS option rejection; broader type-specific RR parser obligations remain incomplete.
 
 ## Phase 2: DoQ Transport Layer (QUIC + TLS 1.3)
 *Goal: Secure transport tunnel using EverCrypt/EverQuic.*
@@ -119,7 +122,7 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 - [/] Implement `DNS.Security.Gateway` for authenticated decryption and immediate parsing. Current decrypt function always returns `Success`, but the gateway now copies the bounded ciphertext range into a concrete Low* plaintext workspace before parsing it instead of admitting allocation.
 - [/] Implement `DNS.QUIC.StreamMapping` state machine (ReadingLength, ReadingMessage). State types exist, the two-byte DoQ length prefix parser reads a bounded Low* buffer, `handle_stream_data` copies bounded body bytes into the stream buffer, persists stream phase updates, stores a one-byte partial length prefix, accounts for body bytes after a completed length prefix, advances `ReadingMessage` to `Processing` once enough bytes arrive, and transitions to `Done` for overlong body fragments. Real allocation and close/removal semantics are still incomplete.
 - [/] Implement Stream ID Multiplexer to handle concurrent streams. `find_stream` performs a verified conservative first-slot lookup with explicit ownership preconditions; `allocate_stream` is an explicit verified no-allocation placeholder; and `close_stream` is an explicit verified no-op placeholder. Real allocation and close/removal semantics are still incomplete.
-- [x] Implement EDNS0 (OPT) handling with padding for traffic analysis protection. Current `calculate_padding_len` handles zero block size and computes block padding; structural OPT parsing accepts version 0 in the additional section, but OPT option parsing/serialization is not implemented.
+- [x] Implement EDNS0 (OPT) handling with padding for traffic analysis protection. Current `calculate_padding_len` handles zero block size and computes block padding; structural OPT parsing accepts version 0 in the additional section and structurally parses bounded EDNS options, but OPT option serialization is not implemented.
 - [/] **Validation:** Prove query authenticity (decryption success implies integrity). Current code models the boundary but uses mock AEAD success, so authenticity is not proven against real crypto.
 
 ## Phase 3: Verified Core Logic & Backend

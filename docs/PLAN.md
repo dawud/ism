@@ -123,6 +123,9 @@ Parser-test policy is recorded in [DECISIONS.md](DECISIONS.md). Initial tests sh
 - unknown RR TYPE accepted as `UNKNOWN`;
 - valid EDNS0 OPT pseudo-RR accepted in the additional section;
 - non-root OPT owner and unsupported EDNS version rejected;
+- valid EDNS0 padding option accepted structurally;
+- truncated EDNS0 option header and option data rejected;
+- unknown EDNS0 option code accepted structurally;
 - malformed compression pointers rejected until compression support is implemented.
 
 These tests should eventually run against both the pure parser and the Low* buffer boundary.
@@ -142,8 +145,8 @@ Maintain a compliance matrix for each protocol area. See [DECISIONS.md](DECISION
 | [RFC 3597](https://datatracker.ietf.org/doc/html/rfc3597) | Unknown RR types | Preserve unknown types | Partial | Executable parser tests map unknown QTYPE and RR TYPE values to `UNKNOWN`, and RR RDATA is preserved by RDLENGTH. | Presentation-format handling and full unknown-RR serialization are not implemented. |
 | [RFC 4592](https://datatracker.ietf.org/doc/html/rfc4592) | Wildcards | Match wildcard records correctly | Not implemented | None | Wildcard lookup is still a placeholder. |
 | [RFC 5452](https://datatracker.ietf.org/doc/html/rfc5452) | Forged-answer resilience | Harden recursive answers against poisoning | Partial | Bailiwick validation entry points exist. | `is_subdomain` is still mocked; source-port/ID entropy belongs to the unverified shell or QUIC stack. |
-| [RFC 6891](https://datatracker.ietf.org/doc/html/rfc6891) | EDNS0 OPT | OPT pseudo-RR | Partial | Parser tests cover valid additional-section OPT, non-root OPT owner rejection, and unsupported EDNS version rejection; padding helper verifies. | OPT option parsing and serialization are incomplete. |
-| [RFC 7830](https://datatracker.ietf.org/doc/html/rfc7830) | EDNS0 Padding | Padding option for encrypted DNS traffic | Partial | Padding length helper verifies. | OPT option parsing/serialization is incomplete. |
+| [RFC 6891](https://datatracker.ietf.org/doc/html/rfc6891) | EDNS0 OPT | OPT pseudo-RR | Partial | Parser tests cover valid additional-section OPT, non-root OPT owner rejection, unsupported EDNS version rejection, truncated option rejection, and unknown option acceptance; padding helper verifies. | OPT option serialization is incomplete. |
+| [RFC 7830](https://datatracker.ietf.org/doc/html/rfc7830) | EDNS0 Padding | Padding option for encrypted DNS traffic | Partial | Parser tests cover structurally valid Padding option data and truncation rejection; padding length helper verifies. | Response-side padding serialization is incomplete. |
 | [RFC 8467](https://datatracker.ietf.org/doc/html/rfc8467) | EDNS0 padding policy | Block-length padding guidance | Partial | Block padding helper verifies zero block size and remainder behavior. | Policy selection and response-side padding are incomplete. |
 | [RFC 8310](https://datatracker.ietf.org/doc/html/rfc8310) | Authentication profiles | Strict/opportunistic authentication profile considerations | Mocked | None | DoQ uses QUIC/TLS; client hello and identity validation are still mocked. |
 | [RFC 9250](https://datatracker.ietf.org/doc/html/rfc9250) | DoQ framing | Two-octet length prefix | Partial | Low* stream state verifies complete and split length-prefix parsing, bounded body copying, `ReadingMessage` progress to `Processing`, and conservative overlong-fragment rejection. | Real stream allocation and close/removal semantics are still incomplete. |
