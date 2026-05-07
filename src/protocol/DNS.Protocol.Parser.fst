@@ -238,11 +238,30 @@ let valid_rdata_length rtype rdlen =
   | AAAA -> rdlen = 16us
   | _ -> true
 
+let edns_version_from_ttl (ttl:FStar.UInt32.t) : FStar.UInt8.t =
+  FStar.UInt8.uint_to_t ((FStar.UInt32.v ttl / 65536) % 256)
+
+val valid_rr_position_and_shape :
+  additional_section:bool ->
+  name:DNS.Name.qname ->
+  rtype:qtype ->
+  ttl:FStar.UInt32.t ->
+  Tot bool
+
+let valid_rr_position_and_shape additional_section name rtype ttl =
+  match rtype with
+  | OPT ->
+      additional_section &&
+      name = [] &&
+      edns_version_from_ttl ttl = 0uy
+  | _ -> true
+
 val parse_resource_record_bytes :
+  additional_section:bool ->
   input:list FStar.UInt8.t ->
   Tot (option (resource_record * list FStar.UInt8.t))
 
-let parse_resource_record_bytes input =
+let parse_resource_record_bytes additional_section input =
   match DNS.Name.parse_qname 128 input with
   | None -> None
   | Some (name, rest) ->
@@ -257,7 +276,9 @@ let parse_resource_record_bytes input =
           rdata_input ->
             let rdlen = u16_from_be rdlen_hi rdlen_lo in
             let rtype = u16_to_qtype (u16_from_be rt_hi rt_lo) in
-            if valid_rdata_length rtype rdlen then
+            let ttl = u32_from_be ttl_0 ttl_1 ttl_2 ttl_3 in
+            if valid_rr_position_and_shape additional_section name rtype ttl &&
+               valid_rdata_length rtype rdlen then
               match parse_rdata_bytes rdlen rdata_input with
               | None -> None
               | Some (rdata, tail) ->
@@ -265,7 +286,7 @@ let parse_resource_record_bytes input =
                     name = name;
                     rtype = rtype;
                     rclass = u16_from_be rc_hi rc_lo;
-                    ttl = u32_from_be ttl_0 ttl_1 ttl_2 ttl_3;
+                    ttl = ttl;
                     rdlen = rdlen;
                     rdata = rdata;
                   }, tail)
@@ -274,19 +295,20 @@ let parse_resource_record_bytes input =
         | _ -> None
 
 val parse_resource_records_bytes :
+  additional_section:bool ->
   fuel:nat ->
   count:nat ->
   input:list FStar.UInt8.t ->
   Tot (option (list resource_record * list FStar.UInt8.t)) (decreases fuel)
 
-let rec parse_resource_records_bytes fuel count input =
+let rec parse_resource_records_bytes additional_section fuel count input =
   if count = 0 then Some ([], input)
   else if fuel = 0 then None
   else
-    match parse_resource_record_bytes input with
+    match parse_resource_record_bytes additional_section input with
     | None -> None
     | Some (rr, rest) ->
-        match parse_resource_records_bytes (fuel - 1) (count - 1) rest with
+        match parse_resource_records_bytes additional_section (fuel - 1) (count - 1) rest with
         | None -> None
         | Some (rrs, tail) -> Some (rr :: rrs, tail)
 
@@ -305,13 +327,13 @@ let parse_dns_packet_bytes input =
       match parse_questions_bytes qd qd rest with
       | None -> None
       | Some (qs, after_questions) ->
-          match parse_resource_records_bytes an an after_questions with
+          match parse_resource_records_bytes false an an after_questions with
           | None -> None
           | Some (answers, after_answers) ->
-              match parse_resource_records_bytes ns ns after_answers with
+              match parse_resource_records_bytes false ns ns after_answers with
               | None -> None
               | Some (authorities, after_authorities) ->
-                  match parse_resource_records_bytes ar ar after_authorities with
+                  match parse_resource_records_bytes true ar ar after_authorities with
                   | None -> None
                   | Some (additionals, tail) ->
                       if L.length tail = 0 then

@@ -372,6 +372,77 @@ let invalid_aaaa_rdata_length_dns_response : list FStar.UInt8.t =
 let invalid_aaaa_rdata_length_parse_packet_test =
   assert_norm (parse_dns_packet_bytes invalid_aaaa_rdata_length_dns_response == None)
 
+let valid_edns0_opt_dns_query : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x01uy; 0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x29uy;
+    0x04uy; 0xd0uy;
+    0x00uy; 0x00uy; 0x00uy; 0x00uy;
+    0x00uy; 0x00uy
+  ]
+
+let valid_edns0_opt_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes valid_edns0_opt_dns_query with
+    | Some p ->
+        p.header.arcount == 1us /\
+        L.length p.additionals == 1 /\
+        (match p.additionals with
+         | rr :: [] ->
+             rr.name == [] /\
+             rr.rtype == OPT /\
+             rr.rclass == 1232us /\
+             rr.ttl == 0ul /\
+             rr.rdlen == 0us /\
+             FStar.Bytes.length rr.rdata == 0
+         | _ -> false)
+    | None -> false)
+
+let nonroot_edns0_opt_dns_query : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x01uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x01uy;
+    0x01uy; 0x78uy; 0x00uy;
+    0x00uy; 0x29uy;
+    0x04uy; 0xd0uy;
+    0x00uy; 0x00uy; 0x00uy; 0x00uy;
+    0x00uy; 0x00uy
+  ]
+
+let nonroot_edns0_opt_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes nonroot_edns0_opt_dns_query == None)
+
+let unsupported_edns_version_dns_query : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x01uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x29uy;
+    0x04uy; 0xd0uy;
+    0x00uy; 0x01uy; 0x00uy; 0x00uy;
+    0x00uy; 0x00uy
+  ]
+
+let unsupported_edns_version_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes unsupported_edns_version_dns_query == None)
+
 let boundary_valid_single_question_dns_query_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_single_question_dns_query ==
                parse_dns_packet_bytes valid_single_question_dns_query)
@@ -435,6 +506,18 @@ let boundary_rejects_invalid_a_rdata_length_test =
 let boundary_rejects_invalid_aaaa_rdata_length_test =
   assert_norm (parse_dns_packet_bytes_at_boundary invalid_aaaa_rdata_length_dns_response ==
                parse_dns_packet_bytes invalid_aaaa_rdata_length_dns_response)
+
+let boundary_accepts_edns0_opt_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary valid_edns0_opt_dns_query ==
+               parse_dns_packet_bytes valid_edns0_opt_dns_query)
+
+let boundary_rejects_nonroot_edns0_opt_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary nonroot_edns0_opt_dns_query ==
+               parse_dns_packet_bytes nonroot_edns0_opt_dns_query)
+
+let boundary_rejects_unsupported_edns_version_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary unsupported_edns_version_dns_query ==
+               parse_dns_packet_bytes unsupported_edns_version_dns_query)
 
 let boundary_backend_status_test =
   assert_norm (active_parser_backend == EverParseGeneratedSubset /\

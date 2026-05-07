@@ -24,13 +24,13 @@ let parse_dns_packet_bytes_generated input =
       match parse_questions_bytes qd qd rest with
       | None -> None
       | Some (qs, after_questions) ->
-          match parse_resource_records_bytes an an after_questions with
+          match parse_resource_records_bytes false an an after_questions with
           | None -> None
           | Some (answers, after_answers) ->
-              match parse_resource_records_bytes ns ns after_answers with
+              match parse_resource_records_bytes false ns ns after_answers with
               | None -> None
               | Some (authorities, after_authorities) ->
-                  match parse_resource_records_bytes ar ar after_authorities with
+                  match parse_resource_records_bytes true ar ar after_authorities with
                   | None -> None
                   | Some (additionals, tail) ->
                       if L.length tail = 0 then
