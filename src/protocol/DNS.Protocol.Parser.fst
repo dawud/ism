@@ -325,6 +325,40 @@ let valid_soa_rdata_payload rdlen input =
     | Some (_, after_mname) -> valid_soa_rdata_after_mname after_mname
     | None -> false
 
+val valid_txt_strings :
+  fuel:nat ->
+  input:list FStar.UInt8.t ->
+  Tot bool (decreases fuel)
+
+let rec valid_txt_strings fuel input =
+  if L.length input = 0 then
+    true
+  else if fuel = 0 then
+    false
+  else
+    match input with
+    | slen_b :: rest ->
+        let slen = FStar.UInt8.v slen_b in
+        if L.length rest < slen then
+          false
+        else
+          let (_, tail) = L.splitAt slen rest in
+          valid_txt_strings (fuel - 1) tail
+    | [] -> true
+
+val valid_txt_rdata_payload :
+  rdlen:FStar.UInt16.t ->
+  input:list FStar.UInt8.t ->
+  Tot bool
+
+let valid_txt_rdata_payload rdlen input =
+  let len = FStar.UInt16.v rdlen in
+  if len = 0 || L.length input < len then
+    false
+  else
+    let (payload, _) = L.splitAt len input in
+    valid_txt_strings len payload
+
 val valid_rdata_shape :
   rtype:qtype ->
   rdlen:FStar.UInt16.t ->
@@ -339,6 +373,7 @@ let valid_rdata_shape rtype rdlen input =
   | PTR -> valid_name_rdata_payload rdlen input
   | MX -> valid_mx_rdata_payload rdlen input
   | SOA -> valid_soa_rdata_payload rdlen input
+  | TXT -> valid_txt_rdata_payload rdlen input
   | _ -> true
 
 val parse_resource_record_bytes :

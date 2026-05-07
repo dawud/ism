@@ -75,6 +75,7 @@ The containerized `make extract` command now completes and emits C/H files under
   - [x] NS/CNAME/PTR RDATA accepted only when it is a single fully-consumed uncompressed domain name;
   - [x] MX RDATA accepted only when it has a two-byte preference and a single fully-consumed uncompressed exchange name;
   - [x] SOA RDATA accepted only when it has two fully-consumed uncompressed domain names plus five 32-bit timer fields;
+  - [x] TXT RDATA accepted only when it contains one or more fully-consumed character strings;
   - [x] malformed compression pointers rejected until compression support is implemented.
 - [/] Add extraction as a routine build gate:
   - [x] run `make extract` in the container;
@@ -114,8 +115,8 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 - [x] Implement RFC-assigned integer mapping for all 43+ record types.
 - [/] Implement `DNS.Protocol.header_validator` and `header_reader` using EverParse. Current code has pure byte-list header/RR parsing, a verified Low* buffer reader, and an `EverParseBoundary` module that routes through a production-target subset boundary matching the reference parser; no external generated EverParse header reader is present yet.
 - [/] Implement recursive `parse_qname` with fuel-based termination for name compression. Current code parses uncompressed labels, enforces the 255-byte DNS name length budget, and rejects compression pointers.
-- [/] Implement full `DNS_Packet` parser (Header + Question + RR sections). Current `DNS.Protocol.Parser` parses header, question, and RR sections from byte lists; RR parsing preserves bounded RDATA bytes, maps unknown types to `UNKNOWN`, validates A/AAAA RDATA lengths, validates NS/CNAME/PTR/MX/SOA RDATA shapes, and accepts structurally valid EDNS0 OPT pseudo-RRs/options in the additional section, but broader type-specific RDATA validation and compression-pointer support are not implemented yet.
-- [/] **Validation:** Prove parser is "parser-rejecting" for malformed inputs. Current name/header/question/buffer proofs are admitted-free, and tests cover RR truncation, A/AAAA RDATA length rejection, name-bearing, MX, and SOA RDATA rejection cases, malformed OPT rejection, and malformed EDNS option rejection; broader type-specific RR parser obligations remain incomplete.
+- [/] Implement full `DNS_Packet` parser (Header + Question + RR sections). Current `DNS.Protocol.Parser` parses header, question, and RR sections from byte lists; RR parsing preserves bounded RDATA bytes, maps unknown types to `UNKNOWN`, validates A/AAAA RDATA lengths, validates NS/CNAME/PTR/MX/SOA/TXT RDATA shapes, and accepts structurally valid EDNS0 OPT pseudo-RRs/options in the additional section, but broader type-specific RDATA validation and compression-pointer support are not implemented yet.
+- [/] **Validation:** Prove parser is "parser-rejecting" for malformed inputs. Current name/header/question/buffer proofs are admitted-free, and tests cover RR truncation, A/AAAA RDATA length rejection, name-bearing, MX, SOA, and TXT RDATA rejection cases, malformed OPT rejection, and malformed EDNS option rejection; broader type-specific RR parser obligations remain incomplete.
 
 ## Phase 2: DoQ Transport Layer (QUIC + TLS 1.3)
 *Goal: Secure transport tunnel using EverCrypt/EverQuic.*
