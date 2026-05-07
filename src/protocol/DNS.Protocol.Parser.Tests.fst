@@ -996,6 +996,140 @@ let truncated_txt_string_dns_response : list FStar.UInt8.t =
 let truncated_txt_string_parse_packet_test =
   assert_norm (parse_dns_packet_bytes truncated_txt_string_dns_response == None)
 
+let valid_srv_rdata_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x21uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x21uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x0buy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x02uy;
+    0x01uy; 0xbbuy;
+    0x03uy; 0x73uy; 0x76uy; 0x63uy; 0x00uy
+  ]
+
+let valid_srv_rdata_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes valid_srv_rdata_dns_response with
+    | Some p ->
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.rtype == SRV /\
+             rr.rdlen == 11us /\
+             FStar.Bytes.length rr.rdata == 11
+         | _ -> false)
+    | None -> false)
+
+let truncated_srv_fixed_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x21uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x21uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x05uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x02uy;
+    0x01uy
+  ]
+
+let truncated_srv_fixed_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes truncated_srv_fixed_dns_response == None)
+
+let truncated_srv_target_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x21uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x21uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x09uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x02uy;
+    0x01uy; 0xbbuy;
+    0x03uy; 0x73uy; 0x76uy
+  ]
+
+let truncated_srv_target_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes truncated_srv_target_dns_response == None)
+
+let trailing_srv_target_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x21uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x21uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x08uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x02uy;
+    0x01uy; 0xbbuy;
+    0x00uy; 0xffuy
+  ]
+
+let trailing_srv_target_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes trailing_srv_target_dns_response == None)
+
+let compressed_srv_target_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x21uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x21uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x08uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x02uy;
+    0x01uy; 0xbbuy;
+    0xc0uy; 0x0cuy
+  ]
+
+let compressed_srv_target_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes compressed_srv_target_dns_response == None)
+
 let boundary_valid_single_question_dns_query_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_single_question_dns_query ==
                parse_dns_packet_bytes valid_single_question_dns_query)
@@ -1155,6 +1289,26 @@ let boundary_rejects_zero_length_txt_rdata_test =
 let boundary_rejects_truncated_txt_string_test =
   assert_norm (parse_dns_packet_bytes_at_boundary truncated_txt_string_dns_response ==
                parse_dns_packet_bytes truncated_txt_string_dns_response)
+
+let boundary_accepts_srv_rdata_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary valid_srv_rdata_dns_response ==
+               parse_dns_packet_bytes valid_srv_rdata_dns_response)
+
+let boundary_rejects_truncated_srv_fixed_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary truncated_srv_fixed_dns_response ==
+               parse_dns_packet_bytes truncated_srv_fixed_dns_response)
+
+let boundary_rejects_truncated_srv_target_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary truncated_srv_target_dns_response ==
+               parse_dns_packet_bytes truncated_srv_target_dns_response)
+
+let boundary_rejects_trailing_srv_target_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary trailing_srv_target_dns_response ==
+               parse_dns_packet_bytes trailing_srv_target_dns_response)
+
+let boundary_rejects_compressed_srv_target_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary compressed_srv_target_dns_response ==
+               parse_dns_packet_bytes compressed_srv_target_dns_response)
 
 let boundary_backend_status_test =
   assert_norm (active_parser_backend == EverParseGeneratedSubset /\

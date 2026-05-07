@@ -359,6 +359,27 @@ let valid_txt_rdata_payload rdlen input =
     let (payload, _) = L.splitAt len input in
     valid_txt_strings len payload
 
+val valid_srv_rdata_payload :
+  rdlen:FStar.UInt16.t ->
+  input:list FStar.UInt8.t ->
+  Tot bool
+
+let valid_srv_rdata_payload rdlen input =
+  let len = FStar.UInt16.v rdlen in
+  if len < 7 || L.length input < len then
+    false
+  else
+    let (payload, _) = L.splitAt len input in
+    match payload with
+    | _priority_hi :: _priority_lo ::
+      _weight_hi :: _weight_lo ::
+      _port_hi :: _port_lo ::
+      target ->
+        match DNS.Name.parse_qname 128 target with
+        | Some (_, tail) -> L.length tail = 0
+        | None -> false
+    | _ -> false
+
 val valid_rdata_shape :
   rtype:qtype ->
   rdlen:FStar.UInt16.t ->
@@ -374,6 +395,7 @@ let valid_rdata_shape rtype rdlen input =
   | MX -> valid_mx_rdata_payload rdlen input
   | SOA -> valid_soa_rdata_payload rdlen input
   | TXT -> valid_txt_rdata_payload rdlen input
+  | SRV -> valid_srv_rdata_payload rdlen input
   | _ -> true
 
 val parse_resource_record_bytes :
