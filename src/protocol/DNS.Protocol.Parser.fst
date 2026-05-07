@@ -272,6 +272,21 @@ let valid_opt_options_payload rdlen input =
     | Some _ -> true
     | None -> false
 
+val valid_name_rdata_payload :
+  rdlen:FStar.UInt16.t ->
+  input:list FStar.UInt8.t ->
+  Tot bool
+
+let valid_name_rdata_payload rdlen input =
+  let len = FStar.UInt16.v rdlen in
+  if L.length input < len then
+    false
+  else
+    let (payload, _) = L.splitAt len input in
+    match DNS.Name.parse_qname 128 payload with
+    | Some (_, tail) -> L.length tail = 0
+    | None -> false
+
 val valid_rdata_shape :
   rtype:qtype ->
   rdlen:FStar.UInt16.t ->
@@ -281,6 +296,9 @@ val valid_rdata_shape :
 let valid_rdata_shape rtype rdlen input =
   match rtype with
   | OPT -> valid_opt_options_payload rdlen input
+  | NS -> valid_name_rdata_payload rdlen input
+  | CNAME -> valid_name_rdata_payload rdlen input
+  | PTR -> valid_name_rdata_payload rdlen input
   | _ -> true
 
 val parse_resource_record_bytes :

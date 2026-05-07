@@ -119,6 +119,8 @@ Parser-test policy is recorded in [DECISIONS.md](DECISIONS.md). Initial tests sh
 - valid single-answer RR with bounded RDATA preservation;
 - truncated RR header and RDATA rejected;
 - invalid A/AAAA RDATA lengths rejected;
+- valid CNAME RDATA accepted as one fully-consumed uncompressed name;
+- truncated, trailing, or compressed name-bearing RDATA rejected;
 - unknown QTYPE accepted as `UNKNOWN`;
 - unknown RR TYPE accepted as `UNKNOWN`;
 - valid EDNS0 OPT pseudo-RR accepted in the additional section;
@@ -139,7 +141,7 @@ Maintain a compliance matrix for each protocol area. See [DECISIONS.md](DECISION
 | [RFC 1034](https://datatracker.ietf.org/doc/html/rfc1034) | DNS concepts | Authoritative data, recursion, CNAME, and wildcard model | Partial | Exact radix lookup and CNAME hop-count scaffolds exist. | Wildcard semantics, full CNAME chasing, and recursive behavior are incomplete. |
 | [RFC 1035](https://datatracker.ietf.org/doc/html/rfc1035) | Header format | 12-byte DNS header | Partial | Pure parser tests cover valid and truncated headers; Low* buffer boundary reads the checked length; shared fixtures now exercise the EverParse production-target subset boundary. | External generated parser not integrated yet. |
 | [RFC 1035](https://datatracker.ietf.org/doc/html/rfc1035) | QNAME labels | Labels are length-prefixed | Partial | Tests cover valid root QNAMEs, truncated QNAMEs, invalid label length, trailing bytes, and rejected compression pointers. | Compression is rejected for now, including RR names. |
-| [RFC 1035](https://datatracker.ietf.org/doc/html/rfc1035) | Resource records | RR NAME, TYPE, CLASS, TTL, RDLENGTH, and RDATA fields | Partial | Tests cover one answer RR, truncated RR headers, truncated RDATA, and invalid A/AAAA RDATA lengths. | RDATA is preserved by RDLENGTH; A/AAAA length validation exists, while broader type-specific RDATA validation is incomplete. |
+| [RFC 1035](https://datatracker.ietf.org/doc/html/rfc1035) | Resource records | RR NAME, TYPE, CLASS, TTL, RDLENGTH, and RDATA fields | Partial | Tests cover one answer RR, truncated RR headers, truncated RDATA, invalid A/AAAA RDATA lengths, and name-bearing CNAME RDATA shape. | RDATA is preserved by RDLENGTH; A/AAAA length validation and NS/CNAME/PTR name-shape validation exist, while broader type-specific RDATA validation is incomplete. |
 | [RFC 2181](https://datatracker.ietf.org/doc/html/rfc2181) | DNS clarifications | RRset, TTL, CNAME, and ranking clarifications | Partial | TTL validity and saturated expiry calculations exist. | RRset semantics, trust ranking, and full CNAME rules are incomplete. |
 | [RFC 2308](https://datatracker.ietf.org/doc/html/rfc2308) | Negative caching | Cache NXDOMAIN/NODATA and TTL behavior correctly | Not implemented | None | Recursive cache lookup/insertion are still admitted. |
 | [RFC 3597](https://datatracker.ietf.org/doc/html/rfc3597) | Unknown RR types | Preserve unknown types | Partial | Executable parser tests map unknown QTYPE and RR TYPE values to `UNKNOWN`, and RR RDATA is preserved by RDLENGTH. | Presentation-format handling and full unknown-RR serialization are not implemented. |
