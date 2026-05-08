@@ -7,6 +7,7 @@ open DNS.Protocol
 open DNS.Protocol.Parser
 open DNS.Protocol.Parser.EverParseBoundary
 module OPT = DNS.Protocol.OPT
+module SER = DNS.Protocol.Serializer
 
 let valid_single_question_dns_query : list FStar.UInt8.t =
   [
@@ -46,6 +47,147 @@ let valid_single_question_dns_packet : dns_packet =
 let valid_single_question_dns_query_test =
   assert_norm (parse_dns_packet_bytes valid_single_question_dns_query ==
                Some valid_single_question_dns_packet)
+
+let serialized_response_header : header =
+  {
+    id = 0x1234us;
+    flags = uint16_to_flags 0x8180us;
+    qdcount = 0us;
+    ancount = 0us;
+    nscount = 0us;
+    arcount = 0us;
+  }
+
+let serialized_response_header_bytes_test =
+  assert_norm (SER.serialize_header_bytes serialized_response_header ==
+               [
+                 0x12uy; 0x34uy;
+                 0x81uy; 0x80uy;
+                 0x00uy; 0x00uy;
+                 0x00uy; 0x00uy;
+                 0x00uy; 0x00uy;
+                 0x00uy; 0x00uy
+               ])
+
+let serialized_empty_response_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes (SER.serialize_header_bytes serialized_response_header) with
+    | Some p ->
+        p.header.id == 0x1234us /\
+        p.header.flags.qr == true /\
+        p.header.flags.rcode == 0us /\
+        L.length p.questions == 0 /\
+        L.length p.answers == 0 /\
+        L.length p.additionals == 0
+    | None -> false)
+
+let serialized_root_question_bytes_test =
+  assert_norm (
+    SER.serialize_question_bytes {
+      qname = [];
+      qtype = A;
+      qclass = 1us;
+    } == Some [0x00uy; 0x00uy; 0x01uy; 0x00uy; 0x01uy])
+
+let serialized_a_answer_bytes : list FStar.UInt8.t =
+  match SER.serialize_resource_record_fields_bytes
+          []
+          A
+          1us
+          60ul
+          [0x01uy; 0x02uy; 0x03uy; 0x04uy] with
+  | Some bytes -> bytes
+  | None -> []
+
+let serialized_a_answer_bytes_test =
+  assert_norm (serialized_a_answer_bytes ==
+               [
+                 0x00uy;
+                 0x00uy; 0x01uy;
+                 0x00uy; 0x01uy;
+                 0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+                 0x00uy; 0x04uy;
+                 0x01uy; 0x02uy; 0x03uy; 0x04uy
+               ])
+
+let serialized_a_answer_response : list FStar.UInt8.t =
+  L.append
+    (SER.serialize_header_bytes {
+      id = 0x1234us;
+      flags = uint16_to_flags 0x8180us;
+      qdcount = 0us;
+      ancount = 1us;
+      nscount = 0us;
+      arcount = 0us;
+    })
+    serialized_a_answer_bytes
+
+let serialized_a_answer_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes serialized_a_answer_response with
+    | Some p ->
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.rtype == A /\
+             rr.rdlen == 4us /\
+             FStar.Bytes.length rr.rdata == 4
+         | _ -> false)
+    | None -> false)
+
+let serialized_padding_opt_response_header : header =
+  {
+    id = 0x1234us;
+    flags = uint16_to_flags 0x8180us;
+    qdcount = 0us;
+    ancount = 0us;
+    nscount = 0us;
+    arcount = 1us;
+  }
+
+let serialized_padding_opt_response_bytes : list FStar.UInt8.t =
+  let flags:OPT.opt_flags = { do_bit = false; z = 0us } in
+  match SER.serialize_response_with_opt_payload
+          serialized_padding_opt_response_header
+          1232us
+          0uy
+          0uy
+          flags
+          (OPT.serialize_padding_option_bytes 4us) with
+  | Some bytes -> bytes
+  | None -> []
+
+let serialized_padding_opt_response_bytes_test =
+  assert_norm (serialized_padding_opt_response_bytes ==
+               [
+                 0x12uy; 0x34uy;
+                 0x81uy; 0x80uy;
+                 0x00uy; 0x00uy;
+                 0x00uy; 0x00uy;
+                 0x00uy; 0x00uy;
+                 0x00uy; 0x01uy;
+                 0x00uy;
+                 0x00uy; 0x29uy;
+                 0x04uy; 0xd0uy;
+                 0x00uy; 0x00uy; 0x00uy; 0x00uy;
+                 0x00uy; 0x08uy;
+                 0x00uy; 0x0cuy;
+                 0x00uy; 0x04uy;
+                 0x00uy; 0x00uy; 0x00uy; 0x00uy
+               ])
+
+let serialized_padding_opt_response_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes serialized_padding_opt_response_bytes with
+    | Some p ->
+        L.length p.additionals == 1 /\
+        (match p.additionals with
+         | rr :: [] ->
+             rr.rtype == OPT /\
+             rr.rdlen == 8us /\
+             FStar.Bytes.length rr.rdata == 8
+         | _ -> false)
+    | None -> false)
 
 let truncated_dns_header : list FStar.UInt8.t =
   [
