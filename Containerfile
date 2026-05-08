@@ -1,5 +1,8 @@
-# Use Fedora 44 as the base image
 FROM fedora:44
+
+ARG USER_NAME=ism
+ARG USER_ID=1000
+ARG GROUP_ID=1000
 
 # 1. Install System Dependencies
 RUN dnf install -y \
@@ -10,7 +13,8 @@ RUN dnf install -y \
 # 2. Set Environment Variables
 ENV FSTAR_HOME=/opt/fstar/fstar
 ENV KRML_HOME=/opt/karamel
-ENV PATH="${FSTAR_HOME}/bin:${KRML_HOME}:${PATH}"
+ENV EVERPARSE_HOME=/opt/everparse
+ENV PATH="${FSTAR_HOME}/bin:${KRML_HOME}:${EVERPARSE_HOME}:${PATH}"
 
 # 3. Install F* (Specific stable version for Low*)
 # We use v2026.03.24 as it is the last version before the major Low* removal.
@@ -24,7 +28,17 @@ RUN FSTAR_VERSION=v2026.03.24 \
     && chmod +x ${FSTAR_HOME}/bin/fstar.exe \
     && rm fstar.tar.gz
 
-# 4. Install KaRaMeL (from Source via OPAM)
+# 4. Create the unprivileged development user and writable tool directories.
+RUN groupadd --gid ${GROUP_ID} ${USER_NAME} \
+    && useradd --uid ${USER_ID} --gid ${GROUP_ID} --create-home --shell /bin/bash ${USER_NAME} \
+    && mkdir -p ${KRML_HOME} ${EVERPARSE_HOME} /workspace \
+    && chown -R ${USER_NAME}:${USER_NAME} ${KRML_HOME} ${EVERPARSE_HOME} /workspace
+
+USER ${USER_NAME}
+ENV HOME=/home/${USER_NAME}
+WORKDIR ${HOME}
+
+# 5. Install KaRaMeL (from Source via OPAM)
 RUN opam init --disable-sandboxing -y \
     && eval $(opam env) \
     && opam install -y ocamlfind batteries zarith stdint yojson visitors menhir fix process ctypes ctypes-foreign uucp ppx_deriving_yojson sedlex wasm pprint \
@@ -33,11 +47,23 @@ RUN opam init --disable-sandboxing -y \
     && export FSTAR_HOME=${FSTAR_HOME} \
     && export PATH="${FSTAR_HOME}/bin:${PATH}" \
     && make \
-    && echo 'eval $(opam env)' >> /root/.bashrc
+    && echo 'eval $(opam env)' >> ${HOME}/.bashrc
 
-# 5. Set up the Project Workspace
+# 6. Install EverParse/3D tooling from the standalone binary package.
+RUN EVERPARSE_VERSION=v2026.03.21 \
+    && EVERPARSE_ARCHIVE=everparse_${EVERPARSE_VERSION}_Linux_x86_64.tar.gz \
+    && EVERPARSE_SHA256=467d391c819dbc513173bdb4bb71aa0073e497fe50acfe116099b4ff27b7ebd8 \
+    && EVERPARSE_URL=https://github.com/project-everest/everparse/releases/download/${EVERPARSE_VERSION}/${EVERPARSE_ARCHIVE} \
+    && echo "Downloading EverParse ${EVERPARSE_VERSION} from ${EVERPARSE_URL}" \
+    && wget "${EVERPARSE_URL}" -O /tmp/everparse.tar.gz \
+    && echo "${EVERPARSE_SHA256}  /tmp/everparse.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/everparse.tar.gz -C /opt \
+    && rm /tmp/everparse.tar.gz \
+    && test -x ${EVERPARSE_HOME}/everparse.sh
+
+# 7. Set up the Project Workspace
 WORKDIR /workspace
-COPY . /workspace
+COPY --chown=${USER_NAME}:${USER_NAME} . /workspace
 
 # Default command: Verify the protocol
-CMD ["bash", "-c", "eval $(opam env) && make verify"]
+CMD ["bash", "-lc", "eval $(opam env) && make verify"]

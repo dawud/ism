@@ -25,13 +25,17 @@ jobs:
       - name: Verify F* sources
         run: |
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
             -v "${PWD}:/workspace" \
             localhost/verified-dns-server:latest \
-            bash -lc 'cd /workspace && eval $(opam env) && make verify'
+            bash -lc 'cd /workspace && make verify'
 
       - name: Extract C smoke test
         run: |
           docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
             -v "${PWD}:/workspace" \
             localhost/verified-dns-server:latest \
-            bash -lc 'cd /workspace && eval $(opam env) && make extract'
+            bash -lc 'cd /workspace && make extract'

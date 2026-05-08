@@ -44,6 +44,7 @@ the image's default command runs `make verify`.
 ```bash
 # Run formal verification with the prebuilt local image
 podman run --rm \
+  --userns=keep-id \
   -v "$(pwd):/workspace:Z" \
   localhost/verified-dns-server:latest
 ```
@@ -58,16 +59,34 @@ To run a specific build target, override the default command:
 
 ```bash
 podman run --rm \
+  --userns=keep-id \
   -v "$(pwd):/workspace:Z" \
   localhost/verified-dns-server:latest \
   bash -lc 'eval $(opam env) && make extract'
 ```
 
-With Docker, use the same image name and mount path, but omit the SELinux `:Z`
-suffix if your Docker setup does not support it:
+The image also includes EverParse/3D tooling. To regenerate the current
+EverParse parser scaffold, run:
 
 ```bash
-docker run --rm -v "$(pwd):/workspace" localhost/verified-dns-server:latest
+podman run --rm \
+  --userns=keep-id \
+  -v "$(pwd):/workspace:Z" \
+  localhost/verified-dns-server:latest \
+  bash -lc 'make everparse-generate'
+```
+
+With Docker, run the container as your host UID/GID so generated `obj/`,
+`dist/`, or `generated/` files are writable on the bind mount. Omit the SELinux
+`:Z` suffix if your Docker setup does not support it:
+
+```bash
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/tmp \
+  -v "$(pwd):/workspace" \
+  localhost/verified-dns-server:latest \
+  bash -lc 'make verify'
 ```
 
 ### Manual Build
