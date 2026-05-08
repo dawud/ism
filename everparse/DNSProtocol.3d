@@ -1,8 +1,8 @@
 // DNS wire-format seed for the EverParse production parser boundary.
-// This starts with fixed-size RFC 1035 header validation and the root-question
-// fixture used by the current parser tests. Full QNAME recursion and RR-section
-// validation remain in the handwritten reference parser until the generated
-// boundary is expanded.
+// This starts with fixed-size RFC 1035 header validation plus root-question
+// and single-label uncompressed question fixtures. Full recursive QNAME and
+// RR-section validation remain in the handwritten reference parser until the
+// generated boundary is expanded.
 
 typedef struct _dns_flags {
   UINT16BE qr : 1;
@@ -31,3 +31,13 @@ entrypoint typedef struct _dns_root_question {
   UINT16BE qtype;
   UINT16BE qclass;
 } dns_root_question;
+
+entrypoint typedef struct _dns_single_label_question (UINT32 label_length)
+where label_length > 0 && label_length <= 63
+{
+  UINT8 label_len { label_len == label_length };
+  UINT8 label[label_length];
+  UINT8 root { root == 0 };
+  UINT16BE qtype;
+  UINT16BE qclass;
+} dns_single_label_question;

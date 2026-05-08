@@ -31,3 +31,16 @@ val check_dns_root_question :
       live h0 base /\
       FStar.UInt32.v len <= length base))
     (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+
+[@ (CPrologue "\
+#include \"DNSProtocolWrapper.h\"\n\
+#define DNS_Protocol_Parser_EverParseRuntime_check_dns_single_label_question DnsprotocolCheckDnsSingleLabelQuestion\n")]
+val check_dns_single_label_question :
+  label_length:FStar.UInt32.t ->
+  base:buffer FStar.UInt8.t ->
+  len:FStar.UInt32.t ->
+  Stack bool
+    (requires (fun h0 ->
+      live h0 base /\
+      FStar.UInt32.v len <= length base))
+    (ensures (fun h0 _ h1 -> modifies_none h0 h1))

@@ -44,9 +44,48 @@ let valid_single_question_dns_packet : dns_packet =
     additionals = [];
   }
 
+let valid_single_label_question_dns_query : list FStar.UInt8.t =
+  [
+    0x12uy; 0x35uy;
+    0x01uy; 0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x01uy; 0x61uy; 0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy
+  ]
+
+let valid_single_label_question_dns_packet : dns_packet =
+  {
+    header = {
+      id = 0x1235us;
+      flags = uint16_to_flags 0x0100us;
+      qdcount = 1us;
+      ancount = 0us;
+      nscount = 0us;
+      arcount = 0us;
+    };
+    questions = [
+      {
+        qname = [[0x61uy]];
+        qtype = A;
+        qclass = 1us;
+      }
+    ];
+    answers = [];
+    authorities = [];
+    additionals = [];
+  }
+
 let valid_single_question_dns_query_test =
   assert_norm (parse_dns_packet_bytes valid_single_question_dns_query ==
                Some valid_single_question_dns_packet)
+
+let valid_single_label_question_dns_query_test =
+  assert_norm (parse_dns_packet_bytes valid_single_label_question_dns_query ==
+               Some valid_single_label_question_dns_packet)
 
 let serialized_response_header : header =
   {
@@ -1445,6 +1484,10 @@ let boundary_valid_single_question_dns_query_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_single_question_dns_query ==
                parse_dns_packet_bytes valid_single_question_dns_query)
 
+let boundary_valid_single_label_question_dns_query_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary valid_single_label_question_dns_query ==
+               parse_dns_packet_bytes valid_single_label_question_dns_query)
+
 let boundary_truncated_dns_header_test =
   assert_norm (parse_dns_packet_bytes_at_boundary truncated_dns_header ==
                parse_dns_packet_bytes truncated_dns_header)
@@ -1629,4 +1672,5 @@ let boundary_backend_status_test =
                everparse_generated_artifact_build_gate_available_at_boundary == true /\
                everparse_generated_artifact_linked_in_adapter_verification_at_boundary == true /\
                everparse_generated_artifact_wired_into_active_parser_at_boundary == true /\
-               everparse_generated_subset_gate_active_at_boundary == true)
+               everparse_generated_subset_gate_active_at_boundary == true /\
+               everparse_generated_single_label_question_gate_active_at_boundary == true)

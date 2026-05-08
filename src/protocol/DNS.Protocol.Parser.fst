@@ -504,6 +504,29 @@ val parse_dns_packet_buffer :
       FStar.UInt32.v len <= LowStar.Buffer.length buffer))
     (ensures (fun h0 _ h1 -> modifies_none h0 h1))
 
+val generated_single_label_question_subset_applicable :
+  input:list FStar.UInt8.t ->
+  Tot bool
+
+let generated_single_label_question_subset_applicable input =
+  if L.length input < 18 || L.length input > 80 then
+    false
+  else
+    begin
+      assert (12 < L.length input);
+      let label_len_byte = L.index input 12 in
+      let label_len = FStar.UInt8.v label_len_byte in
+      if label_len = 0 || label_len > 63 then
+        false
+      else if L.length input = 18 + label_len then
+        begin
+          assert (13 + label_len < L.length input);
+          L.index input (13 + label_len) = 0uy
+        end
+      else
+        false
+    end
+
 val validate_generated_root_question_subset_buffer :
   buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
   len:FStar.UInt32.t{FStar.UInt32.v len == 17} ->
@@ -521,18 +544,50 @@ let validate_generated_root_question_subset_buffer buffer len =
   else
     false
 
-val validate_generated_subset_gate_buffer :
+val validate_generated_single_label_question_subset_buffer :
   buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
   len:FStar.UInt32.t ->
+  bytes:list FStar.UInt8.t{
+    L.length bytes == FStar.UInt32.v len /\
+    generated_single_label_question_subset_applicable bytes == true
+  } ->
   Stack bool
     (requires (fun h0 ->
       LowStar.Buffer.live h0 buffer /\
       FStar.UInt32.v len <= LowStar.Buffer.length buffer))
     (ensures (fun h0 _ h1 -> modifies_none h0 h1))
 
-let validate_generated_subset_gate_buffer buffer len =
+let validate_generated_single_label_question_subset_buffer buffer len bytes =
+  assert (L.length bytes >= 18);
+  assert (FStar.UInt32.v len >= 18);
+  assert (12 <= LowStar.Buffer.length buffer);
+  assert (12 < L.length bytes);
+  let label_len = FStar.UInt8.v (L.index bytes 12) in
+  assert (label_len > 0);
+  assert (label_len <= 63);
+  let label_length = FStar.UInt32.uint_to_t label_len in
+  assert (FStar.UInt32.v label_length == label_len);
+  let question_len_nat = FStar.UInt32.v len - 12 in
+  let question_len = FStar.UInt32.uint_to_t question_len_nat in
+  assert (FStar.UInt32.v question_len == question_len_nat);
+  let question = LowStar.Buffer.offset buffer 12ul in
+  EPR.check_dns_single_label_question label_length question question_len
+
+val validate_generated_subset_gate_buffer :
+  buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
+  len:FStar.UInt32.t ->
+  bytes:list FStar.UInt8.t{L.length bytes == FStar.UInt32.v len} ->
+  Stack bool
+    (requires (fun h0 ->
+      LowStar.Buffer.live h0 buffer /\
+      FStar.UInt32.v len <= LowStar.Buffer.length buffer))
+    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+
+let validate_generated_subset_gate_buffer buffer len bytes =
   if FStar.UInt32.v len = 17 then
     validate_generated_root_question_subset_buffer buffer len
+  else if generated_single_label_question_subset_applicable bytes then
+    validate_generated_single_label_question_subset_buffer buffer len bytes
   else
     true
 
@@ -559,9 +614,9 @@ let rec read_buffer_range buffer pos remaining =
     b :: rest
 
 let parse_dns_packet_buffer buffer len =
-  let generated_subset_ok = validate_generated_subset_gate_buffer buffer len in
+  let bytes = read_buffer_range buffer 0 (FStar.UInt32.v len) in
+  let generated_subset_ok = validate_generated_subset_gate_buffer buffer len bytes in
   if generated_subset_ok then
-    let bytes = read_buffer_range buffer 0 (FStar.UInt32.v len) in
     parse_dns_packet_bytes bytes
   else
     None
