@@ -11,10 +11,21 @@ GENERATED_DIR = generated
 EVERPARSE_SRC_DIR = everparse
 EVERPARSE_OUT_DIR = $(GENERATED_DIR)/everparse
 EVERPARSE_CMD ?= everparse.sh
+EVERPARSE_HOME ?= /opt/everparse
+EVERPARSE_INCLUDE_DIRS = $(EVERPARSE_OUT_DIR) \
+                         $(EVERPARSE_HOME)/src/3d/prelude/buffer \
+                         $(EVERPARSE_HOME)/src/3d/prelude \
+                         $(EVERPARSE_HOME)/src/lowparse \
+                         $(EVERPARSE_HOME)/krmllib \
+                         $(EVERPARSE_HOME)/krmllib/obj
 
 # F* configuration
 FSTAR_OPTS  = --odir $(OBJ_DIR) --cache_dir $(OBJ_DIR) \
               $(addprefix --include , $(SRC_DIRS))
+
+EVERPARSE_FSTAR_OPTS = --odir $(EVERPARSE_OUT_DIR) --cache_dir $(EVERPARSE_OUT_DIR) \
+                       $(addprefix --include , $(EVERPARSE_INCLUDE_DIRS)) \
+                       --already_cached 'Prims,LowStar,FStar,LowParse,C,EverParse3d.*,Spec'
 
 # KaRaMel configuration
 KRML_OPTS   = -drop 'FStar.Tactics.*' -drop 'FStar.Reflection.*' \
@@ -23,7 +34,18 @@ KRML_OPTS   = -drop 'FStar.Tactics.*' -drop 'FStar.Reflection.*' \
               -tmpdir $(DIST_DIR) -skip-compilation
 
 # 1. Collect all F* source files
-ALL_FST_FILES = $(wildcard src/protocol/*.fst) \
+PROTOCOL_FST_FILES = src/protocol/DNS.Name.fst \
+                     src/protocol/DNS.Protocol.fst \
+                     src/protocol/DNS.Constants.fst \
+                     src/protocol/DNS.RCode.fst \
+                     src/protocol/DNS.Protocol.OPT.fst \
+                     src/protocol/DNS.Protocol.Parser.fst \
+                     src/protocol/DNS.Protocol.Parser.EverParseGenerated.fst \
+                     src/protocol/DNS.Protocol.Parser.EverParseBoundary.fst \
+                     src/protocol/DNS.Protocol.Serializer.fst \
+                     src/protocol/DNS.Protocol.Parser.Tests.fst
+
+ALL_FST_FILES = $(PROTOCOL_FST_FILES) \
                 $(wildcard src/security/*.fst) \
                 $(wildcard src/transport/*.fst) \
                 $(wildcard src/logic/*.fst) \
@@ -32,7 +54,7 @@ ALL_FST_FILES = $(wildcard src/protocol/*.fst) \
 
 # Extraction is narrower than verification while Phase 3/4 scaffolds still
 # contain specification-oriented lists, admits, and Steel placeholders.
-EXTRACT_FST_FILES = $(filter-out src/protocol/%.Tests.fst, $(wildcard src/protocol/*.fst)) \
+EXTRACT_FST_FILES = $(filter-out src/protocol/%.Tests.fst, $(PROTOCOL_FST_FILES)) \
                     $(wildcard src/security/*.fst) \
                     $(wildcard src/transport/*.fst) \
                     $(wildcard spec/*.fsti)
@@ -74,6 +96,7 @@ everparse-verify: everparse-generate
 	@test -s $(EVERPARSE_OUT_DIR)/DNSProtocol.h
 	@test -s $(EVERPARSE_OUT_DIR)/DNSProtocolWrapper.c
 	@test -s $(EVERPARSE_OUT_DIR)/DNSProtocolWrapper.h
+	$(EVERPARSE_HOME)/bin/fstar.exe $(EVERPARSE_FSTAR_OPTS) src/protocol/DNS.Protocol.Parser.EverParseAdapter.fst
 	@echo "EverParse DNSProtocol subset generated and verified."
 
 # 4. Cleanup

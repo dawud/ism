@@ -2,7 +2,6 @@ module DNS.Protocol.Parser
 
 open FStar.UInt16
 open FStar.HyperStack.ST
-open LowParse.Low.Base
 open DNS.Protocol
 open DNS.Constants
 module L = FStar.List.Tot
@@ -496,7 +495,7 @@ let validate_dns_packet_bytes (input:list FStar.UInt8.t) : bool =
   | None -> false
 
 val parse_dns_packet_buffer :
-  buffer:uint8_ptr ->
+  buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
   len:FStar.UInt32.t ->
   Stack (option dns_packet)
     (requires (fun h0 ->
@@ -505,7 +504,7 @@ val parse_dns_packet_buffer :
     (ensures (fun h0 _ h1 -> modifies_none h0 h1))
 
 val read_buffer_range :
-  buffer:uint8_ptr ->
+  buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
   pos:nat ->
   remaining:nat ->
   Stack (bytes:list FStar.UInt8.t{L.length bytes == remaining})
@@ -531,7 +530,7 @@ let parse_dns_packet_buffer buffer len =
   parse_dns_packet_bytes bytes
 
 val lemma_read_buffer_range_length :
-  buffer:uint8_ptr ->
+  buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
   pos:nat ->
   remaining:nat ->
   Stack unit
@@ -546,7 +545,7 @@ let lemma_read_buffer_range_length buffer pos remaining =
   ()
 
 val lemma_parse_dns_packet_buffer_reads_len :
-  buffer:uint8_ptr ->
+  buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
   len:FStar.UInt32.t ->
   Stack unit
     (requires (fun h0 ->
@@ -560,7 +559,7 @@ let lemma_parse_dns_packet_buffer_reads_len buffer len =
   ()
 
 val lemma_parse_dns_packet_buffer_safe_prefix :
-  buffer:uint8_ptr ->
+  buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
   len:FStar.UInt32.t ->
   Stack unit
     (requires (fun h0 ->

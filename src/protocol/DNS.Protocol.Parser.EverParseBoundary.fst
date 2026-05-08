@@ -21,6 +21,9 @@ let everparse_3d_grammar_available_at_boundary : bool =
 let everparse_generated_artifact_build_gate_available_at_boundary : bool =
   everparse_generated_artifact_build_gate_available
 
+let everparse_generated_artifact_linked_in_adapter_verification_at_boundary : bool =
+  everparse_generated_artifact_linked_in_adapter_verification
+
 let everparse_generated_artifact_wired_into_active_parser_at_boundary : bool =
   everparse_generated_artifact_wired_into_active_parser
 

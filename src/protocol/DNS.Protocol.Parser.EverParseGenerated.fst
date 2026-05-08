@@ -19,6 +19,8 @@ let everparse_3d_grammar_available : bool = true
 
 let everparse_generated_artifact_build_gate_available : bool = true
 
+let everparse_generated_artifact_linked_in_adapter_verification : bool = true
+
 let everparse_generated_artifact_wired_into_active_parser : bool = false
 
 val parse_dns_packet_bytes_generated :
