@@ -104,6 +104,47 @@ let serialize_resource_record_fields_bytes
           u16_hi rdlen_wire; u16_lo rdlen_wire
         ] rdata))
 
+let serialize_resource_record_bytes (rr:resource_record) : option (list FStar.UInt8.t) =
+  serialize_resource_record_fields_bytes
+    rr.name
+    rr.rtype
+    rr.rclass
+    rr.ttl
+    (OPT.bytes_to_list rr.rdata)
+
+let rec serialize_resource_records_bytes (records:list resource_record) : option (list FStar.UInt8.t) =
+  match records with
+  | [] -> Some []
+  | record :: rest ->
+      match serialize_resource_record_bytes record, serialize_resource_records_bytes rest with
+      | Some rr_bytes, Some rest_bytes -> Some (L.append rr_bytes rest_bytes)
+      | _, _ -> None
+
+let header_counts_match (packet:dns_packet) : bool =
+  FStar.UInt16.v packet.header.qdcount = L.length packet.questions &&
+  FStar.UInt16.v packet.header.ancount = L.length packet.answers &&
+  FStar.UInt16.v packet.header.nscount = L.length packet.authorities &&
+  FStar.UInt16.v packet.header.arcount = L.length packet.additionals
+
+let serialize_dns_packet_bytes (packet:dns_packet) : option (list FStar.UInt8.t) =
+  if not (header_counts_match packet) then
+    None
+  else
+    match serialize_questions_bytes packet.questions,
+          serialize_resource_records_bytes packet.answers,
+          serialize_resource_records_bytes packet.authorities,
+          serialize_resource_records_bytes packet.additionals with
+    | Some question_bytes,
+      Some answer_bytes,
+      Some authority_bytes,
+      Some additional_bytes ->
+        Some (
+          L.append (serialize_header_bytes packet.header)
+            (L.append question_bytes
+              (L.append answer_bytes
+                (L.append authority_bytes additional_bytes))))
+    | _, _, _, _ -> None
+
 let serialize_response_with_opt_payload
   (h:header)
   (udp_payload_size:FStar.UInt16.t)

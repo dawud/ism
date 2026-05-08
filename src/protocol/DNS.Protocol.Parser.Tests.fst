@@ -189,6 +189,92 @@ let serialized_padding_opt_response_parse_packet_test =
          | _ -> false)
     | None -> false)
 
+let serialized_single_question_packet_bytes : list FStar.UInt8.t =
+  match SER.serialize_dns_packet_bytes valid_single_question_dns_packet with
+  | Some bytes -> bytes
+  | None -> []
+
+let serialized_single_question_packet_bytes_test =
+  assert_norm (serialized_single_question_packet_bytes == valid_single_question_dns_query)
+
+let serialized_single_question_packet_roundtrip_test =
+  assert_norm (parse_dns_packet_bytes serialized_single_question_packet_bytes ==
+               Some valid_single_question_dns_packet)
+
+let serialized_unknown_answer_packet : dns_packet =
+  {
+    header = {
+      id = 0x1234us;
+      flags = uint16_to_flags 0x8180us;
+      qdcount = 0us;
+      ancount = 1us;
+      nscount = 0us;
+      arcount = 0us;
+    };
+    questions = [];
+    answers = [
+      {
+        name = [];
+        rtype = UNKNOWN 65000us;
+        rclass = 1us;
+        ttl = 60ul;
+        rdlen = 0us;
+        rdata = FStar.Bytes.empty_bytes;
+      }
+    ];
+    authorities = [];
+    additionals = [];
+  }
+
+let serialized_unknown_answer_packet_serialize_test =
+  assert_norm (
+    match SER.serialize_dns_packet_bytes serialized_unknown_answer_packet with
+    | Some _ -> true
+    | None -> false)
+
+let serialized_padding_opt_packet : dns_packet =
+  {
+    header = serialized_padding_opt_response_header;
+    questions = [];
+    answers = [];
+    authorities = [];
+    additionals = [
+      {
+        name = [];
+        rtype = OPT;
+        rclass = 1232us;
+        ttl = 0ul;
+        rdlen = 0us;
+        rdata = FStar.Bytes.empty_bytes;
+      }
+    ];
+  }
+
+let serialized_empty_opt_packet_serialize_test =
+  assert_norm (
+    match SER.serialize_dns_packet_bytes serialized_padding_opt_packet with
+    | Some _ -> true
+    | None -> false)
+
+let mismatched_count_packet : dns_packet =
+  {
+    header = {
+      id = 0x1234us;
+      flags = uint16_to_flags 0x8180us;
+      qdcount = 1us;
+      ancount = 0us;
+      nscount = 0us;
+      arcount = 0us;
+    };
+    questions = [];
+    answers = [];
+    authorities = [];
+    additionals = [];
+  }
+
+let mismatched_count_packet_serialize_test =
+  assert_norm (SER.serialize_dns_packet_bytes mismatched_count_packet == None)
+
 let truncated_dns_header : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
