@@ -2,6 +2,7 @@
 obj/
 # Generated C/H files and KaRaMeL makefiles
 dist/
+generated/
 .depend
 
 # OS / IDE

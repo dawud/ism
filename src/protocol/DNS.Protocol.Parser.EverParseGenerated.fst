@@ -9,6 +9,13 @@ type generated_parse_status =
 
 let generated_parse_status_value : generated_parse_status = GeneratedSubsetBoundary
 
+type everparse_source_status =
+  | CheckedIn3DHeaderGrammar
+
+let everparse_source_status_value : everparse_source_status = CheckedIn3DHeaderGrammar
+
+let everparse_3d_grammar_available : bool = true
+
 val parse_dns_packet_bytes_generated :
   input:list FStar.UInt8.t ->
   Tot (option dns_packet)

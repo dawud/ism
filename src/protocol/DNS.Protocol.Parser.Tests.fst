@@ -1624,4 +1624,5 @@ let boundary_rejects_compressed_srv_target_test =
 let boundary_backend_status_test =
   assert_norm (active_parser_backend == EverParseGeneratedSubset /\
                everparse_subset_boundary_available == true /\
-               everparse_generated_parser_available == false)
+               everparse_generated_parser_available == false /\
+               everparse_3d_grammar_available_at_boundary == true)
