@@ -7,6 +7,7 @@ open DNS.Constants
 module L = FStar.List.Tot
 module LPP = FStar.List.Pure.Properties
 module OPT = DNS.Protocol.OPT
+module EPR = DNS.Protocol.Parser.EverParseRuntime
 
 (* --- Flag Mapping --- *)
 
@@ -503,6 +504,38 @@ val parse_dns_packet_buffer :
       FStar.UInt32.v len <= LowStar.Buffer.length buffer))
     (ensures (fun h0 _ h1 -> modifies_none h0 h1))
 
+val validate_generated_root_question_subset_buffer :
+  buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
+  len:FStar.UInt32.t{FStar.UInt32.v len == 17} ->
+  Stack bool
+    (requires (fun h0 ->
+      LowStar.Buffer.live h0 buffer /\
+      FStar.UInt32.v len <= LowStar.Buffer.length buffer))
+    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+
+let validate_generated_root_question_subset_buffer buffer len =
+  let header_ok = EPR.check_dns_header buffer len in
+  if header_ok then
+    let question = LowStar.Buffer.offset buffer 12ul in
+    EPR.check_dns_root_question question 5ul
+  else
+    false
+
+val validate_generated_subset_gate_buffer :
+  buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
+  len:FStar.UInt32.t ->
+  Stack bool
+    (requires (fun h0 ->
+      LowStar.Buffer.live h0 buffer /\
+      FStar.UInt32.v len <= LowStar.Buffer.length buffer))
+    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+
+let validate_generated_subset_gate_buffer buffer len =
+  if FStar.UInt32.v len = 17 then
+    validate_generated_root_question_subset_buffer buffer len
+  else
+    true
+
 val read_buffer_range :
   buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
   pos:nat ->
@@ -526,8 +559,12 @@ let rec read_buffer_range buffer pos remaining =
     b :: rest
 
 let parse_dns_packet_buffer buffer len =
-  let bytes = read_buffer_range buffer 0 (FStar.UInt32.v len) in
-  parse_dns_packet_bytes bytes
+  let generated_subset_ok = validate_generated_subset_gate_buffer buffer len in
+  if generated_subset_ok then
+    let bytes = read_buffer_range buffer 0 (FStar.UInt32.v len) in
+    parse_dns_packet_bytes bytes
+  else
+    None
 
 val lemma_read_buffer_range_length :
   buffer:LowStar.Buffer.buffer FStar.UInt8.t ->

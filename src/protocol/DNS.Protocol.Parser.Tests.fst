@@ -1628,4 +1628,5 @@ let boundary_backend_status_test =
                everparse_3d_grammar_available_at_boundary == true /\
                everparse_generated_artifact_build_gate_available_at_boundary == true /\
                everparse_generated_artifact_linked_in_adapter_verification_at_boundary == true /\
-               everparse_generated_artifact_wired_into_active_parser_at_boundary == false)
+               everparse_generated_artifact_wired_into_active_parser_at_boundary == true /\
+               everparse_generated_subset_gate_active_at_boundary == true)

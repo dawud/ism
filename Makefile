@@ -74,7 +74,7 @@ verify:
 	$(FSTAR_HOME)/bin/fstar.exe $(FSTAR_OPTS) $(ALL_FST_FILES)
 
 # 3. Extraction Stage
-extract: verify
+extract: everparse-verify verify
 	@echo "Extracting to C in $(DIST_DIR)..."
 	mkdir -p $(DIST_DIR)
 	$(KRML_HOME)/krml $(KRML_OPTS) $(EXTRACT_FST_FILES)

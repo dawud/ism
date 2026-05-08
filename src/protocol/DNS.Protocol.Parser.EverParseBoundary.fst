@@ -27,6 +27,9 @@ let everparse_generated_artifact_linked_in_adapter_verification_at_boundary : bo
 let everparse_generated_artifact_wired_into_active_parser_at_boundary : bool =
   everparse_generated_artifact_wired_into_active_parser
 
+let everparse_generated_subset_gate_active_at_boundary : bool =
+  everparse_generated_subset_gate_active
+
 val parse_dns_packet_bytes_at_boundary :
   input:list FStar.UInt8.t ->
   Tot (option dns_packet)

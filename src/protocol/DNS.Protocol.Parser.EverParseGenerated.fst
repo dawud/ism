@@ -21,7 +21,9 @@ let everparse_generated_artifact_build_gate_available : bool = true
 
 let everparse_generated_artifact_linked_in_adapter_verification : bool = true
 
-let everparse_generated_artifact_wired_into_active_parser : bool = false
+let everparse_generated_artifact_wired_into_active_parser : bool = true
+
+let everparse_generated_subset_gate_active : bool = true
 
 val parse_dns_packet_bytes_generated :
   input:list FStar.UInt8.t ->
