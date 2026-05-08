@@ -31,7 +31,7 @@ Phase completion gates are recorded in [DECISIONS.md](DECISIONS.md). Keep this r
 
 ### Phase 1: Formalized Wire Format & Verified Parsing
 *Goal: Create a zero-copy, verified parser and serializer for modern DNS messages.*
-- **Scope:** RFC 1034, RFC 1035, RFC 2181, RFC 3597, RFC 6891, RFC 7830, RFC 8467, RFC 9499.
+- **Scope:** RFC 1034, RFC 1035, RFC 2181, RFC 3597, RFC 6891, RFC 6895, RFC 7830, RFC 8467, RFC 9499.
 - **Parser Strategy:** The handwritten parser is the bootstrap/reference parser; EverParse remains the production target. See [DECISIONS.md](DECISIONS.md).
 - **Tasks:**
   - Define `DNS_Packet`, `Header`, `Question`, and 43+ `Resource Record` types in F*.
@@ -46,7 +46,7 @@ Phase completion gates are recorded in [DECISIONS.md](DECISIONS.md). Keep this r
 
 ### Phase 2: DoQ Transport and TLS Security
 *Goal: Establish a secure transport tunnel using miTLS and EverQuic.*
-- **Scope:** RFC 9250, RFC 9000, RFC 9001, RFC 9002, RFC 8310, RFC 8446, RFC 8914.
+- **Scope:** RFC 8310, RFC 8446, RFC 8914, RFC 9000, RFC 9001, RFC 9002, RFC 9250.
 - **Sub-phases:**
   - **2A: DNS-over-QUIC framing:** Implement the RFC 9250 two-octet DNS message length prefix, reject malformed frame boundaries, and prove bounds on frame accumulation.
   - **2B: Stream accumulation:** Implement `ReadingLength`, `ReadingMessage`, `Processing`, and cleanup transitions without admitted state changes.
@@ -161,15 +161,16 @@ Maintain a compliance matrix for each protocol area. See [DECISIONS.md](DECISION
 | [RFC 4592](https://datatracker.ietf.org/doc/html/rfc4592) | Wildcards | Match wildcard records correctly | Not implemented | None | Wildcard lookup is still a placeholder. |
 | [RFC 5452](https://datatracker.ietf.org/doc/html/rfc5452) | Forged-answer resilience | Harden recursive answers against poisoning | Partial | Bailiwick validation entry points exist. | `is_subdomain` is still mocked; source-port/ID entropy belongs to the unverified shell or QUIC stack. |
 | [RFC 6891](https://datatracker.ietf.org/doc/html/rfc6891) | EDNS0 OPT | OPT pseudo-RR | Partial | Parser tests cover valid additional-section OPT, non-root OPT owner rejection, unsupported EDNS version rejection, truncated option rejection, unknown option acceptance, basic OPT option serialization round-trips, minimal OPT response serialization, and packet-level OPT construction. | Full DNS response generation integration is incomplete. |
+| [RFC 6895](https://datatracker.ietf.org/doc/html/rfc6895) | DNS IANA considerations | RR TYPE, CLASS, OpCode, RCODE, and header-bit registry policy | Reference | `qtype` mappings cover assigned RR TYPE constants; `rcode` models assigned response codes; tests preserve unknown QTYPE/RR TYPE values. | BCP 42 registry policy, included to govern numeric constants and allocation ranges rather than runtime packet behavior. Track the 6895bis draft only if it becomes an RFC. |
 | [RFC 7830](https://datatracker.ietf.org/doc/html/rfc7830) | EDNS0 Padding | Padding option for encrypted DNS traffic | Partial | Parser tests cover structurally valid Padding option data and truncation rejection; padding length helper verifies; padding option serialization accounts for the option header and round-trips through the parser. | Response construction does not yet apply padding policy automatically. |
-| [RFC 8467](https://datatracker.ietf.org/doc/html/rfc8467) | EDNS0 padding policy | Block-length padding guidance | Partial | Block padding helper verifies zero block size and remainder behavior, and padding option serialization handles zero block size. | Policy selection and full response-side integration are incomplete. |
 | [RFC 8310](https://datatracker.ietf.org/doc/html/rfc8310) | Authentication profiles | Strict/opportunistic authentication profile considerations | Mocked | None | DoQ uses QUIC/TLS; client hello and identity validation are still mocked. |
-| [RFC 9250](https://datatracker.ietf.org/doc/html/rfc9250) | DoQ framing | Two-octet length prefix | Partial | Low* stream state verifies complete and split length-prefix parsing, bounded body copying, `ReadingMessage` progress to `Processing`, and conservative overlong-fragment rejection. | Real stream allocation and close/removal semantics are still incomplete. |
+| [RFC 8446](https://datatracker.ietf.org/doc/html/rfc8446) | TLS 1.3 | Authenticated transport | Mocked | None | Mock AEAD and handshake remain. |
+| [RFC 8467](https://datatracker.ietf.org/doc/html/rfc8467) | EDNS0 padding policy | Block-length padding guidance | Partial | Block padding helper verifies zero block size and remainder behavior, and padding option serialization handles zero block size. | Policy selection and full response-side integration are incomplete. |
+| [RFC 8914](https://datatracker.ietf.org/doc/html/rfc8914) | Extended DNS Errors | EDE responses such as Too Early for 0-RTT handling | Not implemented | None | No 0-RTT or EDE response handling exists yet. |
 | [RFC 9000](https://datatracker.ietf.org/doc/html/rfc9000) | QUIC transport | Streams, connection lifecycle, and flow-control model | Trusted | None | Transport is delegated to EverQuic or an unverified shell adapter. |
 | [RFC 9001](https://datatracker.ietf.org/doc/html/rfc9001) | TLS for QUIC | QUIC handshake protection and key schedule | Trusted | None | TLS/QUIC integration is still represented by trusted adapters and mocks. |
 | [RFC 9002](https://datatracker.ietf.org/doc/html/rfc9002) | QUIC recovery | Loss detection and congestion control | Trusted | None | Recovery behavior is delegated to EverQuic or the unverified QUIC shell. |
-| [RFC 8446](https://datatracker.ietf.org/doc/html/rfc8446) | TLS 1.3 | Authenticated transport | Mocked | None | Mock AEAD and handshake remain. |
-| [RFC 8914](https://datatracker.ietf.org/doc/html/rfc8914) | Extended DNS Errors | EDE responses such as Too Early for 0-RTT handling | Not implemented | None | No 0-RTT or EDE response handling exists yet. |
+| [RFC 9250](https://datatracker.ietf.org/doc/html/rfc9250) | DoQ framing | Two-octet length prefix | Partial | Low* stream state verifies complete and split length-prefix parsing, bounded body copying, `ReadingMessage` progress to `Processing`, and conservative overlong-fragment rejection. | Real stream allocation and close/removal semantics are still incomplete. |
 | [RFC 9499](https://datatracker.ietf.org/doc/html/rfc9499) | DNS terminology | Current DNS terms for global DNS, QNAME, bailiwick, and roles | Reference | Documentation alignment only | Use for terminology; no executable behavior is directly required. |
 
 Non-RFC standards dependencies to track separately:
