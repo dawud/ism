@@ -39,7 +39,7 @@ EXTRACT_FST_FILES = $(filter-out src/protocol/%.Tests.fst, $(wildcard src/protoc
 
 EVERPARSE_3D_FILES = $(wildcard $(EVERPARSE_SRC_DIR)/*.3d)
 
-.PHONY: all verify extract everparse-generate clean
+.PHONY: all verify extract everparse-generate everparse-verify clean
 
 all: extract
 
@@ -66,6 +66,15 @@ everparse-generate:
 		exit 127; \
 	}
 	$(EVERPARSE_CMD) --odir $(EVERPARSE_OUT_DIR) --no_clang_format $(EVERPARSE_3D_FILES)
+
+everparse-verify: everparse-generate
+	@test -s $(EVERPARSE_OUT_DIR)/DNSProtocol.fst
+	@test -s $(EVERPARSE_OUT_DIR)/DNSProtocol.fsti
+	@test -s $(EVERPARSE_OUT_DIR)/DNSProtocol.c
+	@test -s $(EVERPARSE_OUT_DIR)/DNSProtocol.h
+	@test -s $(EVERPARSE_OUT_DIR)/DNSProtocolWrapper.c
+	@test -s $(EVERPARSE_OUT_DIR)/DNSProtocolWrapper.h
+	@echo "EverParse DNSProtocol subset generated and verified."
 
 # 4. Cleanup
 clean:

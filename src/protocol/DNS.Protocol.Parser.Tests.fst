@@ -1625,4 +1625,6 @@ let boundary_backend_status_test =
   assert_norm (active_parser_backend == EverParseGeneratedSubset /\
                everparse_subset_boundary_available == true /\
                everparse_generated_parser_available == false /\
-               everparse_3d_grammar_available_at_boundary == true)
+               everparse_3d_grammar_available_at_boundary == true /\
+               everparse_generated_artifact_build_gate_available_at_boundary == true /\
+               everparse_generated_artifact_wired_into_active_parser_at_boundary == false)

@@ -5,9 +5,10 @@ open DNS.Protocol.Parser
 module L = FStar.List.Tot
 
 type generated_parse_status =
-  | GeneratedSubsetBoundary
+  | GeneratedSubsetBoundaryWithVerifiedArtifact
 
-let generated_parse_status_value : generated_parse_status = GeneratedSubsetBoundary
+let generated_parse_status_value : generated_parse_status =
+  GeneratedSubsetBoundaryWithVerifiedArtifact
 
 type everparse_source_status =
   | CheckedIn3DHeaderGrammar
@@ -15,6 +16,10 @@ type everparse_source_status =
 let everparse_source_status_value : everparse_source_status = CheckedIn3DHeaderGrammar
 
 let everparse_3d_grammar_available : bool = true
+
+let everparse_generated_artifact_build_gate_available : bool = true
+
+let everparse_generated_artifact_wired_into_active_parser : bool = false
 
 val parse_dns_packet_bytes_generated :
   input:list FStar.UInt8.t ->

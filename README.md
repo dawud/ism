@@ -66,14 +66,14 @@ podman run --rm \
 ```
 
 The image also includes EverParse/3D tooling. To regenerate the current
-EverParse parser scaffold, run:
+EverParse parser scaffold and verify/extract the generated subset, run:
 
 ```bash
 podman run --rm \
   --userns=keep-id \
   -v "$(pwd):/workspace:Z" \
   localhost/verified-dns-server:latest \
-  bash -lc 'make everparse-generate'
+  bash -lc 'make everparse-verify'
 ```
 
 With Docker, run the container as your host UID/GID so generated `obj/`,

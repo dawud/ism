@@ -18,6 +18,12 @@ let everparse_subset_boundary_available : bool = true
 let everparse_3d_grammar_available_at_boundary : bool =
   everparse_3d_grammar_available
 
+let everparse_generated_artifact_build_gate_available_at_boundary : bool =
+  everparse_generated_artifact_build_gate_available
+
+let everparse_generated_artifact_wired_into_active_parser_at_boundary : bool =
+  everparse_generated_artifact_wired_into_active_parser
+
 val parse_dns_packet_bytes_at_boundary :
   input:list FStar.UInt8.t ->
   Tot (option dns_packet)

@@ -31,6 +31,15 @@ jobs:
             localhost/verified-dns-server:latest \
             bash -lc 'cd /workspace && make verify'
 
+      - name: Verify EverParse generated subset
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -v "${PWD}:/workspace" \
+            localhost/verified-dns-server:latest \
+            bash -lc 'cd /workspace && make everparse-verify'
+
       - name: Extract C smoke test
         run: |
           docker run --rm \
