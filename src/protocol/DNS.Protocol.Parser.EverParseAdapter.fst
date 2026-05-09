@@ -16,6 +16,8 @@ let generated_dns_single_label_question_validator_linked : bool = true
 
 let generated_dns_two_label_question_validator_linked : bool = true
 
+let generated_dns_uncompressed_question_validator_linked : bool = true
+
 let generated_dns_header_validator = DNSProtocol.validate__dns_header
 
 let generated_dns_root_question_validator =
@@ -26,3 +28,6 @@ let generated_dns_single_label_question_validator label_length =
 
 let generated_dns_two_label_question_validator first_label_length second_label_length =
   DNSProtocol.validate__dns_two_label_question first_label_length second_label_length
+
+let generated_dns_uncompressed_question_validator qname_length =
+  DNSProtocol.validate__dns_uncompressed_question qname_length
