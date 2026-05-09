@@ -626,6 +626,11 @@ let valid_single_answer_parse_packet_test =
          | _ -> false)
     | None -> false)
 
+let generated_single_answer_rr_gate_accepts_valid_single_answer_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      valid_single_answer_dns_response == true)
+
 let truncated_rr_header_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -1785,4 +1790,5 @@ let boundary_backend_status_test =
                everparse_generated_subset_gate_active_at_boundary == true /\
                everparse_generated_single_label_question_gate_active_at_boundary == false /\
                everparse_generated_two_label_question_gate_active_at_boundary == false /\
-               everparse_generated_uncompressed_question_gate_active_at_boundary == true)
+               everparse_generated_uncompressed_question_gate_active_at_boundary == true /\
+               everparse_generated_single_answer_rr_gate_active_at_boundary == true)

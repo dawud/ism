@@ -31,6 +31,8 @@ let everparse_generated_two_label_question_gate_active : bool = false
 
 let everparse_generated_uncompressed_question_gate_active : bool = true
 
+let everparse_generated_single_answer_rr_gate_active : bool = true
+
 val parse_dns_packet_bytes_generated :
   input:list FStar.UInt8.t ->
   Tot (option dns_packet)
