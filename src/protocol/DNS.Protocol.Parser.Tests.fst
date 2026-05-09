@@ -631,6 +631,49 @@ let generated_single_answer_rr_gate_accepts_valid_single_answer_test =
     generated_uncompressed_question_answer_packet_subset_applicable
       valid_single_answer_dns_response == true)
 
+let valid_aaaa_answer_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x1cuy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x1cuy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x10uy;
+    0x20uy; 0x01uy; 0x0duy; 0xb8uy;
+    0x00uy; 0x00uy; 0x00uy; 0x00uy;
+    0x00uy; 0x00uy; 0x00uy; 0x00uy;
+    0x00uy; 0x00uy; 0x00uy; 0x01uy
+  ]
+
+let valid_aaaa_answer_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes valid_aaaa_answer_dns_response with
+    | Some p ->
+        p.header.ancount == 1us /\
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.rtype == AAAA /\
+             rr.rclass == 1us /\
+             rr.ttl == 60ul /\
+             rr.rdlen == 16us /\
+             FStar.Bytes.length rr.rdata == 16
+         | _ -> false)
+    | None -> false)
+
+let generated_aaaa_answer_gate_accepts_valid_aaaa_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      valid_aaaa_answer_dns_response == true)
+
 let truncated_rr_header_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -746,6 +789,16 @@ let invalid_aaaa_rdata_length_dns_response : list FStar.UInt8.t =
 
 let invalid_aaaa_rdata_length_parse_packet_test =
   assert_norm (parse_dns_packet_bytes invalid_aaaa_rdata_length_dns_response == None)
+
+let generated_a_answer_gate_covers_invalid_length_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      invalid_a_rdata_length_dns_response == true)
+
+let generated_aaaa_answer_gate_covers_invalid_length_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      invalid_aaaa_rdata_length_dns_response == true)
 
 let valid_edns0_opt_dns_query : list FStar.UInt8.t =
   [
@@ -1643,6 +1696,10 @@ let boundary_accepts_single_answer_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_single_answer_dns_response ==
                parse_dns_packet_bytes valid_single_answer_dns_response)
 
+let boundary_accepts_aaaa_answer_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary valid_aaaa_answer_dns_response ==
+               parse_dns_packet_bytes valid_aaaa_answer_dns_response)
+
 let boundary_rejects_truncated_rr_header_test =
   assert_norm (parse_dns_packet_bytes_at_boundary truncated_rr_header_dns_response ==
                parse_dns_packet_bytes truncated_rr_header_dns_response)
@@ -1791,4 +1848,5 @@ let boundary_backend_status_test =
                everparse_generated_single_label_question_gate_active_at_boundary == false /\
                everparse_generated_two_label_question_gate_active_at_boundary == false /\
                everparse_generated_uncompressed_question_gate_active_at_boundary == true /\
-               everparse_generated_single_answer_rr_gate_active_at_boundary == true)
+               everparse_generated_single_answer_rr_gate_active_at_boundary == true /\
+               everparse_generated_a_aaaa_answer_rr_gate_active_at_boundary == true)
