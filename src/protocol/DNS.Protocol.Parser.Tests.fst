@@ -1092,6 +1092,11 @@ let valid_cname_rdata_parse_packet_test =
          | _ -> false)
     | None -> false)
 
+let generated_name_rdata_answer_gate_accepts_valid_cname_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      valid_cname_rdata_dns_response == true)
+
 let truncated_name_rdata_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -1113,6 +1118,11 @@ let truncated_name_rdata_dns_response : list FStar.UInt8.t =
 
 let truncated_name_rdata_parse_packet_test =
   assert_norm (parse_dns_packet_bytes truncated_name_rdata_dns_response == None)
+
+let generated_name_rdata_answer_gate_covers_truncated_name_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      truncated_name_rdata_dns_response == true)
 
 let trailing_name_rdata_dns_response : list FStar.UInt8.t =
   [
@@ -1136,6 +1146,11 @@ let trailing_name_rdata_dns_response : list FStar.UInt8.t =
 let trailing_name_rdata_parse_packet_test =
   assert_norm (parse_dns_packet_bytes trailing_name_rdata_dns_response == None)
 
+let generated_name_rdata_answer_gate_covers_trailing_name_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      trailing_name_rdata_dns_response == true)
+
 let compressed_name_rdata_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -1157,6 +1172,11 @@ let compressed_name_rdata_dns_response : list FStar.UInt8.t =
 
 let compressed_name_rdata_parse_packet_test =
   assert_norm (parse_dns_packet_bytes compressed_name_rdata_dns_response == None)
+
+let generated_name_rdata_answer_gate_covers_compressed_name_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      compressed_name_rdata_dns_response == true)
 
 let valid_mx_rdata_dns_response : list FStar.UInt8.t =
   [
@@ -1849,4 +1869,5 @@ let boundary_backend_status_test =
                everparse_generated_two_label_question_gate_active_at_boundary == false /\
                everparse_generated_uncompressed_question_gate_active_at_boundary == true /\
                everparse_generated_single_answer_rr_gate_active_at_boundary == true /\
-               everparse_generated_a_aaaa_answer_rr_gate_active_at_boundary == true)
+               everparse_generated_a_aaaa_answer_rr_gate_active_at_boundary == true /\
+               everparse_generated_name_rdata_answer_rr_gate_active_at_boundary == true)

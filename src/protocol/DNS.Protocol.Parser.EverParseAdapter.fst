@@ -24,6 +24,8 @@ let generated_dns_uncompressed_question_a_answer_packet_validator_linked : bool 
 
 let generated_dns_uncompressed_question_aaaa_answer_packet_validator_linked : bool = true
 
+let generated_dns_uncompressed_question_name_rdata_answer_packet_validator_linked : bool = true
+
 let generated_dns_header_validator = DNSProtocol.validate__dns_header
 
 let generated_dns_root_question_validator =
@@ -46,3 +48,11 @@ let generated_dns_uncompressed_question_a_answer_packet_validator qname_length r
 
 let generated_dns_uncompressed_question_aaaa_answer_packet_validator qname_length rr_name_length =
   DNSProtocol.validate__dns_uncompressed_question_aaaa_answer_packet qname_length rr_name_length
+
+let generated_dns_uncompressed_question_name_rdata_answer_packet_validator
+    qname_length rr_name_length rdata_name_length expected_rtype =
+  DNSProtocol.validate__dns_uncompressed_question_name_rdata_answer_packet
+    qname_length
+    rr_name_length
+    rdata_name_length
+    expected_rtype
