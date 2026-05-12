@@ -1705,6 +1705,31 @@ let compressed_srv_target_dns_response : list FStar.UInt8.t =
 let compressed_srv_target_parse_packet_test =
   assert_norm (parse_dns_packet_bytes compressed_srv_target_dns_response == None)
 
+let generated_srv_answer_gate_accepts_valid_srv_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      valid_srv_rdata_dns_response == true)
+
+let generated_srv_answer_gate_covers_truncated_fixed_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      truncated_srv_fixed_dns_response == true)
+
+let generated_srv_answer_gate_covers_truncated_target_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      truncated_srv_target_dns_response == true)
+
+let generated_srv_answer_gate_covers_trailing_target_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      trailing_srv_target_dns_response == true)
+
+let generated_srv_answer_gate_covers_compressed_target_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      compressed_srv_target_dns_response == true)
+
 let boundary_valid_single_question_dns_query_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_single_question_dns_query ==
                parse_dns_packet_bytes valid_single_question_dns_query)
@@ -1917,4 +1942,5 @@ let boundary_backend_status_test =
                everparse_generated_a_aaaa_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_name_rdata_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_mx_answer_rr_gate_active_at_boundary == true /\
-               everparse_generated_soa_answer_rr_gate_active_at_boundary == true)
+               everparse_generated_soa_answer_rr_gate_active_at_boundary == true /\
+               everparse_generated_srv_answer_rr_gate_active_at_boundary == true)

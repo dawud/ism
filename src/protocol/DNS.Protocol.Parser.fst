@@ -603,6 +603,23 @@ let generated_uncompressed_question_answer_packet_fields input =
                                 assert (mname_length <= 255);
                                 Some mname_length
                             | None -> None
+                          else if rr_type = 33 then
+                            begin match rdata_tail with
+                            | _priority_hi :: _priority_lo ::
+                              _weight_hi :: _weight_lo ::
+                              _port_hi :: _port_lo ::
+                              target_tail ->
+                                begin match DNS.Name.parse_qname 128 target_tail with
+                                | Some (target_name, _) ->
+                                    DNS.Name.lemma_parser_rejecting 128 target_tail;
+                                    let target_name_length = DNS.Name.dns_name_length target_name in
+                                    assert (target_name_length > 0);
+                                    assert (target_name_length <= 255);
+                                    Some target_name_length
+                                | None -> None
+                                end
+                            | _ -> None
+                            end
                           else
                             None in
                         let soa_rname_length =
@@ -629,6 +646,7 @@ let generated_uncompressed_question_answer_packet_fields input =
                            rr_type = 5 ||
                            rr_type = 12 ||
                            rr_type = 15 ||
+                           rr_type = 33 ||
                            L.length rdata_tail = rdata_length then
                           Some (
                             question_qname_length,
@@ -676,6 +694,8 @@ let generated_uncompressed_question_answer_packet_subset_applicable input =
        else if rr_type = 15 then
          true
        else if rr_type = 6 then
+         true
+       else if rr_type = 33 then
          true
        else
          L.length input = 26 + qname_length + rr_name_length + rdata_length)
@@ -800,6 +820,21 @@ let validate_generated_uncompressed_question_answer_packet_subset_buffer buffer 
               buffer
               len
         | _, _ ->
+            false
+      else if rr_type_nat = 33 then
+        match rdata_name_length_opt with
+        | Some target_name_length_nat ->
+            assert (target_name_length_nat > 0);
+            assert (target_name_length_nat <= 255);
+            let target_name_length = FStar.UInt32.uint_to_t target_name_length_nat in
+            assert (FStar.UInt32.v target_name_length == target_name_length_nat);
+            EPR.check_dns_uncompressed_question_srv_answer_packet
+              qname_length
+              rr_name_length
+              target_name_length
+              buffer
+              len
+        | None ->
             false
       else
         EPR.check_dns_uncompressed_question_answer_packet
