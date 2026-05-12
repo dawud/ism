@@ -51,6 +51,9 @@ let everparse_generated_name_rdata_answer_rr_gate_active_at_boundary : bool =
 let everparse_generated_mx_answer_rr_gate_active_at_boundary : bool =
   everparse_generated_mx_answer_rr_gate_active
 
+let everparse_generated_soa_answer_rr_gate_active_at_boundary : bool =
+  everparse_generated_soa_answer_rr_gate_active
+
 val parse_dns_packet_bytes_at_boundary :
   input:list FStar.UInt8.t ->
   Tot (option dns_packet)

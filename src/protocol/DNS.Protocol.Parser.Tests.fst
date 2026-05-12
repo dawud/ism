@@ -1365,6 +1365,11 @@ let valid_soa_rdata_parse_packet_test =
          | _ -> false)
     | None -> false)
 
+let generated_soa_answer_gate_accepts_valid_soa_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      valid_soa_rdata_dns_response == true)
+
 let truncated_soa_mname_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -1386,6 +1391,11 @@ let truncated_soa_mname_dns_response : list FStar.UInt8.t =
 
 let truncated_soa_mname_parse_packet_test =
   assert_norm (parse_dns_packet_bytes truncated_soa_mname_dns_response == None)
+
+let generated_soa_answer_gate_covers_truncated_mname_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      truncated_soa_mname_dns_response == true)
 
 let trailing_soa_timers_dns_response : list FStar.UInt8.t =
   [
@@ -1416,6 +1426,11 @@ let trailing_soa_timers_dns_response : list FStar.UInt8.t =
 let trailing_soa_timers_parse_packet_test =
   assert_norm (parse_dns_packet_bytes trailing_soa_timers_dns_response == None)
 
+let generated_soa_answer_gate_covers_trailing_timers_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      trailing_soa_timers_dns_response == true)
+
 let compressed_soa_mname_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -1442,6 +1457,11 @@ let compressed_soa_mname_dns_response : list FStar.UInt8.t =
 
 let compressed_soa_mname_parse_packet_test =
   assert_norm (parse_dns_packet_bytes compressed_soa_mname_dns_response == None)
+
+let generated_soa_answer_gate_covers_compressed_mname_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      compressed_soa_mname_dns_response == true)
 
 let valid_txt_rdata_dns_response : list FStar.UInt8.t =
   [
@@ -1896,4 +1916,5 @@ let boundary_backend_status_test =
                everparse_generated_single_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_a_aaaa_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_name_rdata_answer_rr_gate_active_at_boundary == true /\
-               everparse_generated_mx_answer_rr_gate_active_at_boundary == true)
+               everparse_generated_mx_answer_rr_gate_active_at_boundary == true /\
+               everparse_generated_soa_answer_rr_gate_active_at_boundary == true)

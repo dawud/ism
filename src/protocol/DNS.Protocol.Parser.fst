@@ -540,7 +540,7 @@ type generated_dns_name_length = n:nat{n > 0 /\ n <= 255}
 
 val generated_uncompressed_question_answer_packet_fields :
   input:list FStar.UInt8.t ->
-  Tot (option (nat * nat * nat * nat * option generated_dns_name_length))
+  Tot (option (nat * nat * nat * nat * option generated_dns_name_length * option generated_dns_name_length))
 
 let generated_uncompressed_question_answer_packet_fields input =
   if L.length input < 28 || L.length input > 66071 then
@@ -594,10 +594,37 @@ let generated_uncompressed_question_answer_packet_fields input =
                                 end
                             | _ -> None
                             end
+                          else if rr_type = 6 then
+                            match DNS.Name.parse_qname 128 rdata_tail with
+                            | Some (mname, _) ->
+                                DNS.Name.lemma_parser_rejecting 128 rdata_tail;
+                                let mname_length = DNS.Name.dns_name_length mname in
+                                assert (mname_length > 0);
+                                assert (mname_length <= 255);
+                                Some mname_length
+                            | None -> None
+                          else
+                            None in
+                        let soa_rname_length =
+                          if rr_type = 6 then
+                            begin match DNS.Name.parse_qname 128 rdata_tail with
+                            | Some (_, after_mname) ->
+                                begin match DNS.Name.parse_qname 128 after_mname with
+                                | Some (rname, _) ->
+                                    DNS.Name.lemma_parser_rejecting 128 after_mname;
+                                    let rname_length = DNS.Name.dns_name_length rname in
+                                    assert (rname_length > 0);
+                                    assert (rname_length <= 255);
+                                    Some rname_length
+                                | None -> None
+                                end
+                            | None -> None
+                            end
                           else
                             None in
                         if rr_type = 1 ||
                            rr_type = 28 ||
+                           rr_type = 6 ||
                            rr_type = 2 ||
                            rr_type = 5 ||
                            rr_type = 12 ||
@@ -608,7 +635,8 @@ let generated_uncompressed_question_answer_packet_fields input =
                             DNS.Name.dns_name_length rr_name,
                             rdata_length,
                             rr_type,
-                            rdata_name_length
+                            rdata_name_length,
+                            soa_rname_length
                           )
                         else
                           None
@@ -623,7 +651,7 @@ let generated_uncompressed_question_answer_packet_fields input =
 
 let generated_uncompressed_question_answer_packet_lengths input =
   match generated_uncompressed_question_answer_packet_fields input with
-  | Some (qname_length, rr_name_length, rdata_length, _, _) ->
+  | Some (qname_length, rr_name_length, rdata_length, _, _, _) ->
       Some (qname_length, rr_name_length, rdata_length)
   | None -> None
 
@@ -633,7 +661,7 @@ val generated_uncompressed_question_answer_packet_subset_applicable :
 
 let generated_uncompressed_question_answer_packet_subset_applicable input =
   match generated_uncompressed_question_answer_packet_fields input with
-  | Some (qname_length, rr_name_length, rdata_length, rr_type, _) ->
+  | Some (qname_length, rr_name_length, rdata_length, rr_type, _, _) ->
       qname_length > 0 &&
       qname_length <= 255 &&
       rr_name_length > 0 &&
@@ -646,6 +674,8 @@ let generated_uncompressed_question_answer_packet_subset_applicable input =
        else if rr_type = 2 || rr_type = 5 || rr_type = 12 then
          true
        else if rr_type = 15 then
+         true
+       else if rr_type = 6 then
          true
        else
          L.length input = 26 + qname_length + rr_name_length + rdata_length)
@@ -694,7 +724,7 @@ val validate_generated_uncompressed_question_answer_packet_subset_buffer :
 
 let validate_generated_uncompressed_question_answer_packet_subset_buffer buffer len bytes =
   match generated_uncompressed_question_answer_packet_fields bytes with
-  | Some (qname_length_nat, rr_name_length_nat, rdata_length_nat, rr_type_nat, rdata_name_length_opt) ->
+  | Some (qname_length_nat, rr_name_length_nat, rdata_length_nat, rr_type_nat, rdata_name_length_opt, soa_rname_length_opt) ->
       assert (qname_length_nat > 0);
       assert (qname_length_nat <= 255);
       assert (rr_name_length_nat > 0);
@@ -750,6 +780,26 @@ let validate_generated_uncompressed_question_answer_packet_subset_buffer buffer 
               buffer
               len
         | None ->
+            false
+      else if rr_type_nat = 6 then
+        match rdata_name_length_opt, soa_rname_length_opt with
+        | Some mname_length_nat, Some rname_length_nat ->
+            assert (mname_length_nat > 0);
+            assert (mname_length_nat <= 255);
+            assert (rname_length_nat > 0);
+            assert (rname_length_nat <= 255);
+            let mname_length = FStar.UInt32.uint_to_t mname_length_nat in
+            assert (FStar.UInt32.v mname_length == mname_length_nat);
+            let rname_length = FStar.UInt32.uint_to_t rname_length_nat in
+            assert (FStar.UInt32.v rname_length == rname_length_nat);
+            EPR.check_dns_uncompressed_question_soa_answer_packet
+              qname_length
+              rr_name_length
+              mname_length
+              rname_length
+              buffer
+              len
+        | _, _ ->
             false
       else
         EPR.check_dns_uncompressed_question_answer_packet
