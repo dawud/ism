@@ -1571,6 +1571,26 @@ let truncated_txt_string_dns_response : list FStar.UInt8.t =
 let truncated_txt_string_parse_packet_test =
   assert_norm (parse_dns_packet_bytes truncated_txt_string_dns_response == None)
 
+let generated_txt_answer_gate_accepts_valid_txt_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      valid_txt_rdata_dns_response == true)
+
+let generated_txt_answer_gate_accepts_empty_string_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      empty_txt_string_rdata_dns_response == true)
+
+let generated_txt_answer_gate_covers_zero_length_rdata_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      zero_length_txt_rdata_dns_response == true)
+
+let generated_txt_answer_gate_covers_truncated_string_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      truncated_txt_string_dns_response == true)
+
 let valid_srv_rdata_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -1943,4 +1963,5 @@ let boundary_backend_status_test =
                everparse_generated_name_rdata_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_mx_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_soa_answer_rr_gate_active_at_boundary == true /\
-               everparse_generated_srv_answer_rr_gate_active_at_boundary == true)
+               everparse_generated_srv_answer_rr_gate_active_at_boundary == true /\
+               everparse_generated_txt_answer_rr_gate_active_at_boundary == true)

@@ -647,6 +647,7 @@ let generated_uncompressed_question_answer_packet_fields input =
                            rr_type = 12 ||
                            rr_type = 15 ||
                            rr_type = 33 ||
+                           rr_type = 16 ||
                            L.length rdata_tail = rdata_length then
                           Some (
                             question_qname_length,
@@ -696,6 +697,8 @@ let generated_uncompressed_question_answer_packet_subset_applicable input =
        else if rr_type = 6 then
          true
        else if rr_type = 33 then
+         true
+       else if rr_type = 16 then
          true
        else
          L.length input = 26 + qname_length + rr_name_length + rdata_length)
@@ -836,6 +839,13 @@ let validate_generated_uncompressed_question_answer_packet_subset_buffer buffer 
               len
         | None ->
             false
+      else if rr_type_nat = 16 then
+        EPR.check_dns_uncompressed_question_txt_answer_packet
+          qname_length
+          rr_name_length
+          rdata_length
+          buffer
+          len
       else
         EPR.check_dns_uncompressed_question_answer_packet
           qname_length

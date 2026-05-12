@@ -32,6 +32,8 @@ let generated_dns_uncompressed_question_soa_answer_packet_validator_linked : boo
 
 let generated_dns_uncompressed_question_srv_answer_packet_validator_linked : bool = true
 
+let generated_dns_uncompressed_question_txt_answer_packet_validator_linked : bool = true
+
 let generated_dns_header_validator = DNSProtocol.validate__dns_header
 
 let generated_dns_root_question_validator =
@@ -84,3 +86,10 @@ let generated_dns_uncompressed_question_srv_answer_packet_validator
     qname_length
     rr_name_length
     target_name_length
+
+let generated_dns_uncompressed_question_txt_answer_packet_validator
+    qname_length rr_name_length rdata_length =
+  DNSProtocol.validate__dns_uncompressed_question_txt_answer_packet
+    qname_length
+    rr_name_length
+    rdata_length
