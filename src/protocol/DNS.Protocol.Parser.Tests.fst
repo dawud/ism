@@ -1211,6 +1211,11 @@ let valid_mx_rdata_parse_packet_test =
          | _ -> false)
     | None -> false)
 
+let generated_mx_answer_gate_accepts_valid_mx_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      valid_mx_rdata_dns_response == true)
+
 let truncated_mx_preference_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -1232,6 +1237,11 @@ let truncated_mx_preference_dns_response : list FStar.UInt8.t =
 
 let truncated_mx_preference_parse_packet_test =
   assert_norm (parse_dns_packet_bytes truncated_mx_preference_dns_response == None)
+
+let generated_mx_answer_gate_covers_truncated_preference_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      truncated_mx_preference_dns_response == true)
 
 let truncated_mx_exchange_dns_response : list FStar.UInt8.t =
   [
@@ -1256,6 +1266,11 @@ let truncated_mx_exchange_dns_response : list FStar.UInt8.t =
 let truncated_mx_exchange_parse_packet_test =
   assert_norm (parse_dns_packet_bytes truncated_mx_exchange_dns_response == None)
 
+let generated_mx_answer_gate_covers_truncated_exchange_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      truncated_mx_exchange_dns_response == true)
+
 let trailing_mx_exchange_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -1279,6 +1294,11 @@ let trailing_mx_exchange_dns_response : list FStar.UInt8.t =
 let trailing_mx_exchange_parse_packet_test =
   assert_norm (parse_dns_packet_bytes trailing_mx_exchange_dns_response == None)
 
+let generated_mx_answer_gate_covers_trailing_exchange_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      trailing_mx_exchange_dns_response == true)
+
 let compressed_mx_exchange_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -1301,6 +1321,11 @@ let compressed_mx_exchange_dns_response : list FStar.UInt8.t =
 
 let compressed_mx_exchange_parse_packet_test =
   assert_norm (parse_dns_packet_bytes compressed_mx_exchange_dns_response == None)
+
+let generated_mx_answer_gate_covers_compressed_exchange_test =
+  assert_norm (
+    generated_uncompressed_question_answer_packet_subset_applicable
+      compressed_mx_exchange_dns_response == true)
 
 let valid_soa_rdata_dns_response : list FStar.UInt8.t =
   [
@@ -1870,4 +1895,5 @@ let boundary_backend_status_test =
                everparse_generated_uncompressed_question_gate_active_at_boundary == true /\
                everparse_generated_single_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_a_aaaa_answer_rr_gate_active_at_boundary == true /\
-               everparse_generated_name_rdata_answer_rr_gate_active_at_boundary == true)
+               everparse_generated_name_rdata_answer_rr_gate_active_at_boundary == true /\
+               everparse_generated_mx_answer_rr_gate_active_at_boundary == true)

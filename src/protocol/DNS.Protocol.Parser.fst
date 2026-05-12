@@ -580,6 +580,20 @@ let generated_uncompressed_question_answer_packet_fields input =
                                 assert (rdata_name_length <= 255);
                                 Some rdata_name_length
                             | None -> None
+                          else if rr_type = 15 then
+                            begin match rdata_tail with
+                            | _pref_hi :: _pref_lo :: exchange_tail ->
+                                begin match DNS.Name.parse_qname 128 exchange_tail with
+                                | Some (exchange_name, _) ->
+                                    DNS.Name.lemma_parser_rejecting 128 exchange_tail;
+                                    let exchange_name_length = DNS.Name.dns_name_length exchange_name in
+                                    assert (exchange_name_length > 0);
+                                    assert (exchange_name_length <= 255);
+                                    Some exchange_name_length
+                                | None -> None
+                                end
+                            | _ -> None
+                            end
                           else
                             None in
                         if rr_type = 1 ||
@@ -587,6 +601,7 @@ let generated_uncompressed_question_answer_packet_fields input =
                            rr_type = 2 ||
                            rr_type = 5 ||
                            rr_type = 12 ||
+                           rr_type = 15 ||
                            L.length rdata_tail = rdata_length then
                           Some (
                             question_qname_length,
@@ -629,6 +644,8 @@ let generated_uncompressed_question_answer_packet_subset_applicable input =
        else if rr_type = 28 then
          true
        else if rr_type = 2 || rr_type = 5 || rr_type = 12 then
+         true
+       else if rr_type = 15 then
          true
        else
          L.length input = 26 + qname_length + rr_name_length + rdata_length)
@@ -715,6 +732,21 @@ let validate_generated_uncompressed_question_answer_packet_subset_buffer buffer 
               rr_name_length
               rdata_name_length
               expected_rtype
+              buffer
+              len
+        | None ->
+            false
+      else if rr_type_nat = 15 then
+        match rdata_name_length_opt with
+        | Some exchange_name_length_nat ->
+            assert (exchange_name_length_nat > 0);
+            assert (exchange_name_length_nat <= 255);
+            let exchange_name_length = FStar.UInt32.uint_to_t exchange_name_length_nat in
+            assert (FStar.UInt32.v exchange_name_length == exchange_name_length_nat);
+            EPR.check_dns_uncompressed_question_mx_answer_packet
+              qname_length
+              rr_name_length
+              exchange_name_length
               buffer
               len
         | None ->
