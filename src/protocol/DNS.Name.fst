@@ -14,7 +14,24 @@ type qname = list label
 
 (* Helper to check if a byte is a pointer (starts with 11) *)
 let is_pointer (b: FStar.UInt8.t) : bool =
-  FStar.UInt8.(b >=^ 192uy)
+  FStar.UInt8.v b >= 192
+
+let pointer_offset (hi:FStar.UInt8.t{FStar.UInt8.v hi >= 192}) (lo:FStar.UInt8.t) : nat =
+  let hi_part = Prims.op_Subtraction (FStar.UInt8.v hi) 192 in
+  Prims.op_Addition (Prims.op_Multiply hi_part 256) (FStar.UInt8.v lo)
+
+val suffix_at :
+  offset:nat ->
+  input:list FStar.UInt8.t ->
+  Tot (option (list FStar.UInt8.t)) (decreases offset)
+
+let rec suffix_at offset input =
+  if offset = 0 then
+    Some input
+  else
+    match input with
+    | [] -> None
+    | _ :: tl -> suffix_at (offset - 1) tl
 
 let take_label (len:nat{len >= 1 && len <= 63}) (rest:list FStar.UInt8.t{L.length rest >= len})
   : (lbl:label{L.length lbl == len} * list FStar.UInt8.t)
@@ -67,6 +84,78 @@ let parse_qname fuel input =
   match parse_qname_bounded fuel 255 input with
   | Some (name, rest) -> Some (name, rest)
   | None -> None
+
+val parse_qname_compressed_bounded :
+  fuel:nat ->
+  remaining:nat ->
+  original:list FStar.UInt8.t ->
+  pointer_limit:nat ->
+  input:list FStar.UInt8.t ->
+  Tot (option (qname * list FStar.UInt8.t)) (decreases fuel)
+
+let rec parse_qname_compressed_bounded fuel remaining original pointer_limit input =
+  if fuel = 0 then
+    None
+  else
+    match input with
+    | [] -> None
+    | b :: rest ->
+        if b = 0uy then
+          if remaining >= 1 then Some ([], rest) else None
+        else if is_pointer b then
+          begin match rest with
+          | lo :: tail ->
+              let offset = pointer_offset b lo in
+              if offset >= pointer_limit then
+                None
+              else
+                begin match suffix_at offset original with
+                | None -> None
+                | Some target ->
+                    begin match parse_qname_compressed_bounded
+                            (fuel - 1)
+                            remaining
+                            original
+                            pointer_limit
+                            target with
+                    | Some (name, _) ->
+                        if dns_name_length name <= remaining then
+                          Some (name, tail)
+                        else
+                          None
+                    | None -> None
+                    end
+                end
+          | [] -> None
+          end
+        else
+          let len = FStar.UInt8.v b in
+          if len < 1 || len > 63 then
+            None
+          else if L.length rest < len then
+            None
+          else if len + 1 >= remaining then
+            None
+          else
+            let (l, next_input) = take_label len rest in
+            match parse_qname_compressed_bounded
+                    (fuel - 1)
+                    (remaining - (len + 1))
+                    original
+                    pointer_limit
+                    next_input with
+            | Some (tl, final_input) -> Some (l :: tl, final_input)
+            | None -> None
+
+val parse_qname_compressed :
+  fuel:nat ->
+  original:list FStar.UInt8.t ->
+  pointer_limit:nat ->
+  input:list FStar.UInt8.t ->
+  Tot (option (qname * list FStar.UInt8.t)) (decreases fuel)
+
+let parse_qname_compressed fuel original pointer_limit input =
+  parse_qname_compressed_bounded fuel 255 original pointer_limit input
 
 (* --- Safety and Termination Proofs --- *)
 

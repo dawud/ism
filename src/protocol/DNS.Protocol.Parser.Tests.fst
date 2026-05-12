@@ -631,6 +631,84 @@ let generated_single_answer_rr_gate_accepts_valid_single_answer_test =
     generated_uncompressed_question_answer_packet_subset_applicable
       valid_single_answer_dns_response == true)
 
+let valid_compressed_answer_name_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0xc0uy; 0x0cuy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x04uy;
+    0x01uy; 0x02uy; 0x03uy; 0x04uy
+  ]
+
+let valid_compressed_answer_name_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes valid_compressed_answer_name_dns_response with
+    | Some p ->
+        p.header.ancount == 1us /\
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.name == [] /\
+             rr.rtype == A /\
+             rr.rdlen == 4us /\
+             FStar.Bytes.length rr.rdata == 4
+         | _ -> false)
+    | None -> false)
+
+let self_loop_compressed_answer_name_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0xc0uy; 0x11uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x04uy;
+    0x01uy; 0x02uy; 0x03uy; 0x04uy
+  ]
+
+let self_loop_compressed_answer_name_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes self_loop_compressed_answer_name_dns_response == None)
+
+let out_of_range_compressed_answer_name_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0xc0uy; 0xffuy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x04uy;
+    0x01uy; 0x02uy; 0x03uy; 0x04uy
+  ]
+
+let out_of_range_compressed_answer_name_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes out_of_range_compressed_answer_name_dns_response == None)
+
 let valid_aaaa_answer_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -1805,6 +1883,18 @@ let boundary_rejects_malformed_compression_pointer_test =
 let boundary_accepts_single_answer_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_single_answer_dns_response ==
                parse_dns_packet_bytes valid_single_answer_dns_response)
+
+let boundary_accepts_compressed_answer_name_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary valid_compressed_answer_name_dns_response ==
+               parse_dns_packet_bytes valid_compressed_answer_name_dns_response)
+
+let boundary_rejects_self_loop_compressed_answer_name_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary self_loop_compressed_answer_name_dns_response ==
+               parse_dns_packet_bytes self_loop_compressed_answer_name_dns_response)
+
+let boundary_rejects_out_of_range_compressed_answer_name_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary out_of_range_compressed_answer_name_dns_response ==
+               parse_dns_packet_bytes out_of_range_compressed_answer_name_dns_response)
 
 let boundary_accepts_aaaa_answer_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_aaaa_answer_dns_response ==

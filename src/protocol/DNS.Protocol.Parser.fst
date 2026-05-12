@@ -437,6 +437,53 @@ let parse_resource_record_bytes additional_section input =
               None
         | _ -> None
 
+let offset_from_tail (original:list FStar.UInt8.t) (tail:list FStar.UInt8.t) : nat =
+  if L.length tail <= L.length original then
+    L.length original - L.length tail
+  else
+    0
+
+val parse_resource_record_bytes_at :
+  original:list FStar.UInt8.t ->
+  current_offset:nat ->
+  additional_section:bool ->
+  input:list FStar.UInt8.t ->
+  Tot (option (resource_record * list FStar.UInt8.t))
+
+let parse_resource_record_bytes_at original current_offset additional_section input =
+  match DNS.Name.parse_qname_compressed 128 original current_offset input with
+  | None -> None
+  | Some (name, rest) ->
+      if L.length rest < 10 then
+        None
+      else
+        match rest with
+        | rt_hi :: rt_lo ::
+          rc_hi :: rc_lo ::
+          ttl_0 :: ttl_1 :: ttl_2 :: ttl_3 ::
+          rdlen_hi :: rdlen_lo ::
+          rdata_input ->
+            let rdlen = u16_from_be rdlen_hi rdlen_lo in
+            let rtype = u16_to_qtype (u16_from_be rt_hi rt_lo) in
+            let ttl = u32_from_be ttl_0 ttl_1 ttl_2 ttl_3 in
+            if valid_rr_position_and_shape additional_section name rtype ttl &&
+               valid_rdata_length rtype rdlen &&
+               valid_rdata_shape rtype rdlen rdata_input then
+              match parse_rdata_bytes rdlen rdata_input with
+              | None -> None
+              | Some (rdata, tail) ->
+                  Some ({
+                    name = name;
+                    rtype = rtype;
+                    rclass = u16_from_be rc_hi rc_lo;
+                    ttl = ttl;
+                    rdlen = rdlen;
+                    rdata = rdata;
+                  }, tail)
+            else
+              None
+        | _ -> None
+
 val parse_resource_records_bytes :
   additional_section:bool ->
   fuel:nat ->
@@ -455,6 +502,37 @@ let rec parse_resource_records_bytes additional_section fuel count input =
         | None -> None
         | Some (rrs, tail) -> Some (rr :: rrs, tail)
 
+val parse_resource_records_bytes_at :
+  original:list FStar.UInt8.t ->
+  current_offset:nat ->
+  additional_section:bool ->
+  fuel:nat ->
+  count:nat ->
+  input:list FStar.UInt8.t ->
+  Tot (option (list resource_record * list FStar.UInt8.t)) (decreases fuel)
+
+let rec parse_resource_records_bytes_at original current_offset additional_section fuel count input =
+  if count = 0 then Some ([], input)
+  else if fuel = 0 then None
+  else
+    match parse_resource_record_bytes_at original current_offset additional_section input with
+    | None -> None
+    | Some (rr, rest) ->
+        let consumed =
+          if L.length rest <= L.length input then
+            L.length input - L.length rest
+          else
+            0 in
+        match parse_resource_records_bytes_at
+                original
+                (current_offset + consumed)
+                additional_section
+                (fuel - 1)
+                (count - 1)
+                rest with
+        | None -> None
+        | Some (rrs, tail) -> Some (rr :: rrs, tail)
+
 val parse_dns_packet_bytes :
   input:list FStar.UInt8.t ->
   Tot (option dns_packet)
@@ -470,13 +548,16 @@ let parse_dns_packet_bytes input =
       match parse_questions_bytes qd qd rest with
       | None -> None
       | Some (qs, after_questions) ->
-          match parse_resource_records_bytes false an an after_questions with
+          let answer_offset = offset_from_tail input after_questions in
+          match parse_resource_records_bytes_at input answer_offset false an an after_questions with
           | None -> None
           | Some (answers, after_answers) ->
-              match parse_resource_records_bytes false ns ns after_answers with
+              let authority_offset = offset_from_tail input after_answers in
+              match parse_resource_records_bytes_at input authority_offset false ns ns after_answers with
               | None -> None
               | Some (authorities, after_authorities) ->
-                  match parse_resource_records_bytes true ar ar after_authorities with
+                  let additional_offset = offset_from_tail input after_authorities in
+                  match parse_resource_records_bytes_at input additional_offset true ar ar after_authorities with
                   | None -> None
                   | Some (additionals, tail) ->
                       if L.length tail = 0 then

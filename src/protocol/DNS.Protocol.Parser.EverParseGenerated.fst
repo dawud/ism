@@ -60,13 +60,16 @@ let parse_dns_packet_bytes_generated input =
       match parse_questions_bytes qd qd rest with
       | None -> None
       | Some (qs, after_questions) ->
-          match parse_resource_records_bytes false an an after_questions with
+          let answer_offset = offset_from_tail input after_questions in
+          match parse_resource_records_bytes_at input answer_offset false an an after_questions with
           | None -> None
           | Some (answers, after_answers) ->
-              match parse_resource_records_bytes false ns ns after_answers with
+              let authority_offset = offset_from_tail input after_answers in
+              match parse_resource_records_bytes_at input authority_offset false ns ns after_answers with
               | None -> None
               | Some (authorities, after_authorities) ->
-                  match parse_resource_records_bytes true ar ar after_authorities with
+                  let additional_offset = offset_from_tail input after_authorities in
+                  match parse_resource_records_bytes_at input additional_offset true ar ar after_authorities with
                   | None -> None
                   | Some (additionals, tail) ->
                       if L.length tail = 0 then
