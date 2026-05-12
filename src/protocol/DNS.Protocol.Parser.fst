@@ -287,6 +287,23 @@ let valid_name_rdata_payload rdlen input =
     | Some (_, tail) -> L.length tail = 0
     | None -> false
 
+val valid_name_rdata_payload_at :
+  original:list FStar.UInt8.t ->
+  rdata_offset:nat ->
+  rdlen:FStar.UInt16.t ->
+  input:list FStar.UInt8.t ->
+  Tot bool
+
+let valid_name_rdata_payload_at original rdata_offset rdlen input =
+  let len = FStar.UInt16.v rdlen in
+  if L.length input < len then
+    false
+  else
+    let (payload, _) = L.splitAt len input in
+    match DNS.Name.parse_qname_compressed 128 original rdata_offset payload with
+    | Some (_, tail) -> L.length tail = 0
+    | None -> false
+
 val valid_mx_rdata_payload :
   rdlen:FStar.UInt16.t ->
   input:list FStar.UInt8.t ->
@@ -398,6 +415,21 @@ let valid_rdata_shape rtype rdlen input =
   | SRV -> valid_srv_rdata_payload rdlen input
   | _ -> true
 
+val valid_rdata_shape_at :
+  original:list FStar.UInt8.t ->
+  rdata_offset:nat ->
+  rtype:qtype ->
+  rdlen:FStar.UInt16.t ->
+  input:list FStar.UInt8.t ->
+  Tot bool
+
+let valid_rdata_shape_at original rdata_offset rtype rdlen input =
+  match rtype with
+  | NS -> valid_name_rdata_payload_at original rdata_offset rdlen input
+  | CNAME -> valid_name_rdata_payload_at original rdata_offset rdlen input
+  | PTR -> valid_name_rdata_payload_at original rdata_offset rdlen input
+  | _ -> valid_rdata_shape rtype rdlen input
+
 val parse_resource_record_bytes :
   additional_section:bool ->
   input:list FStar.UInt8.t ->
@@ -466,9 +498,11 @@ let parse_resource_record_bytes_at original current_offset additional_section in
             let rdlen = u16_from_be rdlen_hi rdlen_lo in
             let rtype = u16_to_qtype (u16_from_be rt_hi rt_lo) in
             let ttl = u32_from_be ttl_0 ttl_1 ttl_2 ttl_3 in
+            let name_consumed = offset_from_tail input rest in
+            let rdata_offset = current_offset + name_consumed + 10 in
             if valid_rr_position_and_shape additional_section name rtype ttl &&
                valid_rdata_length rtype rdlen &&
-               valid_rdata_shape rtype rdlen rdata_input then
+               valid_rdata_shape_at original rdata_offset rtype rdlen rdata_input then
               match parse_rdata_bytes rdlen rdata_input with
               | None -> None
               | Some (rdata, tail) ->
@@ -761,7 +795,7 @@ val generated_uncompressed_question_answer_packet_subset_applicable :
 
 let generated_uncompressed_question_answer_packet_subset_applicable input =
   match generated_uncompressed_question_answer_packet_fields input with
-  | Some (qname_length, rr_name_length, rdata_length, rr_type, _, _) ->
+  | Some (qname_length, rr_name_length, rdata_length, rr_type, rdata_name_length_opt, _) ->
       qname_length > 0 &&
       qname_length <= 255 &&
       rr_name_length > 0 &&
@@ -772,7 +806,9 @@ let generated_uncompressed_question_answer_packet_subset_applicable input =
        else if rr_type = 28 then
          true
        else if rr_type = 2 || rr_type = 5 || rr_type = 12 then
-         true
+         (match rdata_name_length_opt with
+          | Some _ -> true
+          | None -> L.length input <> 26 + qname_length + rr_name_length + rdata_length)
        else if rr_type = 15 then
          true
        else if rr_type = 6 then

@@ -1197,10 +1197,10 @@ let truncated_name_rdata_dns_response : list FStar.UInt8.t =
 let truncated_name_rdata_parse_packet_test =
   assert_norm (parse_dns_packet_bytes truncated_name_rdata_dns_response == None)
 
-let generated_name_rdata_answer_gate_covers_truncated_name_test =
+let generated_name_rdata_answer_gate_skips_truncated_name_test =
   assert_norm (
     generated_uncompressed_question_answer_packet_subset_applicable
-      truncated_name_rdata_dns_response == true)
+      truncated_name_rdata_dns_response == false)
 
 let trailing_name_rdata_dns_response : list FStar.UInt8.t =
   [
@@ -1249,12 +1249,66 @@ let compressed_name_rdata_dns_response : list FStar.UInt8.t =
   ]
 
 let compressed_name_rdata_parse_packet_test =
-  assert_norm (parse_dns_packet_bytes compressed_name_rdata_dns_response == None)
+  assert_norm (
+    match parse_dns_packet_bytes compressed_name_rdata_dns_response with
+    | Some p ->
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.rtype == CNAME /\
+             rr.rdlen == 2us /\
+             FStar.Bytes.length rr.rdata == 2
+         | _ -> false)
+    | None -> false)
 
-let generated_name_rdata_answer_gate_covers_compressed_name_test =
+let generated_name_rdata_answer_gate_skips_compressed_name_test =
   assert_norm (
     generated_uncompressed_question_answer_packet_subset_applicable
-      compressed_name_rdata_dns_response == true)
+      compressed_name_rdata_dns_response == false)
+
+let self_loop_compressed_name_rdata_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x05uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x05uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x02uy;
+    0xc0uy; 0x1cuy
+  ]
+
+let self_loop_compressed_name_rdata_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes self_loop_compressed_name_rdata_dns_response == None)
+
+let out_of_range_compressed_name_rdata_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x05uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x05uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x02uy;
+    0xc0uy; 0xffuy
+  ]
+
+let out_of_range_compressed_name_rdata_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes out_of_range_compressed_name_rdata_dns_response == None)
 
 let valid_mx_rdata_dns_response : list FStar.UInt8.t =
   [
@@ -1960,9 +2014,17 @@ let boundary_rejects_trailing_name_rdata_test =
   assert_norm (parse_dns_packet_bytes_at_boundary trailing_name_rdata_dns_response ==
                parse_dns_packet_bytes trailing_name_rdata_dns_response)
 
-let boundary_rejects_compressed_name_rdata_test =
+let boundary_accepts_compressed_name_rdata_test =
   assert_norm (parse_dns_packet_bytes_at_boundary compressed_name_rdata_dns_response ==
                parse_dns_packet_bytes compressed_name_rdata_dns_response)
+
+let boundary_rejects_self_loop_compressed_name_rdata_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary self_loop_compressed_name_rdata_dns_response ==
+               parse_dns_packet_bytes self_loop_compressed_name_rdata_dns_response)
+
+let boundary_rejects_out_of_range_compressed_name_rdata_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary out_of_range_compressed_name_rdata_dns_response ==
+               parse_dns_packet_bytes out_of_range_compressed_name_rdata_dns_response)
 
 let boundary_accepts_mx_rdata_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_mx_rdata_dns_response ==
