@@ -61,6 +61,9 @@ the duration of the call.
 - Connection contexts must set `cc_capacity` to a bound no larger than the
   allocated stream pointer table and keep `cc_num <= cc_capacity` before calling
   verified stream lookup or allocation routines.
+- Connection buffers, stream pointer tables, and stream context buffers must be
+  pairwise disjoint when calling verified stream close or worker routines that
+  may compact the active stream table.
 - Ownership transfer must be explicit at FFI boundaries. Borrowed buffers return
   to shell ownership after the call; persistent buffers remain owned by the
   connection, stream, or cache object named in the verified precondition.

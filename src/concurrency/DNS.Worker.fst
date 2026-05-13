@@ -19,12 +19,14 @@ val worker_loop :
       live h0 conn /\
       LowStar.Buffer.length conn >= 1 /\
       (let c = FStar.Seq.index (LowStar.Buffer.as_seq h0 conn) 0 in
-       FStar.UInt32.v c.cc_num > 0 ==>
-       live h0 c.cc_active /\
-       LowStar.Buffer.length c.cc_active >= 1 /\
-       (let stream_ptr = FStar.Seq.index (LowStar.Buffer.as_seq h0 c.cc_active) 0 in
-        live h0 stream_ptr /\
-        LowStar.Buffer.length stream_ptr >= 1))))
+       FStar.UInt32.v c.cc_num <= FStar.UInt32.v c.cc_capacity /\
+       (if FStar.UInt32.v c.cc_num > 0 then
+          active_streams_live h0 c.cc_active c.cc_capacity /\
+          loc_disjoint (loc_buffer conn) (loc_buffer c.cc_active) /\
+          (let stream_ptr = FStar.Seq.index (LowStar.Buffer.as_seq h0 c.cc_active) 0 in
+           loc_disjoint (loc_buffer conn) (loc_buffer stream_ptr) /\
+           loc_disjoint (loc_buffer c.cc_active) (loc_buffer stream_ptr))
+        else True))))
     (ensures (fun h0 _ h1 -> True))
 
 let worker_loop conn id =
@@ -39,8 +41,8 @@ let worker_loop conn id =
       | Processing ->
           (* Response generation is not integrated yet; the verified bootstrap
              worker consumes the ready stream and closes the first-slot entry. *)
-          close_stream conn id;
-          LowStar.Buffer.upd ctx_ptr 0ul { s with sc_phase = Done }
+          LowStar.Buffer.upd ctx_ptr 0ul { s with sc_phase = Done };
+          close_stream conn id
       | Done -> ()
       | _ -> ()
     else
