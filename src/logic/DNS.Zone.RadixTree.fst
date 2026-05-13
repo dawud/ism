@@ -4,6 +4,7 @@ open DNS.Protocol
 open DNS.Name
 open DNS.RCode
 module OPT = DNS.Protocol.OPT
+module SER = DNS.Protocol.Serializer
 
 let wildcard_label : label = [0x2auy]
 
@@ -154,6 +155,14 @@ let resolve_authoritative_request root request =
   match request.questions with
   | [] -> Error FormErr
   | q :: _ -> resolve_authoritative_question root q
+
+val build_authoritative_response_packet :
+  root:tree_node ->
+  request:dns_packet ->
+  Tot (option dns_packet)
+
+let build_authoritative_response_packet root request =
+  SER.build_result_response_packet request (resolve_authoritative_request root request)
 
 let label_www : label = [0x77uy; 0x77uy; 0x77uy]
 let label_api : label = [0x61uy; 0x70uy; 0x69uy]
@@ -474,3 +483,66 @@ let resolve_authoritative_first_question_request_test =
     match resolve_authoritative_request wildcard_test_root exact_question_request with
     | Success (rr :: []) -> rr.name == [label_www; label_example; label_com]
     | _ -> false)
+
+let build_authoritative_exact_response_packet_test =
+  assert_norm (
+    match build_authoritative_response_packet wildcard_test_root exact_question_request with
+    | Some p ->
+        p.header.id == 0x1234us /\
+        p.header.flags.qr == true /\
+        p.header.flags.rcode == 0us /\
+        p.header.qdcount == 1us /\
+        p.header.ancount == 1us /\
+        p.questions == [exact_a_question] /\
+        (match p.answers with
+         | rr :: [] -> rr.name == [label_www; label_example; label_com]
+         | _ -> false) /\
+        p.authorities == [] /\
+        p.additionals == []
+    | None -> false)
+
+let nodata_question_request : dns_packet =
+  { empty_question_request with
+    header = { empty_question_request.header with qdcount = 1us };
+    questions = [nodata_aaaa_question] }
+
+let build_authoritative_nodata_response_packet_test =
+  assert_norm (
+    match build_authoritative_response_packet wildcard_test_root nodata_question_request with
+    | Some p ->
+        p.header.flags.qr == true /\
+        p.header.flags.rcode == 0us /\
+        p.header.qdcount == 1us /\
+        p.header.ancount == 0us /\
+        p.questions == [nodata_aaaa_question] /\
+        p.answers == []
+    | None -> false)
+
+let missing_question_request : dns_packet =
+  { empty_question_request with
+    header = { empty_question_request.header with qdcount = 1us };
+    questions = [missing_a_question] }
+
+let build_authoritative_nxdomain_response_packet_test =
+  assert_norm (
+    match build_authoritative_response_packet wildcard_test_root missing_question_request with
+    | Some p ->
+        p.header.flags.qr == true /\
+        p.header.flags.rcode == 3us /\
+        p.header.qdcount == 1us /\
+        p.header.ancount == 0us /\
+        p.questions == [missing_a_question] /\
+        p.answers == []
+    | None -> false)
+
+let build_authoritative_formerr_response_packet_test =
+  assert_norm (
+    match build_authoritative_response_packet wildcard_test_root empty_question_request with
+    | Some p ->
+        p.header.flags.qr == true /\
+        p.header.flags.rcode == 1us /\
+        p.header.qdcount == 0us /\
+        p.header.ancount == 0us /\
+        p.questions == [] /\
+        p.answers == []
+    | None -> false)
