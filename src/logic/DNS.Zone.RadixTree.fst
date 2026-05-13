@@ -3,8 +3,14 @@ module DNS.Zone.RadixTree
 open DNS.Protocol
 open DNS.Name
 open DNS.RCode
+module OPT = DNS.Protocol.OPT
 
 let wildcard_label : label = [0x2auy]
+
+type cname_lookup =
+  | NoCname
+  | CnameTarget of qname
+  | MalformedCname
 
 (* A node in the Radix Tree *)
 noeq
@@ -55,6 +61,38 @@ let rec lookup_with_wildcard root query =
           | Some wildcard -> lookup_with_wildcard wildcard tl
           | None -> None
 
+val parse_cname_target_bytes :
+  input:list FStar.UInt8.t ->
+  Tot (option qname)
+
+let parse_cname_target_bytes input =
+  match DNS.Name.parse_qname 128 input with
+  | Some (target, []) -> Some target
+  | _ -> None
+
+val parse_cname_target :
+  rr:resource_record ->
+  Tot (option qname)
+
+let parse_cname_target rr =
+  parse_cname_target_bytes (OPT.bytes_to_list rr.rdata)
+
+val find_cname_target :
+  records:list resource_record ->
+  Tot cname_lookup
+
+let rec find_cname_target records =
+  match records with
+  | [] -> NoCname
+  | rr :: rest ->
+      match rr.rtype with
+      | CNAME ->
+          begin match parse_cname_target rr with
+          | Some target -> CnameTarget target
+          | None -> MalformedCname
+          end
+      | _ -> find_cname_target rest
+
 (* CNAME Chasing and Loop Prevention *)
 val chase_cname : 
   root:tree_node -> 
@@ -66,11 +104,17 @@ let rec chase_cname root target hops =
   if hops = 0 then Error ServFail (* Prevent CNAME loops *)
   else
     match lookup_with_wildcard root target with
-    | Some rrs -> Success rrs
+    | Some rrs ->
+        begin match find_cname_target rrs with
+        | NoCname -> Success rrs
+        | CnameTarget next_target -> chase_cname root next_target (hops - 1)
+        | MalformedCname -> Error ServFail
+        end
     | None -> Error NXDomain
 
 let label_www : label = [0x77uy; 0x77uy; 0x77uy]
 let label_api : label = [0x61uy; 0x70uy; 0x69uy]
+let label_alias : label = [0x61uy; 0x6cuy; 0x69uy; 0x61uy; 0x73uy]
 let label_mail : label = [0x6duy; 0x61uy; 0x69uy; 0x6cuy]
 let label_example : label = [0x65uy; 0x78uy; 0x61uy; 0x6duy; 0x70uy; 0x6cuy; 0x65uy]
 let label_com : label = [0x63uy; 0x6fuy; 0x6duy]
@@ -173,3 +217,106 @@ let lookup_wildcard_does_not_skip_levels_test =
 let lookup_wildcard_root_query_test =
   assert_norm (
     lookup_with_wildcard wildcard_test_root [] == Some [])
+
+let cname_target_rdata_list : list FStar.UInt8.t =
+  [
+    0x03uy; 0x61uy; 0x70uy; 0x69uy;
+    0x07uy; 0x65uy; 0x78uy; 0x61uy; 0x6duy; 0x70uy; 0x6cuy; 0x65uy;
+    0x03uy; 0x63uy; 0x6fuy; 0x6duy;
+    0x00uy
+  ]
+
+let cname_target_rdata_byte (i:FStar.UInt32.t) : FStar.UInt8.t =
+  let n = FStar.UInt32.v i in
+  if n = 0 then 0x03uy
+  else if n = 1 then 0x61uy
+  else if n = 2 then 0x70uy
+  else if n = 3 then 0x69uy
+  else if n = 4 then 0x07uy
+  else if n = 5 then 0x65uy
+  else if n = 6 then 0x78uy
+  else if n = 7 then 0x61uy
+  else if n = 8 then 0x6duy
+  else if n = 9 then 0x70uy
+  else if n = 10 then 0x6cuy
+  else if n = 11 then 0x65uy
+  else if n = 12 then 0x03uy
+  else if n = 13 then 0x63uy
+  else if n = 14 then 0x6fuy
+  else if n = 15 then 0x6duy
+  else 0x00uy
+
+let cname_target_rdata : FStar.Bytes.bytes =
+  FStar.Bytes.init 17ul cname_target_rdata_byte
+
+let cname_record : resource_record =
+  {
+    name = [label_alias; label_example; label_com];
+    rtype = CNAME;
+    rclass = 1us;
+    ttl = 60ul;
+    rdlen = 17us;
+    rdata = cname_target_rdata;
+  }
+
+let cname_target_record : resource_record =
+  {
+    name = [label_api; label_example; label_com];
+    rtype = A;
+    rclass = 1us;
+    ttl = 60ul;
+    rdlen = 0us;
+    rdata = FStar.Bytes.empty_bytes;
+  }
+
+let cname_leaf rr : tree_node =
+  {
+    tn_label = label_com;
+    tn_records = [rr];
+    tn_children = [];
+  }
+
+let cname_branch first rr : tree_node =
+  {
+    tn_label = first;
+    tn_records = [];
+    tn_children = [
+      {
+        tn_label = label_example;
+        tn_records = [];
+        tn_children = [cname_leaf rr];
+      }
+    ];
+  }
+
+let cname_test_root : tree_node =
+  {
+    tn_label = wildcard_label;
+    tn_records = [];
+    tn_children = [
+      cname_branch label_alias cname_record;
+      cname_branch label_api cname_target_record
+    ];
+  }
+
+let parse_cname_target_bytes_accepts_name_test =
+  assert_norm (
+    parse_cname_target_bytes cname_target_rdata_list ==
+    Some [label_api; label_example; label_com])
+
+let parse_cname_target_bytes_rejects_malformed_name_test =
+  assert_norm (parse_cname_target_bytes [0x03uy; 0x61uy] == None)
+
+let find_cname_target_ignores_non_cname_test =
+  assert_norm (find_cname_target [cname_target_record] == NoCname)
+
+let chase_cname_direct_answer_test =
+  assert_norm (
+    match chase_cname cname_test_root [label_api; label_example; label_com] 4 with
+    | Success (rr :: []) -> rr.name == [label_api; label_example; label_com]
+    | _ -> false)
+
+let chase_cname_hop_exhaustion_test =
+  assert_norm (
+    chase_cname cname_test_root [label_api; label_example; label_com] 0 ==
+    Error ServFail)
