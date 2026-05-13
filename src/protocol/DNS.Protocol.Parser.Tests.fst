@@ -1452,12 +1452,68 @@ let compressed_mx_exchange_dns_response : list FStar.UInt8.t =
   ]
 
 let compressed_mx_exchange_parse_packet_test =
-  assert_norm (parse_dns_packet_bytes compressed_mx_exchange_dns_response == None)
+  assert_norm (
+    match parse_dns_packet_bytes compressed_mx_exchange_dns_response with
+    | Some p ->
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.rtype == MX /\
+             rr.rdlen == 4us /\
+             FStar.Bytes.length rr.rdata == 4
+         | _ -> false)
+    | None -> false)
 
-let generated_mx_answer_gate_covers_compressed_exchange_test =
+let generated_mx_answer_gate_skips_compressed_exchange_test =
   assert_norm (
     generated_uncompressed_question_answer_packet_subset_applicable
-      compressed_mx_exchange_dns_response == true)
+      compressed_mx_exchange_dns_response == false)
+
+let self_loop_compressed_mx_exchange_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x0fuy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x0fuy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x04uy;
+    0x00uy; 0x0auy;
+    0xc0uy; 0x1euy
+  ]
+
+let self_loop_compressed_mx_exchange_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes self_loop_compressed_mx_exchange_dns_response == None)
+
+let out_of_range_compressed_mx_exchange_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x0fuy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x0fuy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x04uy;
+    0x00uy; 0x0auy;
+    0xc0uy; 0xffuy
+  ]
+
+let out_of_range_compressed_mx_exchange_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes out_of_range_compressed_mx_exchange_dns_response == None)
 
 let valid_soa_rdata_dns_response : list FStar.UInt8.t =
   [
@@ -2042,9 +2098,17 @@ let boundary_rejects_trailing_mx_exchange_test =
   assert_norm (parse_dns_packet_bytes_at_boundary trailing_mx_exchange_dns_response ==
                parse_dns_packet_bytes trailing_mx_exchange_dns_response)
 
-let boundary_rejects_compressed_mx_exchange_test =
+let boundary_accepts_compressed_mx_exchange_test =
   assert_norm (parse_dns_packet_bytes_at_boundary compressed_mx_exchange_dns_response ==
                parse_dns_packet_bytes compressed_mx_exchange_dns_response)
+
+let boundary_rejects_self_loop_compressed_mx_exchange_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary self_loop_compressed_mx_exchange_dns_response ==
+               parse_dns_packet_bytes self_loop_compressed_mx_exchange_dns_response)
+
+let boundary_rejects_out_of_range_compressed_mx_exchange_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary out_of_range_compressed_mx_exchange_dns_response ==
+               parse_dns_packet_bytes out_of_range_compressed_mx_exchange_dns_response)
 
 let boundary_accepts_soa_rdata_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_soa_rdata_dns_response ==

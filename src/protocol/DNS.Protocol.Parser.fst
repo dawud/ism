@@ -322,6 +322,26 @@ let valid_mx_rdata_payload rdlen input =
         | None -> false
     | _ -> false
 
+val valid_mx_rdata_payload_at :
+  original:list FStar.UInt8.t ->
+  rdata_offset:nat ->
+  rdlen:FStar.UInt16.t ->
+  input:list FStar.UInt8.t ->
+  Tot bool
+
+let valid_mx_rdata_payload_at original rdata_offset rdlen input =
+  let len = FStar.UInt16.v rdlen in
+  if len < 3 || L.length input < len then
+    false
+  else
+    let (payload, _) = L.splitAt len input in
+    match payload with
+    | _pref_hi :: _pref_lo :: exchange ->
+        match DNS.Name.parse_qname_compressed 128 original (rdata_offset + 2) exchange with
+        | Some (_, tail) -> L.length tail = 0
+        | None -> false
+    | _ -> false
+
 val valid_soa_rdata_payload :
   rdlen:FStar.UInt16.t ->
   input:list FStar.UInt8.t ->
@@ -428,6 +448,7 @@ let valid_rdata_shape_at original rdata_offset rtype rdlen input =
   | NS -> valid_name_rdata_payload_at original rdata_offset rdlen input
   | CNAME -> valid_name_rdata_payload_at original rdata_offset rdlen input
   | PTR -> valid_name_rdata_payload_at original rdata_offset rdlen input
+  | MX -> valid_mx_rdata_payload_at original rdata_offset rdlen input
   | _ -> valid_rdata_shape rtype rdlen input
 
 val parse_resource_record_bytes :
@@ -655,7 +676,7 @@ type generated_dns_name_length = n:nat{n > 0 /\ n <= 255}
 
 val generated_uncompressed_question_answer_packet_fields :
   input:list FStar.UInt8.t ->
-  Tot (option (nat * nat * nat * nat * option generated_dns_name_length * option generated_dns_name_length))
+  Tot (option (nat * nat * nat * nat * bool * option generated_dns_name_length * option generated_dns_name_length))
 
 let generated_uncompressed_question_answer_packet_fields input =
   if L.length input < 28 || L.length input > 66071 then
@@ -685,6 +706,24 @@ let generated_uncompressed_question_answer_packet_fields input =
                         let rr_type = FStar.UInt16.v (u16_from_be _rt_hi _rt_lo) in
                         let rdata_length =
                           FStar.UInt16.v (u16_from_be rdlen_hi rdlen_lo) in
+                        let rdata_name_starts_with_pointer =
+                          if rr_type = 2 || rr_type = 5 || rr_type = 12 || rr_type = 6 then
+                            match rdata_tail with
+                            | b :: _ -> DNS.Name.is_pointer b
+                            | _ -> false
+                          else if rr_type = 15 then
+                            match rdata_tail with
+                            | _pref_hi :: _pref_lo :: b :: _ -> DNS.Name.is_pointer b
+                            | _ -> false
+                          else if rr_type = 33 then
+                            match rdata_tail with
+                            | _priority_hi :: _priority_lo ::
+                              _weight_hi :: _weight_lo ::
+                              _port_hi :: _port_lo ::
+                              b :: _ -> DNS.Name.is_pointer b
+                            | _ -> false
+                          else
+                            false in
                         let rdata_name_length =
                           if rr_type = 2 || rr_type = 5 || rr_type = 12 then
                             match DNS.Name.parse_qname 128 rdata_tail with
@@ -769,6 +808,7 @@ let generated_uncompressed_question_answer_packet_fields input =
                             DNS.Name.dns_name_length rr_name,
                             rdata_length,
                             rr_type,
+                            rdata_name_starts_with_pointer,
                             rdata_name_length,
                             soa_rname_length
                           )
@@ -785,7 +825,7 @@ let generated_uncompressed_question_answer_packet_fields input =
 
 let generated_uncompressed_question_answer_packet_lengths input =
   match generated_uncompressed_question_answer_packet_fields input with
-  | Some (qname_length, rr_name_length, rdata_length, _, _, _) ->
+  | Some (qname_length, rr_name_length, rdata_length, _, _, _, _) ->
       Some (qname_length, rr_name_length, rdata_length)
   | None -> None
 
@@ -795,7 +835,7 @@ val generated_uncompressed_question_answer_packet_subset_applicable :
 
 let generated_uncompressed_question_answer_packet_subset_applicable input =
   match generated_uncompressed_question_answer_packet_fields input with
-  | Some (qname_length, rr_name_length, rdata_length, rr_type, rdata_name_length_opt, _) ->
+  | Some (qname_length, rr_name_length, rdata_length, rr_type, rdata_name_starts_with_pointer, rdata_name_length_opt, _) ->
       qname_length > 0 &&
       qname_length <= 255 &&
       rr_name_length > 0 &&
@@ -810,7 +850,11 @@ let generated_uncompressed_question_answer_packet_subset_applicable input =
           | Some _ -> true
           | None -> L.length input <> 26 + qname_length + rr_name_length + rdata_length)
        else if rr_type = 15 then
-         true
+         (match rdata_name_length_opt with
+          | Some _ -> true
+          | None ->
+              (not rdata_name_starts_with_pointer) ||
+              L.length input <> 26 + qname_length + rr_name_length + rdata_length)
        else if rr_type = 6 then
          true
        else if rr_type = 33 then
@@ -864,7 +908,7 @@ val validate_generated_uncompressed_question_answer_packet_subset_buffer :
 
 let validate_generated_uncompressed_question_answer_packet_subset_buffer buffer len bytes =
   match generated_uncompressed_question_answer_packet_fields bytes with
-  | Some (qname_length_nat, rr_name_length_nat, rdata_length_nat, rr_type_nat, rdata_name_length_opt, soa_rname_length_opt) ->
+  | Some (qname_length_nat, rr_name_length_nat, rdata_length_nat, rr_type_nat, _, rdata_name_length_opt, soa_rname_length_opt) ->
       assert (qname_length_nat > 0);
       assert (qname_length_nat <= 255);
       assert (rr_name_length_nat > 0);
