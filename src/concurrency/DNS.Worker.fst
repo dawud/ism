@@ -22,28 +22,22 @@ val worker_loop :
        FStar.UInt32.v c.cc_num <= FStar.UInt32.v c.cc_capacity /\
        (if FStar.UInt32.v c.cc_num > 0 then
           active_streams_live h0 c.cc_active c.cc_capacity /\
-          loc_disjoint (loc_buffer conn) (loc_buffer c.cc_active) /\
-          (let stream_ptr = FStar.Seq.index (LowStar.Buffer.as_seq h0 c.cc_active) 0 in
-           loc_disjoint (loc_buffer conn) (loc_buffer stream_ptr) /\
-           loc_disjoint (loc_buffer c.cc_active) (loc_buffer stream_ptr))
+          loc_disjoint (loc_buffer conn) (loc_buffer c.cc_active)
         else True))))
     (ensures (fun h0 _ h1 -> True))
 
 let worker_loop conn id =
-  let c = LowStar.Buffer.index conn 0ul in
-  if FStar.UInt32.v c.cc_num = 0 then
-    ()
-  else
-    let ctx_ptr = LowStar.Buffer.index c.cc_active 0ul in
+  let stream_opt = find_stream conn id in
+  match stream_opt with
+  | Some ctx_ptr ->
     let s = LowStar.Buffer.index ctx_ptr 0ul in
-    if s.sc_id = id then
+    begin
       match s.sc_phase with
       | Processing ->
           (* Response generation is not integrated yet; the verified bootstrap
-             worker consumes the ready stream and closes the first-slot entry. *)
-          LowStar.Buffer.upd ctx_ptr 0ul { s with sc_phase = Done };
+             worker consumes the ready stream by closing the active entry. *)
           close_stream conn id
       | Done -> ()
       | _ -> ()
-    else
-      ()
+    end
+  | None -> ()

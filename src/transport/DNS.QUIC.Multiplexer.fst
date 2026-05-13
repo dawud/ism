@@ -33,6 +33,16 @@ let active_streams_live h active count =
      live h stream_ptr /\
      LowStar.Buffer.length stream_ptr >= 1))
 
+val stream_option_live :
+  h:FStar.Monotonic.HyperStack.mem ->
+  result:option (buffer stream_context) ->
+  Type0
+
+let stream_option_live h result =
+  match result with
+  | Some stream_ptr -> live h stream_ptr /\ LowStar.Buffer.length stream_ptr >= 1
+  | None -> True
+
 val find_stream_from :
   active:buffer (buffer stream_context) ->
   capacity:FStar.UInt32.t ->
@@ -43,7 +53,9 @@ val find_stream_from :
     (requires (fun h0 ->
       active_streams_live h0 active capacity /\
       FStar.UInt32.v count <= FStar.UInt32.v capacity))
-    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+    (ensures (fun h0 result h1 ->
+      modifies_none h0 h1 /\
+      stream_option_live h1 result))
     (decreases (FStar.UInt32.v count - FStar.UInt32.v idx))
 
 let rec find_stream_from active capacity count id idx =
@@ -113,7 +125,9 @@ val find_stream :
          FStar.UInt32.v c.cc_num <= FStar.UInt32.v c.cc_capacity /\
          (FStar.UInt32.v c.cc_num > 0 ==>
           active_streams_live h0 c.cc_active c.cc_capacity))))
-      (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+      (ensures (fun h0 result h1 ->
+        modifies_none h0 h1 /\
+        stream_option_live h1 result))
 
 let find_stream conn_ptr id =
   let conn = LowStar.Buffer.index conn_ptr 0ul in
