@@ -8,6 +8,70 @@ open DNS.Protocol
 open DNS.RCode
 open DNS.QUIC.StreamMapping
 open DNS.QUIC.Multiplexer
+module PARSE = DNS.Protocol.Parser
+module SER = DNS.Protocol.Serializer
+module Z = DNS.Zone.RadixTree
+
+val build_worker_response_bytes :
+  root:Z.tree_node ->
+  request:dns_packet ->
+  Tot (option (list FStar.UInt8.t))
+
+let build_worker_response_bytes root request =
+  match Z.build_authoritative_response_packet root request with
+  | Some response -> SER.serialize_dns_packet_bytes response
+  | None -> None
+
+let worker_exact_response_bytes_serialize_test =
+  assert_norm (
+    match build_worker_response_bytes Z.wildcard_test_root Z.exact_question_request with
+    | Some _ -> true
+    | None -> false)
+
+let worker_nodata_response_bytes_parse_test =
+  assert_norm (
+    match build_worker_response_bytes Z.wildcard_test_root Z.nodata_question_request with
+    | Some bytes ->
+        (match PARSE.parse_dns_packet_bytes bytes with
+         | Some p ->
+             p.header.flags.qr == true /\
+             p.header.flags.rcode == 0us /\
+             p.header.qdcount == 1us /\
+             p.header.ancount == 0us /\
+             p.questions == [Z.nodata_aaaa_question] /\
+             p.answers == []
+         | None -> false)
+    | None -> false)
+
+let worker_nxdomain_response_bytes_parse_test =
+  assert_norm (
+    match build_worker_response_bytes Z.wildcard_test_root Z.missing_question_request with
+    | Some bytes ->
+        (match PARSE.parse_dns_packet_bytes bytes with
+         | Some p ->
+             p.header.flags.qr == true /\
+             p.header.flags.rcode == 3us /\
+             p.header.qdcount == 1us /\
+             p.header.ancount == 0us /\
+             p.questions == [Z.missing_a_question] /\
+             p.answers == []
+         | None -> false)
+    | None -> false)
+
+let worker_formerr_response_bytes_parse_test =
+  assert_norm (
+    match build_worker_response_bytes Z.wildcard_test_root Z.empty_question_request with
+    | Some bytes ->
+        (match PARSE.parse_dns_packet_bytes bytes with
+         | Some p ->
+             p.header.flags.qr == true /\
+             p.header.flags.rcode == 1us /\
+             p.header.qdcount == 0us /\
+             p.header.ancount == 0us /\
+             p.questions == [] /\
+             p.answers == []
+         | None -> false)
+    | None -> false)
 
 (* The Worker Harness *)
 (* This loop represents a thread processing a single QUIC connection *)
