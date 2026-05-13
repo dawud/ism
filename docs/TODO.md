@@ -33,7 +33,7 @@ The containerized `make extract` command now completes and emits C/H files under
 
 ## Proof Debt / Trusted Gaps
 
-- [ ] Remove all remaining `admit()` calls from worker processing.
+- [x] Remove all remaining `admit()` calls from worker processing.
 - [ ] Replace `assume` uses with real refinements or lemmas.
 - [x] Replace local mock interfaces under `spec/` with real Project Everest / Low* / Steel dependencies or explicitly documented trusted interfaces.
 - [ ] Replace placeholder functions that return fixed values, including client hello verification and AEAD decrypt success.
@@ -151,7 +151,7 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 *Goal: Thread-safe execution using Steel.*
 
 - [/] Implement `DNS.Cache.Sharded` using Steel invariants for thread-safe access. Current module defines the sharded cache shape, `shard_permission` is a concrete erased `vprop` placeholder through the trusted Steel bootstrap adapter, and concurrent get/add conservatively delegate to the first shard with explicit ownership preconditions. Real hash-based shard selection and Steel invariants are still incomplete.
-- [/] Implement the Worker Thread harness (`worker_loop`). Current harness skeleton exists, but it reads the stream context via `admit()`, response processing is admitted, and the loop has no real polling or scheduler integration.
+- [/] Implement the Worker Thread harness (`worker_loop`). Current harness performs a conservative first-slot stream lookup, reads the stream context directly, and moves matching `Processing` streams to `Done` without admits. Real response generation, polling, scheduler integration, and stream cleanup remain incomplete.
 - [ ] Integrate with "Unverified Shell" for UDP/QUIC socket I/O.
 - [ ] Implement LRU eviction policy for the concurrent cache. No LRU metadata or eviction path is present.
 - [ ] **Validation:** Prove absence of data races using F*'s separation logic.

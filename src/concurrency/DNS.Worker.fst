@@ -27,23 +27,20 @@ val worker_loop :
         LowStar.Buffer.length stream_ptr >= 1))))
     (ensures (fun h0 _ h1 -> True))
 
-let rec worker_loop conn id =
-  (* 1. Poll for data on the stream *)
-  let stream_opt = find_stream conn id in
-  match stream_opt with
-  | Some ctx_ptr ->
-      (* Use admit for bootstrap of the concurrent loop *)
-      let ctx = admit() in
-      let s : stream_context = ctx in
-      (match s.sc_phase with
-       | Processing ->
-           (* 2. Data is ready, perform logic (Authoritative or Recursive) *)
-           ();
-           (* 3. Respond and reset stream *)
-           admit();
-           worker_loop conn id
-       | Done -> ()
-       | _ -> 
-           (* 4. Wait for more data *)
-           worker_loop conn id)
-  | None -> () (* Connection closed *)
+let worker_loop conn id =
+  let c = LowStar.Buffer.index conn 0ul in
+  if FStar.UInt32.v c.cc_num = 0 then
+    ()
+  else
+    let ctx_ptr = LowStar.Buffer.index c.cc_active 0ul in
+    let s = LowStar.Buffer.index ctx_ptr 0ul in
+    if s.sc_id = id then
+      match s.sc_phase with
+      | Processing ->
+          (* Response generation is not integrated yet; the verified bootstrap
+             worker consumes the ready stream by moving it to Done. *)
+          LowStar.Buffer.upd ctx_ptr 0ul { s with sc_phase = Done }
+      | Done -> ()
+      | _ -> ()
+    else
+      ()
