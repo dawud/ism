@@ -36,7 +36,7 @@ The containerized `make extract` command now completes and emits C/H files under
 - [x] Remove all remaining `admit()` calls from worker processing.
 - [x] Replace `assume` uses with real refinements or lemmas.
 - [x] Replace local mock interfaces under `spec/` with real Project Everest / Low* / Steel dependencies or explicitly documented trusted interfaces.
-- [ ] Replace placeholder functions that return fixed values, including client hello verification. AEAD decrypt now branches on a trusted adapter result, but still needs real EverCrypt integration.
+- [x] Replace placeholder functions that return fixed values. Client hello validation and AEAD decrypt now branch on trusted adapter results, but still need real EverCrypt/miTLS/EverQuic integration.
 - [ ] Add or document the unverified shell boundary for socket/QUIC I/O, buffer ownership transfer, and scheduler/thread integration.
 - [/] Run extraction with KaRaMeL after implementation gaps are reduced, not only `make verify`. Current `make extract` completes, but generated C still carries non-Low* warning debt.
 - [ ] Keep the trusted-boundary inventory in `docs/THREAT_MODEL.md` current whenever a mock, admission, assumption, or unverified adapter is added or removed.
@@ -129,7 +129,7 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 *Goal: Secure transport tunnel using EverCrypt/EverQuic.*
 
 - [x] Define `crypto_context` for session state.
-- [/] Integrate EverCrypt for TLS 1.3 Handshake. Current `DNS.Security.Handshake` defines the state type and transitions, but `verify_client_hello` is a mock that always returns `true`; EverCrypt specs are documented trusted bootstrap adapters.
+- [/] Integrate EverCrypt for TLS 1.3 Handshake. Current `DNS.Security.Handshake` defines the state type and transitions, but `verify_client_hello` delegates success/failure to the trusted `EverCrypt.Cipher.validate_client_hello` bootstrap adapter; real miTLS/EverQuic integration remains incomplete.
 - [/] Implement `DNS.Security.Gateway` for authenticated decryption and immediate parsing. Current decrypt delegates success/failure to the trusted `EverCrypt.AEAD.decrypt_authenticated` bootstrap adapter, and the gateway copies the bounded ciphertext range into a concrete Low* plaintext workspace before parsing it instead of admitting allocation.
 - [/] Implement `DNS.QUIC.StreamMapping` state machine (ReadingLength, ReadingMessage). State types exist, the two-byte DoQ length prefix parser reads a bounded Low* buffer, `handle_stream_data` copies bounded body bytes into the stream buffer, persists stream phase updates, stores a one-byte partial length prefix, accounts for body bytes after a completed length prefix, advances `ReadingMessage` to `Processing` once enough bytes arrive, and transitions to `Done` for overlong body fragments. Real allocation and close/removal semantics are still incomplete.
 - [/] Implement Stream ID Multiplexer to handle concurrent streams. `find_stream` performs a verified conservative first-slot lookup with explicit ownership preconditions; `allocate_stream` is an explicit verified no-allocation placeholder; and `close_stream` is an explicit verified no-op placeholder. Real allocation and close/removal semantics are still incomplete.
