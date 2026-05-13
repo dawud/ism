@@ -38,7 +38,8 @@ let worker_loop conn id =
       match s.sc_phase with
       | Processing ->
           (* Response generation is not integrated yet; the verified bootstrap
-             worker consumes the ready stream by moving it to Done. *)
+             worker consumes the ready stream and closes the first-slot entry. *)
+          close_stream conn id;
           LowStar.Buffer.upd ctx_ptr 0ul { s with sc_phase = Done }
       | Done -> ()
       | _ -> ()
