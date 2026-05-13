@@ -417,6 +417,29 @@ let valid_srv_rdata_payload rdlen input =
         | None -> false
     | _ -> false
 
+val valid_srv_rdata_payload_at :
+  original:list FStar.UInt8.t ->
+  rdata_offset:nat ->
+  rdlen:FStar.UInt16.t ->
+  input:list FStar.UInt8.t ->
+  Tot bool
+
+let valid_srv_rdata_payload_at original rdata_offset rdlen input =
+  let len = FStar.UInt16.v rdlen in
+  if len < 7 || L.length input < len then
+    false
+  else
+    let (payload, _) = L.splitAt len input in
+    match payload with
+    | _priority_hi :: _priority_lo ::
+      _weight_hi :: _weight_lo ::
+      _port_hi :: _port_lo ::
+      target ->
+        match DNS.Name.parse_qname_compressed 128 original (rdata_offset + 6) target with
+        | Some (_, tail) -> L.length tail = 0
+        | None -> false
+    | _ -> false
+
 val valid_rdata_shape :
   rtype:qtype ->
   rdlen:FStar.UInt16.t ->
@@ -449,6 +472,7 @@ let valid_rdata_shape_at original rdata_offset rtype rdlen input =
   | CNAME -> valid_name_rdata_payload_at original rdata_offset rdlen input
   | PTR -> valid_name_rdata_payload_at original rdata_offset rdlen input
   | MX -> valid_mx_rdata_payload_at original rdata_offset rdlen input
+  | SRV -> valid_srv_rdata_payload_at original rdata_offset rdlen input
   | _ -> valid_rdata_shape rtype rdlen input
 
 val parse_resource_record_bytes :
@@ -858,7 +882,11 @@ let generated_uncompressed_question_answer_packet_subset_applicable input =
        else if rr_type = 6 then
          true
        else if rr_type = 33 then
-         true
+         (match rdata_name_length_opt with
+          | Some _ -> true
+          | None ->
+              (not rdata_name_starts_with_pointer) ||
+              L.length input <> 26 + qname_length + rr_name_length + rdata_length)
        else if rr_type = 16 then
          true
        else

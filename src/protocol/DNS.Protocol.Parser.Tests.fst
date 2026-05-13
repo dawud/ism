@@ -1911,7 +1911,17 @@ let compressed_srv_target_dns_response : list FStar.UInt8.t =
   ]
 
 let compressed_srv_target_parse_packet_test =
-  assert_norm (parse_dns_packet_bytes compressed_srv_target_dns_response == None)
+  assert_norm (
+    match parse_dns_packet_bytes compressed_srv_target_dns_response with
+    | Some p ->
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.rtype == SRV /\
+             rr.rdlen == 8us /\
+             FStar.Bytes.length rr.rdata == 8
+         | _ -> false)
+    | None -> false)
 
 let generated_srv_answer_gate_accepts_valid_srv_test =
   assert_norm (
@@ -1933,10 +1943,60 @@ let generated_srv_answer_gate_covers_trailing_target_test =
     generated_uncompressed_question_answer_packet_subset_applicable
       trailing_srv_target_dns_response == true)
 
-let generated_srv_answer_gate_covers_compressed_target_test =
+let generated_srv_answer_gate_skips_compressed_target_test =
   assert_norm (
     generated_uncompressed_question_answer_packet_subset_applicable
-      compressed_srv_target_dns_response == true)
+      compressed_srv_target_dns_response == false)
+
+let self_loop_compressed_srv_target_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x21uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x21uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x08uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x02uy;
+    0x01uy; 0xbbuy;
+    0xc0uy; 0x22uy
+  ]
+
+let self_loop_compressed_srv_target_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes self_loop_compressed_srv_target_dns_response == None)
+
+let out_of_range_compressed_srv_target_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x21uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x21uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x08uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x02uy;
+    0x01uy; 0xbbuy;
+    0xc0uy; 0xffuy
+  ]
+
+let out_of_range_compressed_srv_target_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes out_of_range_compressed_srv_target_dns_response == None)
 
 let boundary_valid_single_question_dns_query_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_single_question_dns_query ==
@@ -2158,9 +2218,17 @@ let boundary_rejects_trailing_srv_target_test =
   assert_norm (parse_dns_packet_bytes_at_boundary trailing_srv_target_dns_response ==
                parse_dns_packet_bytes trailing_srv_target_dns_response)
 
-let boundary_rejects_compressed_srv_target_test =
+let boundary_accepts_compressed_srv_target_test =
   assert_norm (parse_dns_packet_bytes_at_boundary compressed_srv_target_dns_response ==
                parse_dns_packet_bytes compressed_srv_target_dns_response)
+
+let boundary_rejects_self_loop_compressed_srv_target_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary self_loop_compressed_srv_target_dns_response ==
+               parse_dns_packet_bytes self_loop_compressed_srv_target_dns_response)
+
+let boundary_rejects_out_of_range_compressed_srv_target_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary out_of_range_compressed_srv_target_dns_response ==
+               parse_dns_packet_bytes out_of_range_compressed_srv_target_dns_response)
 
 let boundary_backend_status_test =
   assert_norm (active_parser_backend == EverParseGeneratedSubset /\
