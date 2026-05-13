@@ -22,6 +22,21 @@ let build_worker_response_bytes root request =
   | Some response -> SER.serialize_dns_packet_bytes response
   | None -> None
 
+val build_worker_response_bytes_from_buffer :
+  root:Z.tree_node ->
+  request_buffer:buffer FStar.UInt8.t ->
+  request_len:FStar.UInt32.t ->
+  Stack (option (list FStar.UInt8.t))
+    (requires (fun h0 ->
+      live h0 request_buffer /\
+      FStar.UInt32.v request_len <= LowStar.Buffer.length request_buffer))
+    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+
+let build_worker_response_bytes_from_buffer root request_buffer request_len =
+  match PARSE.parse_dns_packet_buffer request_buffer request_len with
+  | Some request -> build_worker_response_bytes root request
+  | None -> None
+
 let worker_exact_response_bytes_serialize_test =
   assert_norm (
     match build_worker_response_bytes Z.wildcard_test_root Z.exact_question_request with
