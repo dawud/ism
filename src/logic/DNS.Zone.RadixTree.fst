@@ -112,6 +112,49 @@ let rec chase_cname root target hops =
         end
     | None -> Error NXDomain
 
+val rr_matches_question :
+  q:question ->
+  rr:resource_record ->
+  Tot bool
+
+let rr_matches_question q rr =
+  rr.rtype = q.qtype && rr.rclass = q.qclass
+
+val filter_question_records :
+  q:question ->
+  records:list resource_record ->
+  Tot (list resource_record) (decreases records)
+
+let rec filter_question_records q records =
+  match records with
+  | [] -> []
+  | rr :: rest ->
+      let filtered_rest = filter_question_records q rest in
+      if rr_matches_question q rr then
+        rr :: filtered_rest
+      else
+        filtered_rest
+
+val resolve_authoritative_question :
+  root:tree_node ->
+  q:question ->
+  Tot dns_result
+
+let resolve_authoritative_question root q =
+  match chase_cname root q.qname 15 with
+  | Success records -> Success (filter_question_records q records)
+  | Error rcode -> Error rcode
+
+val resolve_authoritative_request :
+  root:tree_node ->
+  request:dns_packet ->
+  Tot dns_result
+
+let resolve_authoritative_request root request =
+  match request.questions with
+  | [] -> Error FormErr
+  | q :: _ -> resolve_authoritative_question root q
+
 let label_www : label = [0x77uy; 0x77uy; 0x77uy]
 let label_api : label = [0x61uy; 0x70uy; 0x69uy]
 let label_alias : label = [0x61uy; 0x6cuy; 0x69uy; 0x61uy; 0x73uy]
@@ -320,3 +363,114 @@ let chase_cname_hop_exhaustion_test =
   assert_norm (
     chase_cname cname_test_root [label_api; label_example; label_com] 0 ==
     Error ServFail)
+
+let exact_a_question : question =
+  {
+    qname = [label_com; label_example; label_www];
+    qtype = A;
+    qclass = 1us;
+  }
+
+let wildcard_a_question : question =
+  {
+    qname = [label_com; label_example; label_api];
+    qtype = A;
+    qclass = 1us;
+  }
+
+let missing_a_question : question =
+  {
+    qname = [label_com; label_mail; label_api];
+    qtype = A;
+    qclass = 1us;
+  }
+
+let nodata_aaaa_question : question =
+  {
+    qname = [label_com; label_example; label_www];
+    qtype = AAAA;
+    qclass = 1us;
+  }
+
+let class_mismatch_question : question =
+  {
+    qname = [label_com; label_example; label_www];
+    qtype = A;
+    qclass = 3us;
+  }
+
+let empty_question_request : dns_packet =
+  {
+    header = {
+      id = 0x1234us;
+      flags = {
+        qr = false;
+        opcode = 0us;
+        aa = false;
+        tc = false;
+        rd = true;
+        ra = false;
+        z = false;
+        ad = false;
+        cd = false;
+        rcode = 0us;
+      };
+      qdcount = 0us;
+      ancount = 0us;
+      nscount = 0us;
+      arcount = 0us;
+    };
+    questions = [];
+    answers = [];
+    authorities = [];
+    additionals = [];
+  }
+
+let exact_question_request : dns_packet =
+  { empty_question_request with
+    header = { empty_question_request.header with qdcount = 1us };
+    questions = [exact_a_question] }
+
+let filter_question_records_keeps_matching_rr_test =
+  assert_norm (filter_question_records exact_a_question [exact_record] == [exact_record])
+
+let filter_question_records_drops_qtype_mismatch_test =
+  assert_norm (filter_question_records nodata_aaaa_question [exact_record] == [])
+
+let resolve_authoritative_exact_answer_test =
+  assert_norm (
+    match resolve_authoritative_question wildcard_test_root exact_a_question with
+    | Success (rr :: []) -> rr.name == [label_www; label_example; label_com]
+    | _ -> false)
+
+let resolve_authoritative_wildcard_answer_test =
+  assert_norm (
+    match resolve_authoritative_question wildcard_test_root wildcard_a_question with
+    | Success (rr :: []) -> rr.name == [wildcard_label; label_example; label_com]
+    | _ -> false)
+
+let resolve_authoritative_nxdomain_test =
+  assert_norm (
+    resolve_authoritative_question wildcard_test_root missing_a_question ==
+    Error NXDomain)
+
+let resolve_authoritative_nodata_test =
+  assert_norm (
+    resolve_authoritative_question wildcard_test_root nodata_aaaa_question ==
+    Success [])
+
+let resolve_authoritative_class_mismatch_test =
+  assert_norm (
+    resolve_authoritative_question wildcard_test_root class_mismatch_question ==
+    Success [])
+
+let resolve_authoritative_empty_request_test =
+  assert_norm (
+    resolve_authoritative_request wildcard_test_root empty_question_request ==
+    Error FormErr)
+
+let resolve_authoritative_first_question_request_test =
+  assert_norm (
+    match resolve_authoritative_request wildcard_test_root exact_question_request with
+    | Success (rr :: []) -> rr.name == [label_www; label_example; label_com]
+    | _ -> false)
