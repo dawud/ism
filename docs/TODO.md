@@ -36,7 +36,7 @@ The containerized `make extract` command now completes and emits C/H files under
 - [ ] Remove all remaining `admit()` calls from recursive cache operations, sharded cache operations, and worker processing.
 - [ ] Replace `assume` uses with real refinements or lemmas, especially label casting in `DNS.Name` and `shard_permission` in `DNS.Cache.Sharded`.
 - [x] Replace local mock interfaces under `spec/` with real Project Everest / Low* / Steel dependencies or explicitly documented trusted interfaces.
-- [ ] Replace placeholder functions that return fixed values, including client hello verification, AEAD decrypt success, and wildcard lookup.
+- [ ] Replace placeholder functions that return fixed values, including client hello verification and AEAD decrypt success.
 - [ ] Add or document the unverified shell boundary for socket/QUIC I/O, buffer ownership transfer, and scheduler/thread integration.
 - [/] Run extraction with KaRaMeL after implementation gaps are reduced, not only `make verify`. Current `make extract` completes, but generated C still carries non-Low* warning debt.
 - [ ] Keep the trusted-boundary inventory in `docs/THREAT_MODEL.md` current whenever a mock, admission, assumption, or unverified adapter is added or removed.
@@ -141,7 +141,7 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 
 - [x] Define `rcode` sum types and `dns_result` core type.
 - [/] Implement Verified Static Zone File parser (Master File format). Current code parses one bootstrap binary zone-entry shape with origin QNAME, TTL, CLASS, TYPE, RDLENGTH, and exact RDATA bytes; validates A/AAAA RDLENGTH; and rejects truncated, trailing, and invalid A/AAAA entries. Full master-file text parsing and multi-entry iteration are incomplete.
-- [/] Implement In-Memory Radix Tree for authoritative lookups. Exact lookup is implemented over the in-memory tree; wildcard lookup is a placeholder and tree construction/loading is not implemented.
+- [/] Implement In-Memory Radix Tree for authoritative lookups. Exact lookup and literal `*` wildcard fallback are implemented over the in-memory tree; tree construction/loading is not implemented.
 - [/] Implement CNAME chasing logic with hop-count limits. Hop-count termination exists, but the implementation does not inspect CNAME records or follow CNAME targets.
 - [/] Implement Recursive Resolver logic with Bailiwick validation. Current `validate_answer` rejects records whose owner name is not under the authority zone using a verified DNS-name suffix check; broader recursive answer validation remains incomplete.
 - [/] Implement Verified Cache with absolute TTL enforcement. TTL validity and saturated expiry calculation are present, but cache lookup and insertion are admitted.
