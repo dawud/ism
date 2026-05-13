@@ -263,6 +263,65 @@ let minimal_servfail_response_parse_packet_test =
          | None -> false)
     | None -> false)
 
+let result_response_answer : resource_record =
+  {
+    name = [];
+    rtype = HINFO;
+    rclass = 1us;
+    ttl = 60ul;
+    rdlen = 0us;
+    rdata = FStar.Bytes.empty_bytes;
+  }
+
+let result_success_response_builder_test =
+  assert_norm (
+    match SER.build_result_response_packet
+            valid_single_question_dns_packet
+            (RC.Success [result_response_answer]) with
+    | Some p ->
+        p.header.id == 0x1234us /\
+        p.header.flags.qr == true /\
+        p.header.flags.rcode == 0us /\
+        p.header.qdcount == 1us /\
+        p.header.ancount == 1us /\
+        p.header.nscount == 0us /\
+        p.header.arcount == 0us /\
+        p.questions == valid_single_question_dns_packet.questions /\
+        p.answers == [result_response_answer] /\
+        p.authorities == [] /\
+        p.additionals == []
+    | None -> false)
+
+let result_success_response_serialize_test =
+  assert_norm (
+    match SER.serialize_result_response_bytes
+            valid_single_question_dns_packet
+            (RC.Success [result_response_answer]) with
+    | Some _ -> true
+    | None -> false)
+
+let result_error_response_parse_packet_test =
+  assert_norm (
+    match SER.serialize_result_response_bytes
+            valid_single_question_dns_packet
+            (RC.Error RC.NXDomain) with
+    | Some bytes ->
+        (match parse_dns_packet_bytes bytes with
+         | Some p ->
+             p.header.id == 0x1234us /\
+             p.header.flags.qr == true /\
+             p.header.flags.rcode == 3us /\
+             p.header.qdcount == 1us /\
+             p.header.ancount == 0us /\
+             p.header.nscount == 0us /\
+             p.header.arcount == 0us /\
+             p.questions == valid_single_question_dns_packet.questions /\
+             p.answers == [] /\
+             p.authorities == [] /\
+             p.additionals == []
+         | None -> false)
+    | None -> false)
+
 let serialized_root_question_bytes_test =
   assert_norm (
     SER.serialize_question_bytes {

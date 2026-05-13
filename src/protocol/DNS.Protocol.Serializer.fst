@@ -193,6 +193,47 @@ let serialize_minimal_response_bytes
   | Some response -> serialize_dns_packet_bytes response
   | None -> None
 
+let build_result_response_packet
+  (request:dns_packet)
+  (result:R.dns_result)
+  : option dns_packet
+  =
+  let qd = L.length request.questions in
+  if qd > 65535 then
+    None
+  else
+    let response_rcode, response_answers =
+      match result with
+      | R.Success records -> R.NoError, records
+      | R.Error rcode -> rcode, [] in
+    let an = L.length response_answers in
+    if an > 65535 then
+      None
+    else
+      Some {
+        header = {
+          id = request.header.id;
+          flags = response_flags_from_request request.header response_rcode;
+          qdcount = FStar.UInt16.uint_to_t qd;
+          ancount = FStar.UInt16.uint_to_t an;
+          nscount = 0us;
+          arcount = 0us;
+        };
+        questions = request.questions;
+        answers = response_answers;
+        authorities = [];
+        additionals = [];
+      }
+
+let serialize_result_response_bytes
+  (request:dns_packet)
+  (result:R.dns_result)
+  : option (list FStar.UInt8.t)
+  =
+  match build_result_response_packet request result with
+  | Some response -> serialize_dns_packet_bytes response
+  | None -> None
+
 let serialize_response_with_opt_payload
   (h:header)
   (udp_payload_size:FStar.UInt16.t)
