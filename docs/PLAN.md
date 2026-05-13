@@ -11,10 +11,10 @@ This document outlines the design, architecture, and phased implementation of a 
 
 ## 2. High-Level Architecture
 
-The server follows a "Defensive Ring" architecture, separating the unverified I/O shell from the verified logic core. See [DECISIONS.md](DECISIONS.md) for the accepted architecture and trusted-boundary decisions.
+The server follows a "Defensive Ring" architecture, separating the unverified I/O shell from the verified logic core. See [DECISIONS.md](DECISIONS.md) for the accepted architecture and trusted-boundary decisions, and [UNVERIFIED_SHELL.md](UNVERIFIED_SHELL.md) for the shell/core ownership and scheduling contract.
 
 ### Architectural Layers
-1. **Unverified Shell (C):** Handles POSIX sockets, thread scheduling, and initial UDP packet reception.
+1. **Unverified Shell (C):** Handles POSIX sockets, thread scheduling, initial UDP packet reception, and the documented buffer-ownership contract.
 2. **Secure Gateway (EverCrypt):** Handles TLS 1.3 handshake, authenticated decryption (AEAD), and session key derivation.
 3. **The Gatekeeper (EverParse):** Validates the DNS wire format against the formal specification. Rejects any non-conforming input.
 4. **Verified Core Logic (F*):** Implements Radix Tree lookups, Wildcard matching, and CNAME chasing.
@@ -75,7 +75,7 @@ Phase completion gates are recorded in [DECISIONS.md](DECISIONS.md). Keep this r
 - **Tasks:**
   - Implement a **Sharded Concurrent Cache** using Steel invariants to proof the absence of data races.
   - Create the **Worker Thread Harness** to coordinate parsing, logic, and response generation.
-  - Integrate with the "Unverified Shell" for UDP/QUIC socket I/O.
+  - Integrate with the documented [Unverified Shell](UNVERIFIED_SHELL.md) for UDP/QUIC socket I/O.
 - **Verification:** Use F*'s separation logic to prove that threads cannot interfere with each other's memory regions.
 
 ### Phase 5: Hardening & Supply Chain Verification

@@ -53,7 +53,7 @@ The most critical security layer is the **EverParse** validator. Unlike traditio
 **Parser strategy decision:** EverParse remains the target architecture for the production parser and serializer. The current handwritten F*/Low* parser is a bootstrap/reference implementation used to close DNS semantics, establish tests, and exercise the verified Low* buffer boundary early. It should not silently become a second permanent parser architecture. Once the DNS grammar and tests are stable, the EverParse-generated parser should either replace the handwritten parser or be proved behaviorally equivalent to it.
 
 ### 2. Separation of Concerns: Shell vs. Core
-- **The Shell (Unverified):** Responsible for "messy" tasks like socket syscalls, thread scheduling, and signal handling. It is written in C and kept as small as possible.
+- **The Shell (Unverified):** Responsible for "messy" tasks like socket syscalls, thread scheduling, and signal handling. It is written in C, kept as small as possible, and constrained by the contract in [UNVERIFIED_SHELL.md](UNVERIFIED_SHELL.md).
 - **The Core (Verified):** Responsible for the "intelligence" of the server. All protocol logic, state transitions, and cryptographic operations happen here. It is written in F* and extracted to C only after proofs are closed.
 
 ### 3. Language-Based Security
