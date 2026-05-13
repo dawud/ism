@@ -7,6 +7,7 @@ open DNS.Protocol
 open DNS.Protocol.Parser
 open DNS.Protocol.Parser.EverParseBoundary
 module OPT = DNS.Protocol.OPT
+module RC = DNS.RCode
 module SER = DNS.Protocol.Serializer
 
 let valid_single_question_dns_query : list FStar.UInt8.t =
@@ -220,6 +221,46 @@ let serialized_empty_response_parse_packet_test =
         L.length p.questions == 0 /\
         L.length p.answers == 0 /\
         L.length p.additionals == 0
+    | None -> false)
+
+let minimal_noerror_response_builder_test =
+  assert_norm (
+    match SER.build_minimal_response_packet valid_single_question_dns_packet RC.NoError with
+    | Some p ->
+        p.header.id == 0x1234us /\
+        p.header.flags.qr == true /\
+        p.header.flags.opcode == valid_single_question_dns_packet.header.flags.opcode /\
+        p.header.flags.rd == true /\
+        p.header.flags.cd == false /\
+        p.header.flags.rcode == 0us /\
+        p.header.qdcount == 1us /\
+        p.header.ancount == 0us /\
+        p.header.nscount == 0us /\
+        p.header.arcount == 0us /\
+        p.questions == valid_single_question_dns_packet.questions /\
+        p.answers == [] /\
+        p.authorities == [] /\
+        p.additionals == []
+    | None -> false)
+
+let minimal_servfail_response_parse_packet_test =
+  assert_norm (
+    match SER.serialize_minimal_response_bytes valid_single_question_dns_packet RC.ServFail with
+    | Some bytes ->
+        (match parse_dns_packet_bytes bytes with
+         | Some p ->
+             p.header.id == 0x1234us /\
+             p.header.flags.qr == true /\
+             p.header.flags.rcode == 2us /\
+             p.header.qdcount == 1us /\
+             p.header.ancount == 0us /\
+             p.header.nscount == 0us /\
+             p.header.arcount == 0us /\
+             p.questions == valid_single_question_dns_packet.questions /\
+             p.answers == [] /\
+             p.authorities == [] /\
+             p.additionals == []
+         | None -> false)
     | None -> false)
 
 let serialized_root_question_bytes_test =

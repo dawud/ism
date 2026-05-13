@@ -5,6 +5,7 @@ open DNS.Constants
 module L = FStar.List.Tot
 module N = DNS.Name
 module OPT = DNS.Protocol.OPT
+module R = DNS.RCode
 
 let u16_hi (n:FStar.UInt16.t) : FStar.UInt8.t =
   FStar.UInt8.uint_to_t (FStar.UInt16.v n / 256)
@@ -144,6 +145,53 @@ let serialize_dns_packet_bytes (packet:dns_packet) : option (list FStar.UInt8.t)
               (L.append answer_bytes
                 (L.append authority_bytes additional_bytes))))
     | _, _, _, _ -> None
+
+let response_flags_from_request (request_header:header) (rcode:R.rcode) : dns_flags =
+  {
+    qr = true;
+    opcode = request_header.flags.opcode;
+    aa = false;
+    tc = false;
+    rd = request_header.flags.rd;
+    ra = false;
+    z = false;
+    ad = false;
+    cd = request_header.flags.cd;
+    rcode = R.rcode_to_u4 rcode;
+  }
+
+let build_minimal_response_packet
+  (request:dns_packet)
+  (rcode:R.rcode)
+  : option dns_packet
+  =
+  let qd = L.length request.questions in
+  if qd > 65535 then
+    None
+  else
+    Some {
+      header = {
+        id = request.header.id;
+        flags = response_flags_from_request request.header rcode;
+        qdcount = FStar.UInt16.uint_to_t qd;
+        ancount = 0us;
+        nscount = 0us;
+        arcount = 0us;
+      };
+      questions = request.questions;
+      answers = [];
+      authorities = [];
+      additionals = [];
+    }
+
+let serialize_minimal_response_bytes
+  (request:dns_packet)
+  (rcode:R.rcode)
+  : option (list FStar.UInt8.t)
+  =
+  match build_minimal_response_packet request rcode with
+  | Some response -> serialize_dns_packet_bytes response
+  | None -> None
 
 let serialize_response_with_opt_payload
   (h:header)
