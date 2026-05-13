@@ -8,8 +8,8 @@ open LowStar.Buffer
 module HS = FStar.HyperStack
 
 (* Trusted AEAD model for specification purposes. Until the real EverCrypt
-   boundary is integrated, successful decryption is modeled as an authenticated
-   plaintext workspace populated from the ciphertext range. *)
+   boundary is integrated, successful decryption is delegated to the narrow
+   EverCrypt.AEAD bootstrap adapter. *)
 type ae_key = FStar.Bytes.bytes
 type ae_result = | Success | Failure
 
@@ -23,11 +23,14 @@ val decrypt :
       (requires (fun h0 ->
         live h0 ciphertext /\
         live h0 pt_buffer /\
+        FStar.UInt32.v ct_len <= LowStar.Buffer.length ciphertext /\
         FStar.UInt32.v ct_len <= LowStar.Buffer.length pt_buffer))
       (ensures (fun h0 _ h1 ->
         live h1 pt_buffer /\
         FStar.UInt32.v ct_len <= LowStar.Buffer.length pt_buffer))
-let decrypt key iv ciphertext ct_len pt_buffer = Success
+let decrypt key iv ciphertext ct_len pt_buffer =
+  let authenticated = decrypt_authenticated key iv ciphertext ct_len pt_buffer in
+  if authenticated then Success else Failure
 
 (* Decrypt and Parse: The primary security barrier *)
 val decrypt_and_validate :
