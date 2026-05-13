@@ -362,6 +362,33 @@ let valid_soa_rdata_payload rdlen input =
     | Some (_, after_mname) -> valid_soa_rdata_after_mname after_mname
     | None -> false
 
+val valid_soa_rdata_payload_at :
+  original:list FStar.UInt8.t ->
+  rdata_offset:nat ->
+  rdlen:FStar.UInt16.t ->
+  input:list FStar.UInt8.t ->
+  Tot bool
+
+let valid_soa_rdata_payload_at original rdata_offset rdlen input =
+  let len = FStar.UInt16.v rdlen in
+  if len < 22 || L.length input < len then
+    false
+  else
+    let (payload, _) = L.splitAt len input in
+    match DNS.Name.parse_qname_compressed 128 original rdata_offset payload with
+    | Some (_, after_mname) ->
+        let mname_consumed =
+          if L.length after_mname <= L.length payload then
+            L.length payload - L.length after_mname
+          else
+            0 in
+        let rname_offset = rdata_offset + mname_consumed in
+        begin match DNS.Name.parse_qname_compressed 128 original rname_offset after_mname with
+        | Some (_, timers) -> L.length timers = 20
+        | None -> false
+        end
+    | None -> false
+
 val valid_txt_strings :
   fuel:nat ->
   input:list FStar.UInt8.t ->
@@ -472,6 +499,7 @@ let valid_rdata_shape_at original rdata_offset rtype rdlen input =
   | CNAME -> valid_name_rdata_payload_at original rdata_offset rdlen input
   | PTR -> valid_name_rdata_payload_at original rdata_offset rdlen input
   | MX -> valid_mx_rdata_payload_at original rdata_offset rdlen input
+  | SOA -> valid_soa_rdata_payload_at original rdata_offset rdlen input
   | SRV -> valid_srv_rdata_payload_at original rdata_offset rdlen input
   | _ -> valid_rdata_shape rtype rdlen input
 
@@ -731,9 +759,22 @@ let generated_uncompressed_question_answer_packet_fields input =
                         let rdata_length =
                           FStar.UInt16.v (u16_from_be rdlen_hi rdlen_lo) in
                         let rdata_name_starts_with_pointer =
-                          if rr_type = 2 || rr_type = 5 || rr_type = 12 || rr_type = 6 then
+                          if rr_type = 2 || rr_type = 5 || rr_type = 12 then
                             match rdata_tail with
                             | b :: _ -> DNS.Name.is_pointer b
+                            | _ -> false
+                          else if rr_type = 6 then
+                            match rdata_tail with
+                            | b :: _ ->
+                                DNS.Name.is_pointer b ||
+                                begin match DNS.Name.parse_qname 128 rdata_tail with
+                                | Some (_, after_mname) ->
+                                    begin match after_mname with
+                                    | rb :: _ -> DNS.Name.is_pointer rb
+                                    | _ -> false
+                                    end
+                                | None -> false
+                                end
                             | _ -> false
                           else if rr_type = 15 then
                             match rdata_tail with
@@ -880,7 +921,8 @@ let generated_uncompressed_question_answer_packet_subset_applicable input =
               (not rdata_name_starts_with_pointer) ||
               L.length input <> 26 + qname_length + rr_name_length + rdata_length)
        else if rr_type = 6 then
-         true
+         (not rdata_name_starts_with_pointer) ||
+         L.length input <> 26 + qname_length + rr_name_length + rdata_length
        else if rr_type = 33 then
          (match rdata_name_length_opt with
           | Some _ -> true
