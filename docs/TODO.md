@@ -33,8 +33,8 @@ The containerized `make extract` command now completes and emits C/H files under
 
 ## Proof Debt / Trusted Gaps
 
-- [ ] Remove all remaining `admit()` calls from sharded cache operations and worker processing.
-- [ ] Replace `assume` uses with real refinements or lemmas, especially label casting in `DNS.Name` and `shard_permission` in `DNS.Cache.Sharded`.
+- [ ] Remove all remaining `admit()` calls from worker processing.
+- [ ] Replace `assume` uses with real refinements or lemmas.
 - [x] Replace local mock interfaces under `spec/` with real Project Everest / Low* / Steel dependencies or explicitly documented trusted interfaces.
 - [ ] Replace placeholder functions that return fixed values, including client hello verification and AEAD decrypt success.
 - [ ] Add or document the unverified shell boundary for socket/QUIC I/O, buffer ownership transfer, and scheduler/thread integration.
@@ -150,7 +150,7 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 ## Phase 4: Secure Concurrency & I/O Integration
 *Goal: Thread-safe execution using Steel.*
 
-- [/] Implement `DNS.Cache.Sharded` using Steel invariants for thread-safe access. Current module defines the sharded cache shape, but `shard_permission` is assumed, shard index is fixed/admitted, and concurrent get/add are admitted.
+- [/] Implement `DNS.Cache.Sharded` using Steel invariants for thread-safe access. Current module defines the sharded cache shape, `shard_permission` is a concrete erased `vprop` placeholder through the trusted Steel bootstrap adapter, and concurrent get/add conservatively delegate to the first shard with explicit ownership preconditions. Real hash-based shard selection and Steel invariants are still incomplete.
 - [/] Implement the Worker Thread harness (`worker_loop`). Current harness skeleton exists, but it reads the stream context via `admit()`, response processing is admitted, and the loop has no real polling or scheduler integration.
 - [ ] Integrate with "Unverified Shell" for UDP/QUIC socket I/O.
 - [ ] Implement LRU eviction policy for the concurrent cache. No LRU metadata or eviction path is present.
