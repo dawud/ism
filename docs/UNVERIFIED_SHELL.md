@@ -58,6 +58,9 @@ the duration of the call.
   `loc_disjoint`.
 - The shell must preserve any live `connection_context`, `stream_context`, and
   cache buffers across calls that rely on stored pointers.
+- Connection contexts must set `cc_capacity` to a bound no larger than the
+  allocated stream pointer table and keep `cc_num <= cc_capacity` before calling
+  verified stream lookup or allocation routines.
 - Ownership transfer must be explicit at FFI boundaries. Borrowed buffers return
   to shell ownership after the call; persistent buffers remain owned by the
   connection, stream, or cache object named in the verified precondition.
@@ -100,4 +103,3 @@ The unverified shell must stay small and auditable.
   everparse-generate` and `make everparse-verify`.
 - Update `docs/THREAT_MODEL.md` whenever the shell gains or loses trusted
   behavior, exported entry points, ownership assumptions, or adapter contracts.
-
