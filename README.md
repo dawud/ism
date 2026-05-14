@@ -76,6 +76,16 @@ podman run --rm \
   bash -lc 'make c-compile-smoke'
 ```
 
+To link and run the current generated C boundary smoke binary, run:
+
+```bash
+podman run --rm \
+  --userns=keep-id \
+  -v "$(pwd):/workspace:Z" \
+  localhost/verified-dns-server:latest \
+  bash -lc 'make c-link-smoke'
+```
+
 The image also includes EverParse/3D tooling. To regenerate the current
 EverParse parser scaffold and verify/extract the generated subset, run:
 

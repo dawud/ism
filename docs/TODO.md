@@ -23,7 +23,7 @@ podman run --rm -v "$(pwd):/workspace:Z" localhost/verified-dns-server:latest \
   bash -lc 'eval $(opam env) && make extract'
 ```
 
-The containerized `make extract` command now completes and emits C/H files under `dist/`, and `make c-compile-smoke` syntax-checks the current extracted C bundle plus the EverParse wrapper. KaRaMeL still reports many warning-15 diagnostics because significant parts of the scaffold use GC-backed lists, mathematical integers, or specification-oriented definitions that are not Low*. Treat extraction/compile checks as generated-artifact smoke tests, not yet as proof that the output is production-linked C.
+The containerized `make extract` command now completes and emits C/H files under `dist/`, `make c-compile-smoke` syntax-checks the current extracted C bundle plus the EverParse wrapper, and `make c-link-smoke` links and runs a tiny generated-boundary smoke binary. KaRaMeL still reports many warning-15 diagnostics because significant parts of the scaffold use GC-backed lists, mathematical integers, or specification-oriented definitions that are not Low*. Treat extraction/compile/link checks as generated-artifact smoke tests, not yet as proof that the output is production-linked C.
 
 ## Status Model
 
@@ -87,11 +87,12 @@ The containerized `make extract` command now completes and emits C/H files under
 - [/] Add extraction as a routine build gate:
   - [x] run `make extract` in the container;
   - [x] syntax-check the generated C bundle and EverParse wrapper with `make c-compile-smoke`;
+  - [x] link and run the current generated protocol/EverParse boundary smoke binary with `make c-link-smoke`;
   - [x] separate extraction blockers from verification blockers;
   - [x] classify and reduce warning-15 non-Low* extraction debt;
   - [x] add extraction to CI once warning debt is understood and acceptable.
 
-  Extraction currently verifies all scaffold modules and sends the current protocol/security/transport boundary plus the authoritative worker and shell-event dispatcher path to KaRaMeL. Verification-only parser tests and broader Phase 3/4 cache/concurrency scaffolds stay out of extraction until they are rewritten into Low* or explicitly marked as trusted/specification-only boundaries.
+  Extraction currently verifies all scaffold modules and sends the current protocol/security/transport boundary plus the authoritative worker and shell-event dispatcher path to KaRaMeL, but the clean emitted C/link surface is still the protocol/EverParse parser boundary. Verification-only parser tests and broader Phase 3/4 cache/concurrency scaffolds stay out of extraction until they are rewritten into Low* or explicitly marked as trusted/specification-only boundaries.
 - [x] Replace local mock specs with real dependencies or documented trusted interfaces:
   - [x] EverCrypt AEAD;
   - [x] EverCrypt cipher/helper interfaces;

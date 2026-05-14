@@ -141,6 +141,9 @@ The unverified shell must stay small and auditable.
 - Run sanitizers on shell builds when using an ordinary C compiler.
 - Run `make c-compile-smoke` after extraction-sensitive changes to
   syntax-check the generated C bundle and EverParse wrapper.
+- Run `make c-link-smoke` after generated C boundary changes to link and run
+  the current protocol/EverParse boundary harness. This does not yet cover the
+  worker/dispatcher or MsQuic shell path.
 - Keep generated EverParse wrapper symbols aligned with `make
   everparse-generate` and `make everparse-verify`.
 - Update `docs/THREAT_MODEL.md` whenever the shell gains or loses trusted
