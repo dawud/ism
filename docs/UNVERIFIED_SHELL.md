@@ -10,12 +10,13 @@ cross into the F*/Low* core only through narrow, documented entry points.
 The shell owns:
 
 - POSIX socket setup, polling, reads, writes, and shutdown.
-- QUIC packet I/O, connection dispatch, stream event delivery, and flow-control
-  integration until EverQuic is wired in directly.
+- QUIC/TLS stack integration, packet I/O, connection dispatch, stream event
+  delivery, recovery, congestion control, and flow-control behavior.
 - Thread creation, worker scheduling, timers, signal handling, and process
   lifecycle.
 - Allocation and release of host-side buffers before they are handed to Low*.
-- FFI glue between generated C, EverCrypt/EverQuic/miTLS, and the OS.
+- FFI glue between generated C, MsQuic as the preferred maintained QUIC/TLS
+  stack, and the OS.
 
 The shell must not implement DNS parsing, cache policy, bailiwick validation,
 zone lookup semantics, CNAME chasing, or response-policy decisions. Those
@@ -40,8 +41,9 @@ preconditions are established by construction or checked before the call:
 - `DNS.QUIC.Multiplexer.find_stream`
 - `DNS.Worker.worker_loop`
 
-Until real EverQuic/miTLS integration lands, QUIC/TLS authenticity and
-handshake acceptance are trusted through the adapter interfaces listed in
+QUIC/TLS authenticity, handshake acceptance, certificate/authentication policy,
+packet protection, key updates, flow control, recovery, and connection lifecycle
+are trusted through the MsQuic shell stack and adapter interfaces listed in
 `docs/THREAT_MODEL.md`.
 
 ## Buffer Ownership
@@ -86,14 +88,14 @@ when. It must maintain the logical ownership expected by the verified model:
 
 ## Egress Contract
 
-Response construction, encryption, and QUIC writes are not fully integrated.
-Until they are verified or backed by real EverQuic/miTLS contracts:
+Response construction and QUIC writes are not fully integrated. Until the
+shell/core egress path is wired:
 
 - the shell may drop a request after verified processing;
 - any response bytes emitted by future verified serializers must be treated as
   immutable until encryption/write completion;
 - AEAD encryption, QUIC packetization, congestion control, retransmission, and
-  path validation remain trusted shell or EverQuic responsibilities.
+  path validation remain trusted responsibilities of the MsQuic shell stack.
 
 ## Audit and Test Requirements
 

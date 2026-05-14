@@ -53,13 +53,13 @@ proof debt, extraction, tests, and documentation are aligned.
 
 **Status:** Accepted
 
-**Context:** The project needs high-assurance parsing, cryptography,
-concurrency, extraction, and compilation.
+**Context:** The project needs high-assurance parsing, concurrency,
+extraction, compilation, and a clear boundary for transport security.
 
 **Decision:** Use F*/Low* for verified implementation, EverParse for parser
-generation, EverCrypt/HACL* for cryptography, EverQuic/miTLS for QUIC/TLS,
-Steel for concurrency proofs, KaRaMeL for C extraction, and CompCert as the
-intended high-assurance C compiler.
+generation, HACL*/EverCrypt where directly integrated, Steel for concurrency
+proofs, KaRaMeL for C extraction, and CompCert as the intended high-assurance C
+compiler. QUIC/TLS ownership is recorded separately in DR-0011.
 
 **Consequences:** Local mocks under `spec/` are temporary bootstrap shims. The
 implementation must eventually use real Project Everest / Low* / Steel
@@ -159,3 +159,52 @@ transport, EDNS0, TLS, and related protocol work changes status.
 
 **Consequences:** Protocol changes must update implementation, tests/proofs,
 and the matrix together when compliance status changes.
+
+## DR-0011: Delegate QUIC/TLS to the Unverified Shell
+
+**Status:** Accepted
+
+**Context:** The public miTLS and EverQuic artifacts are research-oriented and
+not a maintained drop-in production QUIC/TLS stack for this repository. Using
+`everquic-crypto` alone would only cover QUIC packet/header protection, not TLS
+handshake policy, QUIC transport state, recovery, flow control, stream
+scheduling, socket I/O, or event-loop integration.
+
+**Decision:** Delegate TLS 1.3, QUIC transport, packet protection, recovery,
+flow control, key updates, connection lifecycle, and socket/event-loop behavior
+to the unverified shell using a well-maintained QUIC/TLS implementation. The
+verified core owns DNS parsing, DoQ stream-message framing above authenticated
+QUIC streams, request handling, response construction, cache/zone logic, and
+resource invariants at the shell/core boundary.
+
+**Consequences:** TLS authenticity, certificate/authentication policy, AEAD
+integrity, QUIC recovery, flow control, congestion control, and path validation
+remain trusted properties of the selected shell stack. This project should not
+implement QUIC/TLS crypto or mark QUIC/TLS as verified unless a future decision
+selects a maintained verified dependency and updates the threat model. The shell
+contract must define the authenticated stream-byte interface and keep transport
+policy out of verified DNS logic.
+
+## DR-0012: Prefer MsQuic for the Shell QUIC/TLS Stack
+
+**Status:** Accepted
+
+**Context:** The unverified shell needs a maintained QUIC/TLS implementation
+with a strong security posture and a narrow integration surface for passing
+authenticated stream bytes into the verified core. Candidate stacks include
+MsQuic, quiche, ngtcp2, and LSQUIC.
+
+**Decision:** Prefer MsQuic for the shell QUIC/TLS stack. MsQuic provides a C
+API, mature object boundaries for listener/connection/stream ownership, active
+maintenance, documented API stability expectations, and a security posture that
+includes a published threat model and automated stress, fuzzing, sanitizer, and
+static-analysis coverage. Keep quiche as the fallback if a Rust shell becomes
+desirable, and ngtcp2 as the fallback if maximum C-level control is more
+important than integration simplicity.
+
+**Consequences:** Shell integration work should target MsQuic first and shape
+the shell/core boundary around MsQuic stream callbacks: authenticated bytes from
+MsQuic into verified DoQ handling, and serialized response bytes from verified
+code back to MsQuic. Pin the chosen MsQuic version or commit before production
+use, document build/link dependencies, and revisit this decision if MsQuic's API,
+maintenance, platform support, or security process no longer fits the project.

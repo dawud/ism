@@ -14,8 +14,8 @@ This document outlines the design, architecture, and phased implementation of a 
 The server follows a "Defensive Ring" architecture, separating the unverified I/O shell from the verified logic core. See [DECISIONS.md](DECISIONS.md) for the accepted architecture and trusted-boundary decisions, and [UNVERIFIED_SHELL.md](UNVERIFIED_SHELL.md) for the shell/core ownership and scheduling contract.
 
 ### Architectural Layers
-1. **Unverified Shell (C):** Handles POSIX sockets, thread scheduling, initial UDP packet reception, and the documented buffer-ownership contract.
-2. **Secure Gateway (EverCrypt):** Handles TLS 1.3 handshake, authenticated decryption (AEAD), and session key derivation.
+1. **Unverified Shell (C):** Handles POSIX sockets, thread scheduling, maintained QUIC/TLS stack integration, authenticated stream delivery, and the documented buffer-ownership contract.
+2. **DoQ Ingress Boundary:** Accepts authenticated QUIC stream bytes from the shell, enforces DoQ length framing, and hands complete DNS messages to parsing.
 3. **The Gatekeeper (EverParse):** Validates the DNS wire format against the formal specification. Rejects any non-conforming input.
 4. **Verified Core Logic (F*):** Implements Radix Tree lookups, Wildcard matching, and CNAME chasing.
 5. **Concurrent Memory (Steel):** Manages the shared recursive cache using separation logic to prove the absence of data races.
@@ -45,15 +45,15 @@ Phase completion gates are recorded in [DECISIONS.md](DECISIONS.md). Keep this r
 - **Verification:** Prove the parser is "total" and "parser-rejecting" for all malformed inputs.
 
 ### Phase 2: DoQ Transport and TLS Security
-*Goal: Establish a secure transport tunnel using miTLS and EverQuic.*
+*Goal: Establish verified DoQ stream handling above a maintained QUIC/TLS shell stack.*
 - **Scope:** RFC 8310, RFC 8446, RFC 8914, RFC 9000, RFC 9001, RFC 9002, RFC 9250.
 - **Sub-phases:**
   - **2A: DNS-over-QUIC framing:** Implement the RFC 9250 two-octet DNS message length prefix, reject malformed frame boundaries, and prove bounds on frame accumulation.
   - **2B: Stream accumulation:** Implement `ReadingLength`, `ReadingMessage`, `Processing`, and cleanup transitions without admitted state changes.
   - **2C: Stream multiplexing:** Implement stream lookup/allocation/close with explicit resource bounds and denial-of-service behavior.
-  - **2D: TLS/AEAD abstraction:** Replace the trusted AEAD decrypt adapter with a real EverCrypt-backed interface and document the exact authenticity property exported to the DNS layer.
-  - **2E: Key lifecycle:** Model epoch changes, session teardown, key zeroization, and forward-secrecy requirements.
-  - **2F: EverCrypt/EverQuic integration:** Replace local mocks with real Project Everest dependencies or a documented trusted adapter.
+  - **2D: Shell TLS/AEAD contract:** Replace the current trusted AEAD decrypt adapter path with an authenticated stream-byte contract exported by the MsQuic shell stack.
+  - **2E: Transport lifecycle contract:** Document session teardown, key update, authentication, and forward-secrecy requirements as shell-stack obligations.
+  - **2F: MsQuic shell integration:** Wire MsQuic as the preferred maintained QUIC/TLS implementation in the unverified shell, keeping its trust assumptions visible.
 - **Tasks:**
   - Define `Connection_Context` to manage ephemeral keys and session state.
   - Implement the QUIC Stream state machine (Accumulator) for handling fragmented frames.
@@ -166,13 +166,13 @@ Maintain a compliance matrix for each protocol area. See [DECISIONS.md](DECISION
 | [RFC 6891](https://datatracker.ietf.org/doc/html/rfc6891) | EDNS0 OPT | OPT pseudo-RR | Partial | Parser tests cover valid additional-section OPT, non-root OPT owner rejection, unsupported EDNS version rejection, truncated option rejection, unknown option acceptance, basic OPT option serialization round-trips, minimal OPT response serialization, and packet-level OPT construction. | Full DNS response generation integration is incomplete. |
 | [RFC 6895](https://datatracker.ietf.org/doc/html/rfc6895) | DNS IANA considerations | RR TYPE, CLASS, OpCode, RCODE, and header-bit registry policy | Reference | `qtype` mappings cover assigned RR TYPE constants; `rcode` models assigned response codes; tests preserve unknown QTYPE/RR TYPE values. | BCP 42 registry policy, included to govern numeric constants and allocation ranges rather than runtime packet behavior. Track the 6895bis draft only if it becomes an RFC. |
 | [RFC 7830](https://datatracker.ietf.org/doc/html/rfc7830) | EDNS0 Padding | Padding option for encrypted DNS traffic | Partial | Parser tests cover structurally valid Padding option data and truncation rejection; padding length helper verifies; padding option serialization accounts for the option header and round-trips through the parser. | Response construction does not yet apply padding policy automatically. |
-| [RFC 8310](https://datatracker.ietf.org/doc/html/rfc8310) | Authentication profiles | Strict/opportunistic authentication profile considerations | Trusted | ClientHello validation now branches on a trusted TLS adapter result instead of unconditional success. | DoQ uses QUIC/TLS, but identity validation and authentication profile policy still depend on trusted adapter behavior rather than real miTLS/EverQuic integration. |
-| [RFC 8446](https://datatracker.ietf.org/doc/html/rfc8446) | TLS 1.3 | Authenticated transport | Trusted | AEAD decrypt and ClientHello validation now branch on trusted adapter results instead of unconditional success. | TLS handshake and AEAD authenticity still depend on trusted adapters rather than real EverCrypt/miTLS/EverQuic integration. |
+| [RFC 8310](https://datatracker.ietf.org/doc/html/rfc8310) | Authentication profiles | Strict/opportunistic authentication profile considerations | Trusted | ClientHello validation now branches on a trusted TLS adapter result instead of unconditional success. | DoQ uses QUIC/TLS, but identity validation and authentication profile policy are delegated to the MsQuic shell stack. |
+| [RFC 8446](https://datatracker.ietf.org/doc/html/rfc8446) | TLS 1.3 | Authenticated transport | Trusted | AEAD decrypt and ClientHello validation now branch on trusted adapter results instead of unconditional success. | TLS handshake, key schedule, certificate policy, and AEAD authenticity are delegated to the MsQuic shell stack. |
 | [RFC 8467](https://datatracker.ietf.org/doc/html/rfc8467) | EDNS0 padding policy | Block-length padding guidance | Partial | Block padding helper verifies zero block size and remainder behavior, and padding option serialization handles zero block size. | Policy selection and full response-side integration are incomplete. |
 | [RFC 8914](https://datatracker.ietf.org/doc/html/rfc8914) | Extended DNS Errors | EDE responses such as Too Early for 0-RTT handling | Not implemented | None | No 0-RTT or EDE response handling exists yet. |
-| [RFC 9000](https://datatracker.ietf.org/doc/html/rfc9000) | QUIC transport | Streams, connection lifecycle, and flow-control model | Trusted | None | Transport is delegated to EverQuic or an unverified shell adapter. |
-| [RFC 9001](https://datatracker.ietf.org/doc/html/rfc9001) | TLS for QUIC | QUIC handshake protection and key schedule | Trusted | None | TLS/QUIC integration is still represented by trusted adapters and mocks. |
-| [RFC 9002](https://datatracker.ietf.org/doc/html/rfc9002) | QUIC recovery | Loss detection and congestion control | Trusted | None | Recovery behavior is delegated to EverQuic or the unverified QUIC shell. |
+| [RFC 9000](https://datatracker.ietf.org/doc/html/rfc9000) | QUIC transport | Streams, connection lifecycle, and flow-control model | Trusted | None | Transport is delegated to the MsQuic shell stack. |
+| [RFC 9001](https://datatracker.ietf.org/doc/html/rfc9001) | TLS for QUIC | QUIC handshake protection and key schedule | Trusted | None | TLS for QUIC is delegated to the MsQuic shell stack. |
+| [RFC 9002](https://datatracker.ietf.org/doc/html/rfc9002) | QUIC recovery | Loss detection and congestion control | Trusted | None | Recovery behavior is delegated to the MsQuic shell stack. |
 | [RFC 9250](https://datatracker.ietf.org/doc/html/rfc9250) | DoQ framing | Two-octet length prefix | Partial | Low* stream state verifies complete and split length-prefix parsing, bounded body copying, `ReadingMessage` progress to `Processing` with the completed message length, conservative overlong-fragment rejection, bounded active stream lookup, capacity-bounded stream allocation, compacting active-stream close, worker dispatch through verified stream lookup, and worker-side completed-buffer parsing into response bytes before stream close. | Response byte dispatch into the worker/DoQ send path, polling, scheduler integration, and resource-bound proofs remain incomplete. |
 | [RFC 9499](https://datatracker.ietf.org/doc/html/rfc9499) | DNS terminology | Current DNS terms for global DNS, QNAME, bailiwick, and roles | Reference | Documentation alignment only | Use for terminology; no executable behavior is directly required. |
 
