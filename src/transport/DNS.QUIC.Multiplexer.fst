@@ -31,7 +31,10 @@ let active_streams_live h active count =
     i < LowStar.Buffer.length active ==>
     (let stream_ptr = FStar.Seq.index (LowStar.Buffer.as_seq h active) i in
      live h stream_ptr /\
-     LowStar.Buffer.length stream_ptr >= 1))
+     LowStar.Buffer.length stream_ptr >= 1 /\
+     (let stream = FStar.Seq.index (LowStar.Buffer.as_seq h stream_ptr) 0 in
+      live h stream.sc_buf /\
+      LowStar.Buffer.length stream.sc_buf >= 65535)))
 
 val stream_option_live :
   h:FStar.Monotonic.HyperStack.mem ->
@@ -40,7 +43,12 @@ val stream_option_live :
 
 let stream_option_live h result =
   match result with
-  | Some stream_ptr -> live h stream_ptr /\ LowStar.Buffer.length stream_ptr >= 1
+  | Some stream_ptr ->
+      live h stream_ptr /\
+      LowStar.Buffer.length stream_ptr >= 1 /\
+      (let stream = FStar.Seq.index (LowStar.Buffer.as_seq h stream_ptr) 0 in
+       live h stream.sc_buf /\
+       LowStar.Buffer.length stream.sc_buf >= 65535)
   | None -> True
 
 val find_stream_from :

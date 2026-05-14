@@ -13,7 +13,7 @@ open FStar.UInt64
 type stream_phase =
   | ReadingLength  of (acc: FStar.UInt32.t)
   | ReadingMessage of (expected: FStar.UInt16.t * current: FStar.UInt32.t)
-  | Processing
+  | Processing of (expected:FStar.UInt16.t)
   | Done
 
 (* The Stream Context held in shared memory but protected by Steel permissions *)
@@ -84,7 +84,7 @@ val advance_message :
 let advance_message expected current incoming =
   let total_len = Prims.op_Addition (FStar.UInt32.v current) (FStar.UInt32.v incoming) in
   if total_len >= FStar.UInt16.v expected then
-    Processing
+    Processing expected
   else
     begin
       assert (total_len < FStar.UInt16.v expected);

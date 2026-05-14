@@ -75,8 +75,9 @@ when. It must maintain the logical ownership expected by the verified model:
 
 - At most one worker mutates a given `stream_context` at a time until real Steel
   permissions replace the bootstrap adapter.
-- A stream marked `Processing` may be passed to `DNS.Worker.worker_loop`; other
-  stream phases should be accumulated through `handle_stream_data`.
+- A stream marked `Processing` carries the completed DNS message length and may
+  be passed to `DNS.Worker.worker_loop`; other stream phases should be
+  accumulated through `handle_stream_data`.
 - Closed or reset streams must not be reused while any verified pointer still
   aliases their buffers.
 - The shell must enforce connection, stream, and buffer-count limits before

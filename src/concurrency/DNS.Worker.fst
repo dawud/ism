@@ -90,7 +90,8 @@ let worker_formerr_response_bytes_parse_test =
 
 (* The Worker Harness *)
 (* This loop represents a thread processing a single QUIC connection *)
-val worker_loop : 
+val worker_loop_with_root :
+  root:Z.tree_node ->
   conn:buffer connection_context -> 
   id:FStar.UInt64.t -> 
   ST unit
@@ -105,18 +106,37 @@ val worker_loop :
         else True))))
     (ensures (fun h0 _ h1 -> True))
 
-let worker_loop conn id =
+let worker_loop_with_root root conn id =
   let stream_opt = find_stream conn id in
   match stream_opt with
   | Some ctx_ptr ->
     let s = LowStar.Buffer.index ctx_ptr 0ul in
     begin
       match s.sc_phase with
-      | Processing ->
-          (* Response generation is not integrated yet; the verified bootstrap
-             worker consumes the ready stream by closing the active entry. *)
+      | Processing request_len ->
+          let request_len32 = FStar.UInt32.uint_to_t (FStar.UInt16.v request_len) in
+          let _response_bytes =
+            build_worker_response_bytes_from_buffer root s.sc_buf request_len32 in
           close_stream conn id
       | Done -> ()
       | _ -> ()
     end
   | None -> ()
+
+val worker_loop :
+  conn:buffer connection_context ->
+  id:FStar.UInt64.t ->
+  ST unit
+    (requires (fun h0 ->
+      live h0 conn /\
+      LowStar.Buffer.length conn >= 1 /\
+      (let c = FStar.Seq.index (LowStar.Buffer.as_seq h0 conn) 0 in
+       FStar.UInt32.v c.cc_num <= FStar.UInt32.v c.cc_capacity /\
+       (if FStar.UInt32.v c.cc_num > 0 then
+          active_streams_live h0 c.cc_active c.cc_capacity /\
+          loc_disjoint (loc_buffer conn) (loc_buffer c.cc_active)
+        else True))))
+    (ensures (fun h0 _ h1 -> True))
+
+let worker_loop conn id =
+  worker_loop_with_root Z.wildcard_test_root conn id
