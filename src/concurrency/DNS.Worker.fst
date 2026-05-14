@@ -8,6 +8,7 @@ open DNS.Protocol
 open DNS.RCode
 open DNS.QUIC.StreamMapping
 open DNS.QUIC.Multiplexer
+module EGRESS = DNS.QUIC.MsQuicEgress
 module PARSE = DNS.Protocol.Parser
 module SER = DNS.Protocol.Serializer
 module Z = DNS.Zone.RadixTree
@@ -88,6 +89,31 @@ let worker_formerr_response_bytes_parse_test =
          | None -> false)
     | None -> false)
 
+val prepare_worker_response_send :
+  root:Z.tree_node ->
+  ctx_ptr:buffer stream_context ->
+  request_len:FStar.UInt32.t ->
+  Stack (option EGRESS.msquic_send_list_descriptor)
+    (requires (fun h0 ->
+      live h0 ctx_ptr /\
+      LowStar.Buffer.length ctx_ptr >= 1 /\
+      (let ctx = FStar.Seq.index (LowStar.Buffer.as_seq h0 ctx_ptr) 0 in
+       live h0 ctx.sc_buf /\
+       FStar.UInt32.v request_len <= LowStar.Buffer.length ctx.sc_buf)))
+    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+
+let prepare_worker_response_send root ctx_ptr request_len =
+  let s = LowStar.Buffer.index ctx_ptr 0ul in
+  match build_worker_response_bytes_from_buffer root s.sc_buf request_len with
+  | Some response_bytes ->
+      let response = {
+        EGRESS.msrl_stream_id = s.sc_id;
+        EGRESS.msrl_bytes = response_bytes;
+        EGRESS.msrl_fin = true;
+      } in
+      Some (EGRESS.prepare_response_list_send () ctx_ptr response)
+  | None -> None
+
 (* The Worker Harness *)
 (* This loop represents a thread processing a single QUIC connection *)
 val worker_loop_with_root :
@@ -115,8 +141,8 @@ let worker_loop_with_root root conn id =
       match s.sc_phase with
       | Processing request_len ->
           let request_len32 = FStar.UInt32.uint_to_t (FStar.UInt16.v request_len) in
-          let _response_bytes =
-            build_worker_response_bytes_from_buffer root s.sc_buf request_len32 in
+          let _send_descriptor =
+            prepare_worker_response_send root ctx_ptr request_len32 in
           close_stream conn id
       | Done -> ()
       | _ -> ()
