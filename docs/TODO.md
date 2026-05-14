@@ -23,7 +23,7 @@ podman run --rm -v "$(pwd):/workspace:Z" localhost/verified-dns-server:latest \
   bash -lc 'eval $(opam env) && make extract'
 ```
 
-The containerized `make extract` command now completes and emits C/H files under `dist/`, `make c-compile-smoke` syntax-checks the current extracted C bundle plus the EverParse wrapper, and `make c-link-smoke` links and runs a tiny generated-boundary smoke binary. KaRaMeL still reports many warning-15 diagnostics because significant parts of the scaffold use GC-backed lists, mathematical integers, or specification-oriented definitions that are not Low*. Treat extraction/compile/link checks as generated-artifact smoke tests, not yet as proof that the output is production-linked C.
+The containerized `make extract` command now completes and emits C/H files under `dist/`, `make c-compile-smoke` syntax-checks the current extracted C bundle plus the EverParse wrapper, and `make c-link-smoke` links and runs a tiny generated-boundary smoke binary covering the parser wrapper and `DNS.ShellBoundary` ingress ABI. KaRaMeL still reports many warning-15 diagnostics because significant parts of the scaffold use GC-backed lists, mathematical integers, or specification-oriented definitions that are not Low*. Treat extraction/compile/link checks as generated-artifact smoke tests, not yet as proof that the output is production-linked C.
 
 ## Status Model
 
@@ -87,12 +87,12 @@ The containerized `make extract` command now completes and emits C/H files under
 - [/] Add extraction as a routine build gate:
   - [x] run `make extract` in the container;
   - [x] syntax-check the generated C bundle and EverParse wrapper with `make c-compile-smoke`;
-  - [x] link and run the current generated protocol/EverParse boundary smoke binary with `make c-link-smoke`;
+  - [x] link and run the current generated protocol/EverParse and shell-boundary smoke binary with `make c-link-smoke`;
   - [x] separate extraction blockers from verification blockers;
   - [x] classify and reduce warning-15 non-Low* extraction debt;
   - [x] add extraction to CI once warning debt is understood and acceptable.
 
-  Extraction currently verifies all scaffold modules and sends the current protocol/security/transport boundary plus the authoritative worker and shell-event dispatcher path to KaRaMeL, but the clean emitted C/link surface is still the protocol/EverParse parser boundary. Verification-only parser tests and broader Phase 3/4 cache/concurrency scaffolds stay out of extraction until they are rewritten into Low* or explicitly marked as trusted/specification-only boundaries.
+  Extraction currently verifies all scaffold modules and sends the current protocol/security/transport boundary plus the authoritative worker and shell-event dispatcher path to KaRaMeL. The clean emitted C/link surface covers the protocol/EverParse parser boundary plus `DNS.ShellBoundary.dispatch_authenticated_stream_data`; broader worker dispatch, response processing, and Phase 3/4 cache/concurrency scaffolds stay out of the linked smoke surface until they are rewritten into Low* or explicitly marked as trusted/specification-only boundaries.
 - [x] Replace local mock specs with real dependencies or documented trusted interfaces:
   - [x] EverCrypt AEAD;
   - [x] EverCrypt cipher/helper interfaces;
@@ -153,7 +153,7 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 *Goal: Thread-safe execution using Steel.*
 
 - [/] Implement `DNS.Cache.Sharded` using Steel invariants for thread-safe access. Current module defines the sharded cache shape, `shard_permission` is a concrete erased `vprop` placeholder through the trusted Steel bootstrap adapter, and concurrent get/add conservatively delegate to the first shard with explicit ownership preconditions. Real hash-based shard selection and Steel invariants are still incomplete.
-- [/] Implement the Worker Thread harness (`worker_loop`). Current harness uses verified stream lookup, reads a matching active stream context, parses completed `Processing` stream buffers into response bytes, copies the serialized response into a caller-provided Low* response buffer, prepares a MsQuic send descriptor without admits, exposes a verified send-completion/drop cleanup boundary that closes the stream, routes shell-selected events through `DNS.ShellScheduler.dispatch_shell_event`, and includes the worker/dispatcher path in the KaRaMeL extraction smoke gate. Real polling, event queues, and C/MsQuic scheduler integration remain incomplete.
+- [/] Implement the Worker Thread harness (`worker_loop`). Current harness uses verified stream lookup, reads a matching active stream context, parses completed `Processing` stream buffers into response bytes, copies the serialized response into a caller-provided Low* response buffer, prepares a MsQuic send descriptor without admits, exposes a verified send-completion/drop cleanup boundary that closes the stream, routes shell-selected events through `DNS.ShellScheduler.dispatch_shell_event`, includes the worker/dispatcher path in the KaRaMeL extraction smoke gate, and exposes a generated C ingress ABI through `DNS.ShellBoundary.dispatch_authenticated_stream_data`. Real polling, event queues, response-side C ABI coverage, and C/MsQuic scheduler integration remain incomplete.
 - [ ] Integrate with the documented [Unverified Shell](UNVERIFIED_SHELL.md) for UDP/QUIC socket I/O.
 - [ ] Implement LRU eviction policy for the concurrent cache. No LRU metadata or eviction path is present.
 - [ ] **Validation:** Prove absence of data races using F*'s separation logic.

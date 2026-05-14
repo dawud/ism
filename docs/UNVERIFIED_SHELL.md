@@ -32,23 +32,29 @@ callee precondition:
 - `FStar.UInt32.v len <= LowStar.Buffer.length buffer`
 - any callee-specific disjointness and capacity requirements
 
-The preferred MsQuic ingress call is:
+The preferred C-facing MsQuic ingress call is:
+
+- `DNS.ShellBoundary.dispatch_authenticated_stream_data`
+
+The preferred verified model-level dispatcher remains:
 
 - `DNS.ShellScheduler.dispatch_shell_event`
-- `DNS.QUIC.MsQuicIngress.handle_authenticated_stream_fragment`
 
 The shell may call verified ingress functions only when their preconditions are
 established by construction or checked before the call:
 
 - `DNS.ShellScheduler.dispatch_shell_event`
+- `DNS.ShellBoundary.dispatch_authenticated_stream_data`
 - `DNS.QUIC.StreamMapping.handle_stream_data`
 - `DNS.QUIC.Multiplexer.find_stream`
 - `DNS.Worker.worker_loop`
 
-`DNS.ShellScheduler.dispatch_shell_event` and the worker path it reaches are
-included in the `make extract` smoke gate. Direct lower-level calls remain
-available as verified boundaries, but new shell integration should target the
-dispatcher first.
+`DNS.ShellBoundary.dispatch_authenticated_stream_data` is included in the
+`make c-link-smoke` generated C boundary harness. `DNS.ShellScheduler` and the
+worker path it reaches are included in the `make extract` smoke gate, but
+response-side dispatcher symbols are not part of the linked shell ABI yet.
+Direct lower-level calls remain available as verified boundaries, but new C
+shell ingress integration should target `DNS.ShellBoundary` first.
 
 `DNS.Security.Handshake.process_crypto_frame` and
 `DNS.Security.Gateway.decrypt_and_validate` are legacy transitional adapter
@@ -92,10 +98,10 @@ the duration of the call.
 The shell scheduler is responsible for choosing which verified function runs and
 when. It must maintain the logical ownership expected by the verified model:
 
-- Prefer `DNS.ShellScheduler.dispatch_shell_event` as the single verified
-  dispatch point for authenticated stream data, processing-ready streams, and
-  send-completion/drop notifications. This dispatcher is part of the extracted
-  shell-facing surface.
+- Prefer `DNS.ShellBoundary.dispatch_authenticated_stream_data` for generated C
+  authenticated ingress, and keep `DNS.ShellScheduler.dispatch_shell_event` as
+  the verified model-level dispatch point for authenticated stream data,
+  processing-ready streams, and send-completion/drop notifications.
 - At most one worker mutates a given `stream_context` at a time until real Steel
   permissions replace the bootstrap adapter.
 - A stream marked `Processing` carries the completed DNS message length and may
@@ -142,8 +148,8 @@ The unverified shell must stay small and auditable.
 - Run `make c-compile-smoke` after extraction-sensitive changes to
   syntax-check the generated C bundle and EverParse wrapper.
 - Run `make c-link-smoke` after generated C boundary changes to link and run
-  the current protocol/EverParse boundary harness. This does not yet cover the
-  worker/dispatcher or MsQuic shell path.
+  the current protocol/EverParse and `DNS.ShellBoundary` ingress harness. This
+  does not yet cover the response-side worker/dispatcher or MsQuic shell path.
 - Keep generated EverParse wrapper symbols aligned with `make
   everparse-generate` and `make everparse-verify`.
 - Update `docs/THREAT_MODEL.md` whenever the shell gains or loses trusted

@@ -76,7 +76,8 @@ podman run --rm \
   bash -lc 'make c-compile-smoke'
 ```
 
-To link and run the current generated C boundary smoke binary, run:
+To link and run the current generated parser and shell-boundary smoke binary,
+run:
 
 ```bash
 podman run --rm \

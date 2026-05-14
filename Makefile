@@ -30,7 +30,8 @@ EVERPARSE_FSTAR_OPTS = --odir $(EVERPARSE_OUT_DIR) --cache_dir $(EVERPARSE_OUT_D
 # KaRaMel configuration
 KRML_OPTS   = -drop 'FStar.Tactics.*' -drop 'FStar.Reflection.*' \
               -bundle DNS.Protocol=DNS.Protocol,DNS.Name,DNS.Constants,DNS.RCode,DNS.Protocol.* \
-              -bundle DNS.Security.*,DNS.QUIC.*,DNS.Zone.RadixTree,DNS.Worker,DNS.ShellScheduler \
+              -bundle DNS.ShellBoundary=DNS.Security.*,DNS.QUIC.*,DNS.Zone.RadixTree,DNS.Worker,DNS.ShellScheduler,DNS.ShellBoundary \
+              -add-include '"krml/internal/compat.h"' \
               -tmpdir $(DIST_DIR) -skip-compilation
 
 # C syntax smoke gate for generated artifacts. This deliberately stops short of
@@ -46,12 +47,15 @@ C_SMOKE_CFLAGS = -std=c11 -D_DEFAULT_SOURCE -D_BSD_SOURCE \
                  -I $(EVERPARSE_HOME)/src/3d/prelude/buffer
 C_COMPILE_SMOKE_CFLAGS = $(C_SMOKE_CFLAGS) -fsyntax-only
 C_COMPILE_SMOKE_SOURCES = $(DIST_DIR)/DNS_Protocol.c \
+                          $(wildcard $(DIST_DIR)/DNS_ShellBoundary.c) \
                           $(EVERPARSE_OUT_DIR)/DNSProtocol.c \
                           $(EVERPARSE_OUT_DIR)/DNSProtocolWrapper.c
 C_LINK_SMOKE = $(DIST_DIR)/c-link-smoke
 C_LINK_SMOKE_SOURCES = shell/link_smoke.c \
                        shell/link_protocol_smoke.c \
                        shell/link_everparse_smoke.c \
+                       shell/link_shell_boundary_smoke.c \
+                       shell/link_krml_compat_stubs.c \
                        $(C_COMPILE_SMOKE_SOURCES)
 
 # 1. Collect all F* source files
@@ -83,6 +87,7 @@ EXTRACT_FST_FILES = $(filter-out src/protocol/%.Tests.fst, $(PROTOCOL_FST_FILES)
                     src/logic/DNS.Zone.RadixTree.fst \
                     src/concurrency/DNS.Worker.fst \
                     src/concurrency/DNS.ShellScheduler.fst \
+                    src/concurrency/DNS.ShellBoundary.fst \
                     $(wildcard spec/*.fsti)
 
 EVERPARSE_3D_FILES = $(wildcard $(EVERPARSE_SRC_DIR)/*.3d)
