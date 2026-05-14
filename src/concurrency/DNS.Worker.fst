@@ -2,6 +2,7 @@ module DNS.Worker
 
 open FStar.HyperStack.ST
 open LowStar.Buffer
+open LowStar.Modifies
 open Steel.Memory
 open Steel.ST.Util
 open DNS.Protocol
@@ -12,6 +13,7 @@ module EGRESS = DNS.QUIC.MsQuicEgress
 module PARSE = DNS.Protocol.Parser
 module SER = DNS.Protocol.Serializer
 module Z = DNS.Zone.RadixTree
+module L = FStar.List.Tot
 
 val build_worker_response_bytes :
   root:Z.tree_node ->
@@ -89,29 +91,72 @@ let worker_formerr_response_bytes_parse_test =
          | None -> false)
     | None -> false)
 
+val copy_response_bytes_to_buffer :
+  bytes:list FStar.UInt8.t ->
+  out:buffer FStar.UInt8.t ->
+  pos:nat ->
+  ST unit
+    (requires (fun h0 ->
+      live h0 out /\
+      pos + L.length bytes <= LowStar.Buffer.length out /\
+      pos + L.length bytes <= 4294967295))
+    (ensures (fun h0 _ h1 ->
+      modifies (loc_buffer out) h0 h1 /\
+      live h1 out))
+    (decreases (L.length bytes))
+
+let rec copy_response_bytes_to_buffer bytes out pos =
+  match bytes with
+  | [] -> ()
+  | byte :: rest ->
+      assert (pos < LowStar.Buffer.length out);
+      assert (pos <= 4294967295);
+      let idx = FStar.UInt32.uint_to_t pos in
+      assert (FStar.UInt32.v idx == pos);
+      LowStar.Buffer.upd out idx byte;
+      assert (pos + 1 + L.length rest <= LowStar.Buffer.length out);
+      assert (pos + 1 + L.length rest <= 4294967295);
+      copy_response_bytes_to_buffer rest out (pos + 1)
+
 val prepare_worker_response_send :
   root:Z.tree_node ->
   ctx_ptr:buffer stream_context ->
+  response_buffer:buffer FStar.UInt8.t ->
+  response_capacity:FStar.UInt32.t ->
   request_len:FStar.UInt32.t ->
-  Stack (option EGRESS.msquic_send_list_descriptor)
+  ST (option EGRESS.msquic_send_descriptor)
     (requires (fun h0 ->
       live h0 ctx_ptr /\
       LowStar.Buffer.length ctx_ptr >= 1 /\
+      live h0 response_buffer /\
+      FStar.UInt32.v response_capacity <= LowStar.Buffer.length response_buffer /\
       (let ctx = FStar.Seq.index (LowStar.Buffer.as_seq h0 ctx_ptr) 0 in
        live h0 ctx.sc_buf /\
        FStar.UInt32.v request_len <= LowStar.Buffer.length ctx.sc_buf)))
-    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+    (ensures (fun h0 _ h1 ->
+      modifies (loc_buffer response_buffer) h0 h1 /\
+      live h1 response_buffer))
 
-let prepare_worker_response_send root ctx_ptr request_len =
+let prepare_worker_response_send root ctx_ptr response_buffer response_capacity request_len =
   let s = LowStar.Buffer.index ctx_ptr 0ul in
   match build_worker_response_bytes_from_buffer root s.sc_buf request_len with
   | Some response_bytes ->
-      let response = {
-        EGRESS.msrl_stream_id = s.sc_id;
-        EGRESS.msrl_bytes = response_bytes;
-        EGRESS.msrl_fin = true;
-      } in
-      Some (EGRESS.prepare_response_list_send () ctx_ptr response)
+      if L.length response_bytes <= FStar.UInt32.v response_capacity then
+        begin
+          let response_len = FStar.UInt32.uint_to_t (L.length response_bytes) in
+          assert (FStar.UInt32.v response_len == L.length response_bytes);
+          let response = {
+            EGRESS.msrf_stream_id = s.sc_id;
+            EGRESS.msrf_data = response_buffer;
+            EGRESS.msrf_len = response_len;
+            EGRESS.msrf_fin = true;
+          } in
+          let descriptor = EGRESS.prepare_response_send () ctx_ptr response in
+          copy_response_bytes_to_buffer response_bytes response_buffer 0;
+          Some descriptor
+        end
+      else
+        None
   | None -> None
 
 (* The Worker Harness *)
@@ -119,11 +164,16 @@ let prepare_worker_response_send root ctx_ptr request_len =
 val worker_loop_with_root :
   root:Z.tree_node ->
   conn:buffer connection_context -> 
+  response_buffer:buffer FStar.UInt8.t ->
+  response_capacity:FStar.UInt32.t ->
   id:FStar.UInt64.t -> 
   ST unit
     (requires (fun h0 ->
       live h0 conn /\
       LowStar.Buffer.length conn >= 1 /\
+      live h0 response_buffer /\
+      FStar.UInt32.v response_capacity <= LowStar.Buffer.length response_buffer /\
+      loc_disjoint (loc_buffer conn) (loc_buffer response_buffer) /\
       (let c = FStar.Seq.index (LowStar.Buffer.as_seq h0 conn) 0 in
        FStar.UInt32.v c.cc_num <= FStar.UInt32.v c.cc_capacity /\
        (if FStar.UInt32.v c.cc_num > 0 then
@@ -132,7 +182,7 @@ val worker_loop_with_root :
         else True))))
     (ensures (fun h0 _ h1 -> True))
 
-let worker_loop_with_root root conn id =
+let worker_loop_with_root root conn response_buffer response_capacity id =
   let stream_opt = find_stream conn id in
   match stream_opt with
   | Some ctx_ptr ->
@@ -142,8 +192,8 @@ let worker_loop_with_root root conn id =
       | Processing request_len ->
           let request_len32 = FStar.UInt32.uint_to_t (FStar.UInt16.v request_len) in
           let _send_descriptor =
-            prepare_worker_response_send root ctx_ptr request_len32 in
-          close_stream conn id
+            prepare_worker_response_send root ctx_ptr response_buffer response_capacity request_len32 in
+          ()
       | Done -> ()
       | _ -> ()
     end
@@ -151,11 +201,16 @@ let worker_loop_with_root root conn id =
 
 val worker_loop :
   conn:buffer connection_context ->
+  response_buffer:buffer FStar.UInt8.t ->
+  response_capacity:FStar.UInt32.t ->
   id:FStar.UInt64.t ->
   ST unit
     (requires (fun h0 ->
       live h0 conn /\
       LowStar.Buffer.length conn >= 1 /\
+      live h0 response_buffer /\
+      FStar.UInt32.v response_capacity <= LowStar.Buffer.length response_buffer /\
+      loc_disjoint (loc_buffer conn) (loc_buffer response_buffer) /\
       (let c = FStar.Seq.index (LowStar.Buffer.as_seq h0 conn) 0 in
        FStar.UInt32.v c.cc_num <= FStar.UInt32.v c.cc_capacity /\
        (if FStar.UInt32.v c.cc_num > 0 then
@@ -164,5 +219,5 @@ val worker_loop :
         else True))))
     (ensures (fun h0 _ h1 -> True))
 
-let worker_loop conn id =
-  worker_loop_with_root Z.wildcard_test_root conn id
+let worker_loop conn response_buffer response_capacity id =
+  worker_loop_with_root Z.wildcard_test_root conn response_buffer response_capacity id

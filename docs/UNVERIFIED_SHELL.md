@@ -101,19 +101,21 @@ when. It must maintain the logical ownership expected by the verified model:
 The preferred MsQuic egress handoff is:
 
 - `DNS.QUIC.MsQuicEgress.prepare_response_send`
-- `DNS.QUIC.MsQuicEgress.prepare_response_list_send` while response
-  serialization remains list-backed.
 
 Response construction and QUIC writes are not fully integrated. Until the C
 shell calls the egress handoff and wires it to MsQuic sends:
 
 - the shell may drop a request after verified processing;
-- any response bytes emitted by verified serializers and handed to
-  `prepare_response_send` or `prepare_response_list_send` must be treated as
-  immutable until encryption/write completion, or copied into shell-owned send
-  storage before verified code can mutate or free the source bytes;
-- MsQuic response fragments passed through either handoff must name the matching
+- the shell must pass a caller-owned Low* response buffer and explicit capacity
+  to `DNS.Worker.worker_loop`;
+- response bytes copied into that buffer and handed to `prepare_response_send`
+  must be treated as immutable until encryption/write completion, or copied
+  into shell-owned send storage before verified code can mutate or free the
+  source bytes;
+- MsQuic response fragments passed through the handoff must name the matching
   verified `stream_context.sc_id`;
+- stream close/cleanup must be sequenced after send completion or after the
+  shell decides to drop the response;
 - AEAD encryption, QUIC packetization, congestion control, retransmission, and
   path validation remain trusted responsibilities of the MsQuic shell stack.
 

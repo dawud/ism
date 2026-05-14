@@ -6,7 +6,6 @@ open LowStar.Modifies
 open FStar.UInt32
 open FStar.UInt64
 open DNS.QUIC.StreamMapping
-module L = FStar.List.Tot
 
 (* Trusted shell token: MsQuic owns encryption, packetization, flow control, and
    the actual stream send. The verified core only prepares immutable bytes for
@@ -29,21 +28,6 @@ type msquic_send_descriptor = {
   mssd_fin: bool;
 }
 
-noeq
-type response_byte_list_fragment = {
-  msrl_stream_id: FStar.UInt64.t;
-  msrl_bytes: list FStar.UInt8.t;
-  msrl_fin: bool;
-}
-
-noeq
-type msquic_send_list_descriptor = {
-  mssld_stream_id: FStar.UInt64.t;
-  mssld_bytes: list FStar.UInt8.t;
-  mssld_len: nat;
-  mssld_fin: bool;
-}
-
 val response_stream_fragment_live :
   h:FStar.Monotonic.HyperStack.mem ->
   ctx_ptr:buffer stream_context ->
@@ -57,20 +41,7 @@ let response_stream_fragment_live h ctx_ptr response =
   FStar.UInt32.v response.msrf_len <= LowStar.Buffer.length response.msrf_data /\
   (let ctx = FStar.Seq.index (LowStar.Buffer.as_seq h ctx_ptr) 0 in
    ctx.sc_id = response.msrf_stream_id /\
-   live h ctx.sc_buf /\
-   disjoint response.msrf_data ctx.sc_buf)
-
-val response_byte_list_fragment_live :
-  h:FStar.Monotonic.HyperStack.mem ->
-  ctx_ptr:buffer stream_context ->
-  response:response_byte_list_fragment ->
-  Type0
-
-let response_byte_list_fragment_live h ctx_ptr response =
-  live h ctx_ptr /\
-  LowStar.Buffer.length ctx_ptr >= 1 /\
-  (let ctx = FStar.Seq.index (LowStar.Buffer.as_seq h ctx_ptr) 0 in
-   ctx.sc_id = response.msrl_stream_id)
+   live h ctx.sc_buf)
 
 (* MsQuic-facing egress boundary. The descriptor is a read-only handoff to the
    shell; the shell must keep the response buffer immutable until send
@@ -94,27 +65,4 @@ let prepare_response_send _borrow _ctx_ptr response =
     mssd_data = response.msrf_data;
     mssd_len = response.msrf_len;
     mssd_fin = response.msrf_fin;
-  }
-
-(* Transitional handoff for the current list-backed serializer. Replace this
-   with prepare_response_send once response serialization writes a Low* buffer. *)
-val prepare_response_list_send :
-  borrow:msquic_send_borrow ->
-  ctx_ptr:buffer stream_context ->
-  response:response_byte_list_fragment ->
-  Stack msquic_send_list_descriptor
-    (requires (fun h0 ->
-      response_byte_list_fragment_live h0 ctx_ptr response))
-    (ensures (fun h0 r h1 ->
-      modifies_none h0 h1 /\
-      r.mssld_stream_id = response.msrl_stream_id /\
-      r.mssld_len = L.length response.msrl_bytes /\
-      r.mssld_fin = response.msrl_fin))
-
-let prepare_response_list_send _borrow _ctx_ptr response =
-  {
-    mssld_stream_id = response.msrl_stream_id;
-    mssld_bytes = response.msrl_bytes;
-    mssld_len = L.length response.msrl_bytes;
-    mssld_fin = response.msrl_fin;
   }
