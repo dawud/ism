@@ -65,6 +65,17 @@ podman run --rm \
   bash -lc 'eval $(opam env) && make extract'
 ```
 
+To syntax-check the generated C bundle and EverParse wrapper without linking a
+final shell binary, run:
+
+```bash
+podman run --rm \
+  --userns=keep-id \
+  -v "$(pwd):/workspace:Z" \
+  localhost/verified-dns-server:latest \
+  bash -lc 'make c-compile-smoke'
+```
+
 The image also includes EverParse/3D tooling. To regenerate the current
 EverParse parser scaffold and verify/extract the generated subset, run:
 

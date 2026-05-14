@@ -139,6 +139,8 @@ The unverified shell must stay small and auditable.
 - Add fuzz tests for malformed packets, fragmented streams, overlong lengths,
   stream resets, allocation failures, and concurrent close/read races.
 - Run sanitizers on shell builds when using an ordinary C compiler.
+- Run `make c-compile-smoke` after extraction-sensitive changes to
+  syntax-check the generated C bundle and EverParse wrapper.
 - Keep generated EverParse wrapper symbols aligned with `make
   everparse-generate` and `make everparse-verify`.
 - Update `docs/THREAT_MODEL.md` whenever the shell gains or loses trusted

@@ -97,9 +97,11 @@ The accepted stack decision is recorded in [DECISIONS.md](DECISIONS.md).
 
 ## 5. Verification, Extraction, and CI
 
-Verification and extraction are separate gates. Current extraction is a generated-artifact smoke test until the remaining warning-15 debt is acceptable for CI. See [DECISIONS.md](DECISIONS.md).
+Verification, extraction, and C syntax checking are separate gates. Current extraction and `make c-compile-smoke` are generated-artifact smoke tests until the remaining warning-15 debt is acceptable for CI and the shell is linkable. See [DECISIONS.md](DECISIONS.md).
 
 The extraction gate verifies all scaffold modules and sends the current protocol/security/transport boundary plus the authoritative worker and shell-event dispatcher path to KaRaMeL. Verification-only parser tests and the broader Phase 3/4 cache/concurrency scaffolds stay out of extraction until they are rewritten into Low* or explicitly marked as trusted/specification-only boundaries.
+
+The C compile smoke gate syntax-checks the current KaRaMeL bundle and the generated EverParse validator/wrapper with the ordinary C compiler. It does not link a runnable shell or claim runtime integration.
 
 The remaining warning-15 debt is concentrated in the protocol model:
 - GC-backed list representations in `DNS.Name` and `DNS.Protocol`;
@@ -180,7 +182,7 @@ Non-RFC standards dependencies to track separately:
 - [draft-ietf-tls-ecdhe-mlkem](https://datatracker.ietf.org/doc/draft-ietf-tls-ecdhe-mlkem/) for hybrid ML-KEM + X25519 TLS 1.3 key agreement until an RFC is published.
 - [draft-ietf-tls-mldsa](https://datatracker.ietf.org/doc/draft-ietf-tls-mldsa/) for ML-DSA in TLS 1.3 until an RFC is published.
 
-Extraction status: containerized `make extract` is now a CI smoke gate. It verifies all F*/spec modules first, then extracts the current protocol/security/transport boundary plus `DNS.Zone.RadixTree`, `DNS.Worker`, and `DNS.ShellScheduler`; broader Phase 3/4 cache/concurrency scaffolds remain verification-only.
+Extraction status: containerized `make extract` is now a CI smoke gate. It verifies all F*/spec modules first, then extracts the current protocol/security/transport boundary plus `DNS.Zone.RadixTree`, `DNS.Worker`, and `DNS.ShellScheduler`; broader Phase 3/4 cache/concurrency scaffolds remain verification-only. `make c-compile-smoke` then syntax-checks the extracted C bundle and EverParse wrapper without linking a final binary.
 
 ## 8. Threat Model Summary
 - **Spoofing:** Mitigated by TLS 1.3 identity and verified Bailiwick checks.
