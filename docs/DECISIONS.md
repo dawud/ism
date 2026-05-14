@@ -107,11 +107,13 @@ in `docs/TODO.md` and the threat model.
 `dist/`, `make c-compile-smoke` syntax-checks the generated artifacts, and
 `make c-link-smoke` links and runs a tiny generated-boundary harness covering
 the protocol/EverParse parser boundary, `DNS.ShellBoundary` ingress ABI, and
-`DNS.ShellResponseBoundary` response send handoff/completion ABI.
+`DNS.ShellResponseBoundary` response send handoff/completion ABI, plus the
+fixed-capacity C shell scaffold over those generated boundaries.
 KaRaMeL still reports warning-15 diagnostics for GC-backed lists,
 mathematical integers, and specification-oriented definitions. The current
 extraction gate verifies all scaffold modules but only emits a clean parser,
-authenticated-ingress, and response send handoff/completion link surface.
+authenticated-ingress, response send handoff/completion, and fixed-capacity
+shell-scaffold link surface.
 
 **Decision:** Treat current extraction as a generated-artifact smoke test, not
 proof that generated output is production C. Classify warning-15 debt as

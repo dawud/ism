@@ -36,6 +36,10 @@ The preferred C-facing MsQuic ingress call is:
 
 - `DNS.ShellBoundary.dispatch_authenticated_stream_data`
 
+The current C shell scaffold is:
+
+- `shell/ism_shell.c`
+
 The preferred verified model-level dispatcher remains:
 
 - `DNS.ShellScheduler.dispatch_shell_event`
@@ -54,6 +58,9 @@ established by construction or checked before the call:
 `DNS.ShellBoundary.dispatch_authenticated_stream_data` is included in the
 `make c-link-smoke` generated C boundary harness, and
 `DNS.ShellResponseBoundary` covers generated C response send handoff/completion.
+`shell/ism_shell.c` owns a fixed-capacity connection/stream table over those
+generated ABIs for local scaffold testing. It does not own sockets, MsQuic
+callbacks, polling, timers, dynamic allocation, or production event queues.
 `DNS.ShellScheduler` and the worker path it reaches are included in the
 `make extract` smoke gate, but worker response construction and scheduler
 dispatch symbols are not part of the linked shell ABI yet. Direct lower-level
@@ -108,6 +115,9 @@ when. It must maintain the logical ownership expected by the verified model:
 - Prefer `DNS.ShellResponseBoundary.prepare_response_send_for_stream` and
   `DNS.ShellResponseBoundary.complete_response_send_for_stream` for generated C
   response handoff and send-completion/drop cleanup.
+- Keep `shell/ism_shell.c` as the fixed-capacity scaffold that owns generated C
+  connection/stream buffers until the MsQuic adapter replaces its local event
+  simulation.
 - Keep `DNS.ShellScheduler.dispatch_shell_event` as the verified model-level
   dispatch point for authenticated stream data, processing-ready streams, and
   send-completion/drop notifications.
@@ -160,9 +170,9 @@ The unverified shell must stay small and auditable.
   syntax-check the generated C bundle and EverParse wrapper.
 - Run `make c-link-smoke` after generated C boundary changes to link and run
   the current protocol/EverParse, `DNS.ShellBoundary` ingress, and
-  `DNS.ShellResponseBoundary` response handoff/completion harness. This does
-  not yet cover worker response construction, scheduler dispatch, or the MsQuic
-  shell path.
+  `DNS.ShellResponseBoundary` response handoff/completion harness plus the
+  fixed-capacity C shell scaffold. This does not yet cover worker response
+  construction, scheduler dispatch, or the MsQuic shell path.
 - Keep generated EverParse wrapper symbols aligned with `make
   everparse-generate` and `make everparse-verify`.
 - Update `docs/THREAT_MODEL.md` whenever the shell gains or loses trusted

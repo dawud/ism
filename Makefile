@@ -58,6 +58,8 @@ C_LINK_SMOKE_SOURCES = shell/link_smoke.c \
                        shell/link_everparse_smoke.c \
                        shell/link_shell_boundary_smoke.c \
                        shell/link_shell_response_boundary_smoke.c \
+                       shell/link_shell_scaffold_smoke.c \
+                       shell/ism_shell.c \
                        shell/link_krml_compat_stubs.c \
                        $(C_COMPILE_SMOKE_SOURCES)
 
