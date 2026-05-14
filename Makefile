@@ -31,6 +31,7 @@ EVERPARSE_FSTAR_OPTS = --odir $(EVERPARSE_OUT_DIR) --cache_dir $(EVERPARSE_OUT_D
 KRML_OPTS   = -drop 'FStar.Tactics.*' -drop 'FStar.Reflection.*' \
               -bundle DNS.Protocol=DNS.Protocol,DNS.Name,DNS.Constants,DNS.RCode,DNS.Protocol.* \
               -bundle DNS.ShellBoundary=DNS.Security.*,DNS.QUIC.*,DNS.Zone.RadixTree,DNS.Worker,DNS.ShellScheduler,DNS.ShellBoundary \
+              -bundle DNS.ShellResponseBoundary=DNS.ShellResponseBoundary \
               -add-include '"krml/internal/compat.h"' \
               -tmpdir $(DIST_DIR) -skip-compilation
 
@@ -48,6 +49,7 @@ C_SMOKE_CFLAGS = -std=c11 -D_DEFAULT_SOURCE -D_BSD_SOURCE \
 C_COMPILE_SMOKE_CFLAGS = $(C_SMOKE_CFLAGS) -fsyntax-only
 C_COMPILE_SMOKE_SOURCES = $(DIST_DIR)/DNS_Protocol.c \
                           $(wildcard $(DIST_DIR)/DNS_ShellBoundary.c) \
+                          $(wildcard $(DIST_DIR)/DNS_ShellResponseBoundary.c) \
                           $(EVERPARSE_OUT_DIR)/DNSProtocol.c \
                           $(EVERPARSE_OUT_DIR)/DNSProtocolWrapper.c
 C_LINK_SMOKE = $(DIST_DIR)/c-link-smoke
@@ -55,6 +57,7 @@ C_LINK_SMOKE_SOURCES = shell/link_smoke.c \
                        shell/link_protocol_smoke.c \
                        shell/link_everparse_smoke.c \
                        shell/link_shell_boundary_smoke.c \
+                       shell/link_shell_response_boundary_smoke.c \
                        shell/link_krml_compat_stubs.c \
                        $(C_COMPILE_SMOKE_SOURCES)
 
@@ -88,6 +91,7 @@ EXTRACT_FST_FILES = $(filter-out src/protocol/%.Tests.fst, $(PROTOCOL_FST_FILES)
                     src/concurrency/DNS.Worker.fst \
                     src/concurrency/DNS.ShellScheduler.fst \
                     src/concurrency/DNS.ShellBoundary.fst \
+                    src/concurrency/DNS.ShellResponseBoundary.fst \
                     $(wildcard spec/*.fsti)
 
 EVERPARSE_3D_FILES = $(wildcard $(EVERPARSE_SRC_DIR)/*.3d)

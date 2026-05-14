@@ -106,11 +106,12 @@ in `docs/TODO.md` and the threat model.
 **Context:** Containerized `make extract` completes and emits C/H files under
 `dist/`, `make c-compile-smoke` syntax-checks the generated artifacts, and
 `make c-link-smoke` links and runs a tiny generated-boundary harness covering
-the protocol/EverParse parser boundary and `DNS.ShellBoundary` ingress ABI.
+the protocol/EverParse parser boundary, `DNS.ShellBoundary` ingress ABI, and
+`DNS.ShellResponseBoundary` response send handoff/completion ABI.
 KaRaMeL still reports warning-15 diagnostics for GC-backed lists,
 mathematical integers, and specification-oriented definitions. The current
-extraction gate verifies all scaffold modules but only emits a clean parser and
-authenticated-ingress shell boundary link surface.
+extraction gate verifies all scaffold modules but only emits a clean parser,
+authenticated-ingress, and response send handoff/completion link surface.
 
 **Decision:** Treat current extraction as a generated-artifact smoke test, not
 proof that generated output is production C. Classify warning-15 debt as
@@ -118,9 +119,9 @@ specification-only code, executable code needing Low* rewrites, compatibility
 header use, or generated/trusted adapter boundary work.
 
 **Consequences:** Extraction warning debt must be reduced or explicitly
-classified before extraction becomes a production gate. Response-side worker
-and dispatcher C link coverage remains separate follow-up work once those
-symbols are emitted in a stable shell-facing form.
+classified before extraction becomes a production gate. Worker
+response-construction and dispatcher C link coverage remain separate follow-up
+work once those symbols are rewritten or emitted in a stable shell-facing form.
 
 ## DR-0008: Pin the Stable F* Lane to v2026.03.24
 

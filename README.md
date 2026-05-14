@@ -77,6 +77,7 @@ podman run --rm \
 ```
 
 To link and run the current generated parser and shell-boundary smoke binary,
+including ingress and response handoff boundaries,
 run:
 
 ```bash
