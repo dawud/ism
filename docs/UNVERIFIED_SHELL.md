@@ -34,11 +34,13 @@ callee precondition:
 
 The preferred MsQuic ingress call is:
 
+- `DNS.ShellScheduler.dispatch_shell_event`
 - `DNS.QUIC.MsQuicIngress.handle_authenticated_stream_fragment`
 
 The shell may call verified ingress functions only when their preconditions are
 established by construction or checked before the call:
 
+- `DNS.ShellScheduler.dispatch_shell_event`
 - `DNS.QUIC.StreamMapping.handle_stream_data`
 - `DNS.QUIC.Multiplexer.find_stream`
 - `DNS.Worker.worker_loop`
@@ -85,6 +87,9 @@ the duration of the call.
 The shell scheduler is responsible for choosing which verified function runs and
 when. It must maintain the logical ownership expected by the verified model:
 
+- Prefer `DNS.ShellScheduler.dispatch_shell_event` as the single verified
+  dispatch point for authenticated stream data, processing-ready streams, and
+  send-completion/drop notifications.
 - At most one worker mutates a given `stream_context` at a time until real Steel
   permissions replace the bootstrap adapter.
 - A stream marked `Processing` carries the completed DNS message length and may
