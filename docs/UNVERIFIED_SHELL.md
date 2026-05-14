@@ -101,6 +101,7 @@ when. It must maintain the logical ownership expected by the verified model:
 The preferred MsQuic egress handoff is:
 
 - `DNS.QUIC.MsQuicEgress.prepare_response_send`
+- `DNS.QUIC.MsQuicSendCompletion.complete_response_send`
 
 Response construction and QUIC writes are not fully integrated. Until the C
 shell calls the egress handoff and wires it to MsQuic sends:
@@ -115,7 +116,7 @@ shell calls the egress handoff and wires it to MsQuic sends:
 - MsQuic response fragments passed through the handoff must name the matching
   verified `stream_context.sc_id`;
 - stream close/cleanup must be sequenced after send completion or after the
-  shell decides to drop the response;
+  shell decides to drop the response by calling `complete_response_send`;
 - AEAD encryption, QUIC packetization, congestion control, retransmission, and
   path validation remain trusted responsibilities of the MsQuic shell stack.
 
