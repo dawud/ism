@@ -15,6 +15,40 @@ ism_shell_reset_stream(ism_shell_stream *stream)
   stream->active = false;
 }
 
+static bool
+ism_shell_stream_is_active_ptr(
+  const ism_shell_connection *conn,
+  const DNS_QUIC_StreamMapping_stream_context *stream
+)
+{
+  for (uint32_t i = 0U; i < conn->ctx.cc_num; i++)
+  {
+    if (conn->ctx.cc_active[i] == stream)
+    {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+static void
+ism_shell_sync_stream_slots(ism_shell_connection *conn)
+{
+  for (uint32_t i = 0U; i < ISM_SHELL_MAX_STREAMS; i++)
+  {
+    ism_shell_stream *slot = &conn->streams[i];
+    if (ism_shell_stream_is_active_ptr(conn, &slot->ctx))
+    {
+      slot->active = true;
+    }
+    else
+    {
+      ism_shell_reset_stream(slot);
+    }
+  }
+}
+
 void
 ism_shell_connection_init(ism_shell_connection *conn)
 {
@@ -157,7 +191,7 @@ ism_shell_complete_response_send(
   {
     if (conn->streams[i].active && conn->streams[i].ctx.sc_id == stream_id)
     {
-      conn->streams[i].active = false;
+      ism_shell_sync_stream_slots(conn);
       break;
     }
   }
