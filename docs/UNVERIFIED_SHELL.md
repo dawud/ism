@@ -98,12 +98,20 @@ when. It must maintain the logical ownership expected by the verified model:
 
 ## Egress Contract
 
-Response construction and QUIC writes are not fully integrated. Until the
-shell/core egress path is wired:
+The preferred MsQuic egress handoff is:
+
+- `DNS.QUIC.MsQuicEgress.prepare_response_send`
+
+Response construction and QUIC writes are not fully integrated. Until the C
+shell calls the egress handoff and wires it to MsQuic sends:
 
 - the shell may drop a request after verified processing;
-- any response bytes emitted by future verified serializers must be treated as
-  immutable until encryption/write completion;
+- any response bytes emitted by verified serializers and handed to
+  `prepare_response_send` must be treated as immutable until encryption/write
+  completion, or copied into shell-owned send storage before verified code can
+  mutate or free the source buffer;
+- MsQuic response fragments passed through `prepare_response_send` must name the
+  matching verified `stream_context.sc_id`;
 - AEAD encryption, QUIC packetization, congestion control, retransmission, and
   path validation remain trusted responsibilities of the MsQuic shell stack.
 
