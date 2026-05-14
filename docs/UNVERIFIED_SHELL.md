@@ -45,6 +45,11 @@ established by construction or checked before the call:
 - `DNS.QUIC.Multiplexer.find_stream`
 - `DNS.Worker.worker_loop`
 
+`DNS.ShellScheduler.dispatch_shell_event` and the worker path it reaches are
+included in the `make extract` smoke gate. Direct lower-level calls remain
+available as verified boundaries, but new shell integration should target the
+dispatcher first.
+
 `DNS.Security.Handshake.process_crypto_frame` and
 `DNS.Security.Gateway.decrypt_and_validate` are legacy transitional adapter
 entry points. They should be bypassed once MsQuic owns TLS handshake,
@@ -89,7 +94,8 @@ when. It must maintain the logical ownership expected by the verified model:
 
 - Prefer `DNS.ShellScheduler.dispatch_shell_event` as the single verified
   dispatch point for authenticated stream data, processing-ready streams, and
-  send-completion/drop notifications.
+  send-completion/drop notifications. This dispatcher is part of the extracted
+  shell-facing surface.
 - At most one worker mutates a given `stream_context` at a time until real Steel
   permissions replace the bootstrap adapter.
 - A stream marked `Processing` carries the completed DNS message length and may

@@ -99,7 +99,7 @@ The accepted stack decision is recorded in [DECISIONS.md](DECISIONS.md).
 
 Verification and extraction are separate gates. Current extraction is a generated-artifact smoke test until the remaining warning-15 debt is acceptable for CI. See [DECISIONS.md](DECISIONS.md).
 
-The extraction gate verifies all scaffold modules but only sends the current protocol/security/transport boundary to KaRaMeL. Verification-only parser tests and Phase 3/4 logic/concurrency scaffolds stay out of extraction until they are rewritten into Low* or explicitly marked as trusted/specification-only boundaries.
+The extraction gate verifies all scaffold modules and sends the current protocol/security/transport boundary plus the authoritative worker and shell-event dispatcher path to KaRaMeL. Verification-only parser tests and the broader Phase 3/4 cache/concurrency scaffolds stay out of extraction until they are rewritten into Low* or explicitly marked as trusted/specification-only boundaries.
 
 The remaining warning-15 debt is concentrated in the protocol model:
 - GC-backed list representations in `DNS.Name` and `DNS.Protocol`;
@@ -173,14 +173,14 @@ Maintain a compliance matrix for each protocol area. See [DECISIONS.md](DECISION
 | [RFC 9000](https://datatracker.ietf.org/doc/html/rfc9000) | QUIC transport | Streams, connection lifecycle, and flow-control model | Trusted | None | Transport is delegated to the MsQuic shell stack. |
 | [RFC 9001](https://datatracker.ietf.org/doc/html/rfc9001) | TLS for QUIC | QUIC handshake protection and key schedule | Trusted | None | TLS for QUIC is delegated to the MsQuic shell stack. |
 | [RFC 9002](https://datatracker.ietf.org/doc/html/rfc9002) | QUIC recovery | Loss detection and congestion control | Trusted | None | Recovery behavior is delegated to the MsQuic shell stack. |
-| [RFC 9250](https://datatracker.ietf.org/doc/html/rfc9250) | DoQ framing | Two-octet length prefix | Partial | Low* stream state verifies complete and split length-prefix parsing, bounded body copying, `ReadingMessage` progress to `Processing` with the completed message length, conservative overlong-fragment rejection, bounded active stream lookup, capacity-bounded stream allocation, compacting active-stream close, worker dispatch through verified stream lookup, worker-side completed-buffer parsing into response bytes, capacity-checked response copy into a caller-provided Low* buffer, worker preparation of a MsQuic send descriptor for that buffer, send-completion/drop cleanup that closes the stream, and a verified shell-event dispatcher over authenticated ingress, processing-ready, and send-completion/drop events. | Actual MsQuic send-path wiring, response-buffer lifetime/aliasing proofs, real polling, event queues, C scheduler integration, and resource-bound proofs remain incomplete. |
+| [RFC 9250](https://datatracker.ietf.org/doc/html/rfc9250) | DoQ framing | Two-octet length prefix | Partial | Low* stream state verifies complete and split length-prefix parsing, bounded body copying, `ReadingMessage` progress to `Processing` with the completed message length, conservative overlong-fragment rejection, bounded active stream lookup, capacity-bounded stream allocation, compacting active-stream close, worker dispatch through verified stream lookup, worker-side completed-buffer parsing into response bytes, capacity-checked response copy into a caller-provided Low* buffer, worker preparation of a MsQuic send descriptor for that buffer, send-completion/drop cleanup that closes the stream, and an extracted shell-event dispatcher over authenticated ingress, processing-ready, and send-completion/drop events. | Actual MsQuic send-path wiring, response-buffer lifetime/aliasing proofs, real polling, event queues, C scheduler integration, and resource-bound proofs remain incomplete. |
 | [RFC 9499](https://datatracker.ietf.org/doc/html/rfc9499) | DNS terminology | Current DNS terms for global DNS, QNAME, bailiwick, and roles | Reference | Documentation alignment only | Use for terminology; no executable behavior is directly required. |
 
 Non-RFC standards dependencies to track separately:
 - [draft-ietf-tls-ecdhe-mlkem](https://datatracker.ietf.org/doc/draft-ietf-tls-ecdhe-mlkem/) for hybrid ML-KEM + X25519 TLS 1.3 key agreement until an RFC is published.
 - [draft-ietf-tls-mldsa](https://datatracker.ietf.org/doc/draft-ietf-tls-mldsa/) for ML-DSA in TLS 1.3 until an RFC is published.
 
-Extraction status: containerized `make extract` is now a CI smoke gate. It verifies all F*/spec modules first, then extracts the current protocol/security/transport boundary while Phase 3/4 scaffolds remain verification-only.
+Extraction status: containerized `make extract` is now a CI smoke gate. It verifies all F*/spec modules first, then extracts the current protocol/security/transport boundary plus `DNS.Zone.RadixTree`, `DNS.Worker`, and `DNS.ShellScheduler`; broader Phase 3/4 cache/concurrency scaffolds remain verification-only.
 
 ## 8. Threat Model Summary
 - **Spoofing:** Mitigated by TLS 1.3 identity and verified Bailiwick checks.
