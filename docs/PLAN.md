@@ -51,7 +51,7 @@ Phase completion gates are recorded in [DECISIONS.md](DECISIONS.md). Keep this r
   - **2A: DNS-over-QUIC framing:** Implement the RFC 9250 two-octet DNS message length prefix, reject malformed frame boundaries, and prove bounds on frame accumulation.
   - **2B: Stream accumulation:** Implement `ReadingLength`, `ReadingMessage`, `Processing`, and cleanup transitions without admitted state changes.
   - **2C: Stream multiplexing:** Implement stream lookup/allocation/close with explicit resource bounds and denial-of-service behavior.
-  - **2D: Shell TLS/AEAD contract:** Replace the current trusted AEAD decrypt adapter path with an authenticated stream-byte contract exported by the MsQuic shell stack.
+  - **2D: Shell TLS/AEAD contract:** Replace the current trusted AEAD decrypt adapter path with an authenticated stream-byte contract exported by the MsQuic shell stack. Current work adds `DNS.QUIC.MsQuicIngress.handle_authenticated_stream_fragment` as the verified ingress boundary.
   - **2E: Transport lifecycle contract:** Document session teardown, key update, authentication, and forward-secrecy requirements as shell-stack obligations.
   - **2F: MsQuic shell integration:** Wire MsQuic as the preferred maintained QUIC/TLS implementation in the unverified shell, keeping its trust assumptions visible.
 - **Tasks:**

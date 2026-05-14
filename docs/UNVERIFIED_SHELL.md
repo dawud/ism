@@ -32,14 +32,21 @@ callee precondition:
 - `FStar.UInt32.v len <= LowStar.Buffer.length buffer`
 - any callee-specific disjointness and capacity requirements
 
-The shell may call the current verified ingress functions only when their
-preconditions are established by construction or checked before the call:
+The preferred MsQuic ingress call is:
 
-- `DNS.Security.Handshake.process_crypto_frame`
-- `DNS.Security.Gateway.decrypt_and_validate`
+- `DNS.QUIC.MsQuicIngress.handle_authenticated_stream_fragment`
+
+The shell may call verified ingress functions only when their preconditions are
+established by construction or checked before the call:
+
 - `DNS.QUIC.StreamMapping.handle_stream_data`
 - `DNS.QUIC.Multiplexer.find_stream`
 - `DNS.Worker.worker_loop`
+
+`DNS.Security.Handshake.process_crypto_frame` and
+`DNS.Security.Gateway.decrypt_and_validate` are legacy transitional adapter
+entry points. They should be bypassed once MsQuic owns TLS handshake,
+authentication policy, packet protection, and authenticated stream delivery.
 
 QUIC/TLS authenticity, handshake acceptance, certificate/authentication policy,
 packet protection, key updates, flow control, recovery, and connection lifecycle
@@ -53,6 +60,9 @@ the duration of the call.
 
 - Input ciphertext and stream-fragment buffers are immutable while verified code
   is reading them.
+- MsQuic stream fragments passed through
+  `handle_authenticated_stream_fragment` must name the matching verified
+  `stream_context.sc_id`.
 - The shell must not free, reallocate, resize, or mutate a buffer until the
   verified call that received it has returned.
 - Destination buffers passed to verified copy/update functions must be
