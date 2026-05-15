@@ -241,3 +241,34 @@ requires successful verification on a current F* release, a clear extraction or
 integration story, updated trusted-boundary documentation, and no regression in
 the existing containerized `make verify`, `make extract`, `make
 c-compile-smoke`, and `make c-link-smoke` gates.
+
+## DR-0014: Evaluate Recent F*, Pulse, and Rust as the Long-Term Path
+
+**Status:** Accepted
+
+**Context:** Recent F* releases have moved the ecosystem away from the old Low*
+sublanguage and toward Pulse for verified mutable and concurrent programming.
+Pulse can extract to Rust, and Rust would reduce the shell and integration
+attack surface compared with handwritten C. The repository still has a working
+stable lane based on F* `v2026.03.24`, Low*/KaRaMeL extraction, EverParse C
+parser generation, and C smoke gates. Pulse-to-Rust extraction is promising but
+must be validated against this project's boundary, performance, dependency, and
+FFI requirements before it replaces the current path.
+
+**Decision:** Treat recent F*, Pulse, and safe Rust extraction as the preferred
+long-term migration direction, but keep it behind the non-blocking migration
+lane until proven by an end-to-end pilot. The first pilot should be a small
+transport or shell-boundary module that verifies on a current F* release,
+extracts to safe Rust, and can be called from the selected QUIC/TLS shell
+without widening the trusted boundary. EverParse remains the production parser
+path during this evaluation, and the stable Low*/KaRaMeL lane remains the
+mainline build until the Pulse/Rust path preserves verification, extraction,
+and shell integration.
+
+**Consequences:** Do not start a broad rewrite to Pulse or Rust on mainline.
+Use the migration lane to compare generated Rust quality, ghost erasure,
+borrow/reference shape, FFI ergonomics, dependency surface, and CI cost. Promote
+Pulse/Rust only after the pilot proves that the generated code is safe,
+maintainable, and compatible with the threat model. If the pilot fails, keep
+Pulse as a proof-track option and continue reducing Low*/KaRaMeL warning debt or
+using narrow trusted Rust/C shell adapters.

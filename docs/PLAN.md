@@ -116,7 +116,10 @@ The stable lane is pinned to F* `v2026.03.24` while old Low* APIs remain in
 use. Track newer F* releases in a non-blocking migration lane. Pulse is a
 migration evaluation track for stateful transport/shell-boundary code, not a
 committed broad rewrite; the parser production path remains EverParse-generated
-C. See [DECISIONS.md](DECISIONS.md).
+C. Recent F*, Pulse, and safe Rust extraction are the preferred long-term
+migration direction only after an end-to-end migration-lane pilot proves
+verification, extraction, FFI ergonomics, generated-code quality, and threat
+model compatibility. See [DECISIONS.md](DECISIONS.md).
 
 ## 6. Parser and Protocol Test Plan
 
