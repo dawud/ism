@@ -112,7 +112,11 @@ The remaining warning-15 debt is concentrated in the protocol model:
 
 ### F* Release Policy
 
-The stable lane is pinned to F* `v2026.03.24` while old Low* APIs remain in use. Track newer F* releases in a non-blocking migration lane. See [DECISIONS.md](DECISIONS.md).
+The stable lane is pinned to F* `v2026.03.24` while old Low* APIs remain in
+use. Track newer F* releases in a non-blocking migration lane. Pulse is a
+migration evaluation track for stateful transport/shell-boundary code, not a
+committed broad rewrite; the parser production path remains EverParse-generated
+C. See [DECISIONS.md](DECISIONS.md).
 
 ## 6. Parser and Protocol Test Plan
 

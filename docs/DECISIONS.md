@@ -216,3 +216,28 @@ MsQuic into verified DoQ handling, and serialized response bytes from verified
 code back to MsQuic. Pin the chosen MsQuic version or commit before production
 use, document build/link dependencies, and revisit this decision if MsQuic's API,
 maintenance, platform support, or security process no longer fits the project.
+
+## DR-0013: Evaluate Pulse Before Any Low* Migration
+
+**Status:** Accepted
+
+**Context:** The stable repository lane is pinned to F* `v2026.03.24` because
+F* `v2026.04.17` removed the old Low* sublanguage. The project still relies on
+legacy Low*/KaRaMeL APIs for executable verified boundaries, while the parser
+strategy already points toward EverParse-generated production C.
+
+**Decision:** Treat Pulse as a migration evaluation track, not as an accepted
+broad rewrite. Keep the stable lane on F* `v2026.03.24` until a migration lane
+proves that the replacement strategy preserves verification, extraction, and
+shell-integration behavior. Evaluate three post-Low* options in that lane:
+Pulse for verified mutable/stateful code, EverParse-generated C boundaries for
+parser-heavy surfaces, and a pinned legacy Low*/KaRaMeL toolchain for code that
+cannot be migrated safely yet.
+
+**Consequences:** Do not start a broad Low* to Pulse conversion on mainline.
+Use a small transport or shell-boundary module as the first Pulse pilot, because
+the parser production path is EverParse rather than Pulse. Promotion of Pulse
+requires successful verification on a current F* release, a clear extraction or
+integration story, updated trusted-boundary documentation, and no regression in
+the existing containerized `make verify`, `make extract`, `make
+c-compile-smoke`, and `make c-link-smoke` gates.
