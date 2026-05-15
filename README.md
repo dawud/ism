@@ -36,6 +36,11 @@ Routine development should use the pinned container image. Upgrading the main
 toolchain past `v2026.03.24` is a migration task, not a routine dependency
 refresh.
 
+The repository also includes a non-blocking migration container in
+`Containerfile.migration`. That image tracks a recent F* release for compatibility
+testing only; failures there are migration evidence and do not replace the pinned
+development lane.
+
 ### Using Podman/Docker (Recommended)
 The development toolchain is provided by the local container image
 `localhost/verified-dns-server:latest`. Mount this repository at `/workspace`;
@@ -53,6 +58,21 @@ If the local image is missing, build it from the checked-in `Containerfile`:
 
 ```bash
 podman build -t localhost/verified-dns-server:latest -f Containerfile .
+```
+
+To test the current sources against a recent F* release without changing the
+stable toolchain, build and run the migration image:
+
+```bash
+podman build \
+  --build-arg FSTAR_VERSION=v2026.05.10 \
+  -t localhost/verified-dns-server:fstar-migration \
+  -f Containerfile.migration .
+
+podman run --rm \
+  --userns=keep-id \
+  -v "$(pwd):/workspace:Z" \
+  localhost/verified-dns-server:fstar-migration
 ```
 
 To run a specific build target, override the default command:

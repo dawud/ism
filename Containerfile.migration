@@ -1,0 +1,36 @@
+FROM fedora:44
+
+ARG USER_NAME=ism
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+ARG FSTAR_VERSION=v2026.05.10
+
+RUN dnf install -y \
+    gcc gcc-c++ make git curl wget gmp-devel libunwind-devel libffi-devel \
+    python3 which time \
+    && dnf clean all
+
+ENV FSTAR_HOME=/opt/fstar/fstar
+ENV PATH="${FSTAR_HOME}/bin:${PATH}"
+
+WORKDIR /tmp
+RUN FSTAR_URL=https://github.com/FStarLang/FStar/releases/download/${FSTAR_VERSION}/fstar-${FSTAR_VERSION}-Linux-x86_64.tar.gz \
+    && echo "Downloading migration F* ${FSTAR_VERSION} from ${FSTAR_URL}" \
+    && wget "${FSTAR_URL}" -O fstar.tar.gz \
+    && mkdir -p /opt/fstar \
+    && tar -xzf fstar.tar.gz -C /opt/fstar \
+    && chmod +x ${FSTAR_HOME}/bin/fstar.exe \
+    && rm fstar.tar.gz
+
+RUN groupadd --gid ${GROUP_ID} ${USER_NAME} \
+    && useradd --uid ${USER_ID} --gid ${GROUP_ID} --create-home --shell /bin/bash ${USER_NAME} \
+    && mkdir -p /workspace \
+    && chown -R ${USER_NAME}:${USER_NAME} /workspace
+
+USER ${USER_NAME}
+ENV HOME=/home/${USER_NAME}
+
+WORKDIR /workspace
+COPY --chown=${USER_NAME}:${USER_NAME} . /workspace
+
+CMD ["make", "verify"]

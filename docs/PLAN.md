@@ -113,7 +113,8 @@ The remaining warning-15 debt is concentrated in the protocol model:
 ### F* Release Policy
 
 The stable lane is pinned to F* `v2026.03.24` while old Low* APIs remain in
-use. Track newer F* releases in a non-blocking migration lane. Pulse is a
+use. Newer F* releases are tracked in a non-blocking migration lane using
+`Containerfile.migration` and the scheduled latest-F* workflow job. Pulse is a
 migration evaluation track for stateful transport/shell-boundary code, not a
 committed broad rewrite; the parser production path remains EverParse-generated
 C. Recent F*, Pulse, and safe Rust extraction are the preferred long-term

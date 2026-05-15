@@ -45,8 +45,8 @@ The containerized `make extract` command now completes and emits C/H files under
 
 - [ ] Maintain F* release policy:
   - [x] Keep the stable container pinned to F* `v2026.03.24` while Low* APIs remain in use.
-  - [ ] Add a non-blocking latest-F* migration container or CI lane.
-  - [ ] Test F* weekly releases in the migration lane on a scheduled cadence.
+  - [x] Add a non-blocking latest-F* migration container or CI lane.
+  - [x] Test F* weekly releases in the migration lane on a scheduled cadence.
   - [x] Decide whether post-Low* migration means Pulse, EverParse-generated C boundaries, or a legacy Low* toolchain. See [DECISIONS.md](DECISIONS.md): Pulse is an evaluation track, EverParse remains the parser production path, and legacy Low*/KaRaMeL stays pinned until a migration lane proves a replacement.
   - [ ] Prototype a small transport or shell-boundary module in Pulse in the non-blocking migration lane.
   - [ ] Extract the Pulse pilot to safe Rust and assess generated-code quality, FFI shape, dependency surface, and threat-model impact.

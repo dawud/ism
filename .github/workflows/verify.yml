@@ -5,6 +5,8 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  schedule:
+    - cron: "0 6 * * 1"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -48,3 +50,33 @@ jobs:
             -v "${PWD}:/workspace" \
             localhost/verified-dns-server:latest \
             bash -lc 'cd /workspace && make extract'
+
+  latest-fstar-migration:
+    name: Latest F* migration lane
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Resolve latest F* release
+        run: |
+          LATEST_FSTAR_VERSION="$(curl -fsSL https://api.github.com/repos/FStarLang/FStar/releases/latest | sed -n 's/.*"tag_name": "\(v[^"]*\)".*/\1/p' | head -n1)"
+          if [ -z "${LATEST_FSTAR_VERSION}" ]; then
+            LATEST_FSTAR_VERSION="v2026.05.10"
+          fi
+          echo "FSTAR_VERSION=${LATEST_FSTAR_VERSION}" >> "${GITHUB_ENV}"
+          echo "Using F* ${LATEST_FSTAR_VERSION} for the migration lane"
+
+      - name: Build latest F* migration image
+        run: docker build --build-arg FSTAR_VERSION="${FSTAR_VERSION}" -t localhost/verified-dns-server:fstar-migration -f Containerfile.migration .
+
+      - name: Verify against latest F*
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -v "${PWD}:/workspace" \
+            localhost/verified-dns-server:fstar-migration \
+            bash -lc 'cd /workspace && make verify'
