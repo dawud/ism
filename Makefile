@@ -42,6 +42,10 @@ PULSE_REF_PILOT_KRML_FILE = $(PULSE_PILOT_RUST_DIR)/DNS_Migration_PulseShellBoun
 PULSE_VALUE_PILOT_KRML_FILE = $(PULSE_PILOT_RUST_DIR)/DNS_Migration_PulseShellBoundaryValue.krml
 PULSE_REF_PILOT_RUST_LOG = $(PULSE_PILOT_RUST_DIR)/rust-ref-translation.log
 PULSE_VALUE_PILOT_RUST_LOG = $(PULSE_PILOT_RUST_DIR)/rust-value-translation.log
+PULSE_VALUE_PILOT_RUST_FILE = $(PULSE_PILOT_RUST_DIR)/dns/migration_pulseshellboundaryvalue.rs
+PULSE_RUST_SMOKE_FILE = $(PULSE_PILOT_RUST_DIR)/pulse_value_smoke.rs
+PULSE_RUST_SMOKE_BIN = $(PULSE_PILOT_RUST_DIR)/pulse-value-smoke
+RUSTC ?= rustc
 PULSE_PILOT_FSTAR_OPTS = --odir $(PULSE_PILOT_OBJ_DIR) \
                          --cache_dir $(PULSE_PILOT_OBJ_DIR) \
                          $(addprefix --include , $(PULSE_INCLUDE_DIRS))
@@ -131,7 +135,7 @@ EXTRACT_FST_FILES = $(filter-out src/protocol/%.Tests.fst, $(PROTOCOL_FST_FILES)
 
 EVERPARSE_3D_FILES = $(wildcard $(EVERPARSE_SRC_DIR)/*.3d)
 
-.PHONY: all verify verify-pulse-pilot assess-pulse-pilot-rust extract c-compile-smoke c-link-smoke everparse-generate everparse-verify clean
+.PHONY: all verify verify-pulse-pilot assess-pulse-pilot-rust pulse-rust-smoke extract c-compile-smoke c-link-smoke everparse-generate everparse-verify clean
 
 all: extract
 
@@ -187,6 +191,43 @@ assess-pulse-pilot-rust:
 		exit $$status; \
 	fi
 	@echo "Pulse value-state pilot Rust translation succeeded; see $(PULSE_PILOT_RUST_DIR)."
+
+pulse-rust-smoke: assess-pulse-pilot-rust
+	@test -s $(PULSE_VALUE_PILOT_RUST_FILE)
+	@command -v $(RUSTC) >/dev/null 2>&1 || { \
+		echo "Rust compiler '$(RUSTC)' was not found."; \
+		echo "Install rustc or use Containerfile.migration."; \
+		exit 127; \
+	}
+	@printf '%s\n' \
+	  '#[path = "dns/migration_pulseshellboundaryvalue.rs"]' \
+	  'mod migration_pulseshellboundaryvalue;' \
+	  '' \
+	  'use migration_pulseshellboundaryvalue as pilot;' \
+	  '' \
+	  'fn main() {' \
+	  '    let initial = pilot::stream_state {' \
+	  '        buffered: 4,' \
+	  '        capacity: 12,' \
+	  '        phase: pilot::shell_phase::ValueReading,' \
+	  '    };' \
+	  '    assert!(pilot::uu___is_ValueReading(initial.phase));' \
+	  '    assert_eq!(pilot::available(initial), 8);' \
+	  '    assert!(pilot::accepts_fragment(initial, 8));' \
+	  '    let accepted = pilot::dispatch_authenticated_bytes_value(initial, 8);' \
+	  '    assert!(accepted.accepted);' \
+	  '    assert_eq!(accepted.next.buffered, 12);' \
+	  '    assert!(matches!(accepted.next.phase, pilot::shell_phase::ValueProcessing));' \
+	  '    assert!(pilot::uu___is_ValueProcessing(accepted.next.phase));' \
+	  '    let rejected = pilot::dispatch_authenticated_bytes_value(accepted.next, 1);' \
+	  '    assert!(!rejected.accepted);' \
+	  '    assert!(matches!(rejected.next.phase, pilot::shell_phase::ValueClosed));' \
+	  '    assert!(pilot::uu___is_ValueClosed(rejected.next.phase));' \
+	  '}' \
+	  > $(PULSE_RUST_SMOKE_FILE)
+	$(RUSTC) --edition=2021 $(PULSE_RUST_SMOKE_FILE) -o $(PULSE_RUST_SMOKE_BIN)
+	$(PULSE_RUST_SMOKE_BIN)
+	@echo "Pulse value-state generated Rust compiled and ran successfully."
 
 # 3. Extraction Stage
 extract: everparse-verify verify

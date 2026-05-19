@@ -280,6 +280,8 @@ depends on `Pulse.Lib.Reference.op_Bang`, which has no corresponding runtime
 implementation in the current toolchain. A second value-state pilot avoids
 Pulse references, uses `FStar.UInt32.t` for the FFI-visible state, and translates
 to safe Rust when the unused `C` support module is dropped from the Rust backend
-pass. This keeps Pulse viable as a proof and state-modeling path, but the Rust
-promotion path should favor extraction-supported value-state APIs unless Pulse
-reference runtime support is proven.
+pass. The generated value-state Rust now compiles and runs through the
+migration-only `make pulse-rust-smoke` gate. This keeps Pulse viable as a proof
+and state-modeling path, but the Rust promotion path should favor
+extraction-supported value-state APIs unless Pulse reference runtime support is
+proven.

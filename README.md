@@ -84,7 +84,18 @@ podman run --rm \
   --userns=keep-id \
   -v "$(pwd):/workspace:Z" \
   localhost/verified-dns-server:fstar-migration \
-  bash -lc 'make verify-pulse-pilot && make assess-pulse-pilot-rust && make verify'
+  bash -lc 'make verify-pulse-pilot && make pulse-rust-smoke && make verify'
+```
+
+To compile and run the generated Rust smoke check for the value-state Pulse
+pilot, run:
+
+```bash
+podman run --rm \
+  --userns=keep-id \
+  -v "$(pwd):/workspace:Z" \
+  localhost/verified-dns-server:fstar-migration \
+  bash -lc 'make pulse-rust-smoke'
 ```
 
 To run a specific build target, override the default command:

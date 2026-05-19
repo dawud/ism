@@ -7,7 +7,7 @@ ARG FSTAR_VERSION=v2026.05.10
 
 RUN dnf install -y \
     gcc gcc-c++ make git curl wget gmp-devel libunwind-devel libffi-devel \
-    python3 which time \
+    python3 which time rust cargo \
     && dnf clean all
 
 ENV FSTAR_HOME=/opt/fstar/fstar
