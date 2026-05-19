@@ -120,7 +120,8 @@ committed broad rewrite; the parser production path remains EverParse-generated
 C. Recent F*, Pulse, and safe Rust extraction are the preferred long-term
 migration direction only after an end-to-end migration-lane pilot proves
 verification, extraction, FFI ergonomics, generated-code quality, and threat
-model compatibility. See [DECISIONS.md](DECISIONS.md).
+model compatibility. Promotion gates for moving a Pulse/Rust wrapper into a
+checked production boundary are recorded in [DECISIONS.md](DECISIONS.md).
 
 ## 6. Parser and Protocol Test Plan
 

@@ -273,6 +273,25 @@ maintainable, and compatible with the threat model. If the pilot fails, keep
 Pulse as a proof-track option and continue reducing Low*/KaRaMeL warning debt or
 using narrow trusted Rust/C shell adapters.
 
+**Promotion Gates:** A Pulse/Rust wrapper may move from migration evidence to a
+checked production boundary only when all of the following are true:
+
+- the extern ABI is stable, documented, and limited to C-friendly value types or
+  explicitly owned buffers;
+- ownership, aliasing, lifetime, and error-state rules are documented in
+  `docs/UNVERIFIED_SHELL.md` and reflected in `docs/THREAT_MODEL.md`;
+- the generated Rust still verifies, extracts, compiles, links from C, and runs
+  through `make pulse-rust-smoke` in CI;
+- generated Rust has been reviewed for ghost erasure, panic behavior, integer
+  semantics, dependency surface, symbol naming, and layout assumptions;
+- any unverified Rust adapter remains small, auditable, and free of DNS policy,
+  QUIC/TLS behavior, allocation policy, and scheduling logic;
+- the wrapper can either replace a current C/Low* boundary with no loss of
+  coverage, or coexist with it behind a documented shell adapter during a
+  bounded migration period;
+- stable-lane gates still pass: `make verify`, `make extract`, and the relevant
+  C smoke gates.
+
 **Pilot Result:** The first migration-lane Pulse shell-boundary pilot verifies
 on F* `v2026.05.10` and emits a KaRaMeL `.krml` artifact. The ref-based pilot is
 not yet usable for Rust extraction: KaRaMeL reports that the generated pilot

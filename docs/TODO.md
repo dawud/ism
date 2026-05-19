@@ -53,6 +53,7 @@ The containerized `make extract` command now completes and emits C/H files under
   - [x] Investigate whether Pulse Rust extraction should use a supported reference runtime, a different Pulse state representation, or a narrow trusted Rust/C adapter for mutable shell-boundary state. Current evidence favors extraction-supported value-state APIs for shell-boundary data passed over FFI, while Pulse references remain useful for proofs until runtime support is proven.
   - [/] Extend the value-state Pulse pilot into an FFI-shaped shell-boundary API and assess generated Rust compile/link behavior. Current work adds `make pulse-rust-smoke`, which compiles and runs a tiny Rust program against the generated value-state Pulse module in the migration container, then builds an extern-friendly Rust `staticlib` wrapper and links it from a C smoke caller.
   - [x] Add extern-friendly generated Rust wrappers and document the ABI shape needed by the unverified shell.
+  - [x] Define promotion gates for moving Pulse/Rust wrappers from migration evidence to checked production boundaries.
   - [ ] Promote the Pulse/Rust wrapper from migration smoke artifact to a checked production boundary only after the shell ABI, ownership model, and promotion criteria are settled.
   - [ ] Promote a newer F* only after verification, extraction strategy, trusted-boundary review, and parser strategy are all clear.
 - [x] Remove parser proof debt:
