@@ -194,6 +194,20 @@ val check_dns_uncompressed_question_txt_answer_packet :
 
 [@ (CPrologue "\
 #include \"DNSProtocolWrapper.h\"\n\
+#define DNS_Protocol_Parser_EverParseRuntime_check_dns_uncompressed_question_compressed_answer_name_packet DnsprotocolCheckDnsUncompressedQuestionCompressedAnswerNamePacket\n")]
+val check_dns_uncompressed_question_compressed_answer_name_packet :
+  qname_length:FStar.UInt32.t ->
+  rdata_length:FStar.UInt32.t ->
+  base:buffer FStar.UInt8.t ->
+  len:FStar.UInt32.t ->
+  Stack bool
+    (requires (fun h0 ->
+      live h0 base /\
+      FStar.UInt32.v len <= length base))
+    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+
+[@ (CPrologue "\
+#include \"DNSProtocolWrapper.h\"\n\
 #define DNS_Protocol_Parser_EverParseRuntime_check_dns_opt_additional_packet DnsprotocolCheckDnsOptAdditionalPacket\n")]
 val check_dns_opt_additional_packet :
   option_payload_length:FStar.UInt32.t ->

@@ -45,6 +45,8 @@ let everparse_generated_srv_answer_rr_gate_active : bool = true
 
 let everparse_generated_txt_answer_rr_gate_active : bool = true
 
+let everparse_generated_compressed_answer_name_rr_gate_active : bool = true
+
 let everparse_generated_edns0_opt_additional_rr_gate_active : bool = true
 
 val parse_dns_packet_bytes_generated :

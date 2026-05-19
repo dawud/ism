@@ -34,6 +34,8 @@ let generated_dns_uncompressed_question_srv_answer_packet_validator_linked : boo
 
 let generated_dns_uncompressed_question_txt_answer_packet_validator_linked : bool = true
 
+let generated_dns_uncompressed_question_compressed_answer_name_packet_validator_linked : bool = true
+
 let generated_dns_opt_additional_packet_validator_linked : bool = true
 
 let generated_dns_uncompressed_question_opt_additional_packet_validator_linked : bool = true
@@ -96,6 +98,12 @@ let generated_dns_uncompressed_question_txt_answer_packet_validator
   DNSProtocol.validate__dns_uncompressed_question_txt_answer_packet
     qname_length
     rr_name_length
+    rdata_length
+
+let generated_dns_uncompressed_question_compressed_answer_name_packet_validator
+    qname_length rdata_length =
+  DNSProtocol.validate__dns_uncompressed_question_compressed_answer_name_packet
+    qname_length
     rdata_length
 
 let generated_dns_opt_additional_packet_validator option_payload_length =
