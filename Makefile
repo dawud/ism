@@ -35,9 +35,13 @@ FSTAR_OPTS  = --odir $(OBJ_DIR) --cache_dir $(OBJ_DIR) \
 
 PULSE_PILOT_OBJ_DIR = $(OBJ_DIR)/pulse-pilot
 PULSE_PILOT_RUST_DIR = $(DIST_DIR)/pulse-rust
-PULSE_PILOT_FST_FILES = $(MIGRATION_DIR)/DNS.Migration.PulseShellBoundary.fst
-PULSE_PILOT_KRML_FILE = $(PULSE_PILOT_RUST_DIR)/DNS_Migration_PulseShellBoundary.krml
-PULSE_PILOT_RUST_LOG = $(PULSE_PILOT_RUST_DIR)/rust-translation.log
+PULSE_REF_PILOT_FST_FILE = $(MIGRATION_DIR)/DNS.Migration.PulseShellBoundary.fst
+PULSE_VALUE_PILOT_FST_FILE = $(MIGRATION_DIR)/DNS.Migration.PulseShellBoundaryValue.fst
+PULSE_PILOT_FST_FILES = $(PULSE_REF_PILOT_FST_FILE) $(PULSE_VALUE_PILOT_FST_FILE)
+PULSE_REF_PILOT_KRML_FILE = $(PULSE_PILOT_RUST_DIR)/DNS_Migration_PulseShellBoundary.krml
+PULSE_VALUE_PILOT_KRML_FILE = $(PULSE_PILOT_RUST_DIR)/DNS_Migration_PulseShellBoundaryValue.krml
+PULSE_REF_PILOT_RUST_LOG = $(PULSE_PILOT_RUST_DIR)/rust-ref-translation.log
+PULSE_VALUE_PILOT_RUST_LOG = $(PULSE_PILOT_RUST_DIR)/rust-value-translation.log
 PULSE_PILOT_FSTAR_OPTS = --odir $(PULSE_PILOT_OBJ_DIR) \
                          --cache_dir $(PULSE_PILOT_OBJ_DIR) \
                          $(addprefix --include , $(PULSE_INCLUDE_DIRS))
@@ -48,6 +52,7 @@ PULSE_PILOT_KRML_EXTRACT_OPTS = -fsopt --no_cmi \
                                 -tmpdir $(PULSE_PILOT_RUST_DIR) \
                                 $(addprefix -I , $(PULSE_INCLUDE_DIRS))
 PULSE_PILOT_RUST_TRANSLATE_OPTS = -backend rust \
+                                  -drop C \
                                   -skip-compilation \
                                   -tmpdir $(PULSE_PILOT_RUST_DIR)
 
@@ -141,27 +146,47 @@ verify:
 verify-pulse-pilot:
 	@mkdir -p $(PULSE_PILOT_OBJ_DIR)
 	@echo "Verifying Pulse migration pilot..."
-	$(FSTAR_HOME)/bin/fstar.exe $(PULSE_PILOT_FSTAR_OPTS) $(PULSE_PILOT_FST_FILES)
+	@for f in $(PULSE_PILOT_FST_FILES); do \
+		$(FSTAR_HOME)/bin/fstar.exe $(PULSE_PILOT_FSTAR_OPTS) $$f || exit $$?; \
+	done
 
 assess-pulse-pilot-rust:
 	@mkdir -p $(PULSE_PILOT_RUST_DIR)
-	@echo "Extracting Pulse migration pilot to KaRaMeL for Rust assessment..."
-	$(PULSE_KRML) $(PULSE_PILOT_KRML_EXTRACT_OPTS) $(PULSE_PILOT_FST_FILES)
-	@test -s $(PULSE_PILOT_KRML_FILE)
-	@echo "Attempting Pulse migration pilot Rust translation..."
+	@echo "Extracting Pulse ref-based pilot to KaRaMeL for Rust assessment..."
+	$(PULSE_KRML) $(PULSE_PILOT_KRML_EXTRACT_OPTS) $(PULSE_REF_PILOT_FST_FILE)
+	@test -s $(PULSE_REF_PILOT_KRML_FILE)
+	@echo "Attempting Pulse ref-based pilot Rust translation..."
 	@set +e; \
-	$(PULSE_KRML) $(PULSE_PILOT_RUST_TRANSLATE_OPTS) $(PULSE_PILOT_KRML_FILE) >$(PULSE_PILOT_RUST_LOG) 2>&1; \
+	$(PULSE_KRML) $(PULSE_PILOT_RUST_TRANSLATE_OPTS) $(PULSE_REF_PILOT_KRML_FILE) >$(PULSE_REF_PILOT_RUST_LOG) 2>&1; \
 	status=$$?; \
-	if [ $$status -eq 0 ]; then \
-		echo "Pulse pilot Rust translation succeeded."; \
+	if grep -q "ERROR translating" $(PULSE_REF_PILOT_RUST_LOG); then \
+		cat $(PULSE_REF_PILOT_RUST_LOG); \
+		exit 1; \
+	elif [ $$status -eq 0 ]; then \
+		echo "Pulse ref-based pilot Rust translation succeeded."; \
 	else \
-		if grep -q "Pulse.Lib.Reference.op_Bang has no corresponding implementation" $(PULSE_PILOT_RUST_LOG); then \
-			echo "Pulse pilot Rust translation is blocked by missing Pulse.Lib.Reference runtime support; see $(PULSE_PILOT_RUST_LOG)."; \
+		if grep -q "Pulse.Lib.Reference.op_Bang has no corresponding implementation" $(PULSE_REF_PILOT_RUST_LOG); then \
+			echo "Pulse ref-based pilot Rust translation is blocked by missing Pulse.Lib.Reference runtime support; see $(PULSE_REF_PILOT_RUST_LOG)."; \
 		else \
-			cat $(PULSE_PILOT_RUST_LOG); \
+			cat $(PULSE_REF_PILOT_RUST_LOG); \
 			exit $$status; \
 		fi; \
 	fi
+	@echo "Extracting Pulse value-state pilot to KaRaMeL for Rust assessment..."
+	$(PULSE_KRML) $(PULSE_PILOT_KRML_EXTRACT_OPTS) $(PULSE_VALUE_PILOT_FST_FILE)
+	@test -s $(PULSE_VALUE_PILOT_KRML_FILE)
+	@echo "Attempting Pulse value-state pilot Rust translation..."
+	@set +e; \
+	$(PULSE_KRML) $(PULSE_PILOT_RUST_TRANSLATE_OPTS) $(PULSE_VALUE_PILOT_KRML_FILE) >$(PULSE_VALUE_PILOT_RUST_LOG) 2>&1; \
+	status=$$?; \
+	if grep -q "ERROR translating" $(PULSE_VALUE_PILOT_RUST_LOG); then \
+		cat $(PULSE_VALUE_PILOT_RUST_LOG); \
+		exit 1; \
+	elif [ $$status -ne 0 ]; then \
+		cat $(PULSE_VALUE_PILOT_RUST_LOG); \
+		exit $$status; \
+	fi
+	@echo "Pulse value-state pilot Rust translation succeeded; see $(PULSE_PILOT_RUST_DIR)."
 
 # 3. Extraction Stage
 extract: everparse-verify verify

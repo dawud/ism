@@ -274,10 +274,12 @@ Pulse as a proof-track option and continue reducing Low*/KaRaMeL warning debt or
 using narrow trusted Rust/C shell adapters.
 
 **Pilot Result:** The first migration-lane Pulse shell-boundary pilot verifies
-on F* `v2026.05.10` and emits a KaRaMeL `.krml` artifact. End-to-end Rust
-translation is not yet usable: KaRaMeL reports that the generated pilot depends
-on `Pulse.Lib.Reference.op_Bang`, which has no corresponding runtime
-implementation in the current toolchain. This keeps Pulse viable as a proof and
-state-modeling path, but blocks promotion of safe Rust extraction until either
-the Pulse reference runtime support is available or the pilot is reshaped to use
-an extraction-supported state representation.
+on F* `v2026.05.10` and emits a KaRaMeL `.krml` artifact. The ref-based pilot is
+not yet usable for Rust extraction: KaRaMeL reports that the generated pilot
+depends on `Pulse.Lib.Reference.op_Bang`, which has no corresponding runtime
+implementation in the current toolchain. A second value-state pilot avoids
+Pulse references, uses `FStar.UInt32.t` for the FFI-visible state, and translates
+to safe Rust when the unused `C` support module is dropped from the Rust backend
+pass. This keeps Pulse viable as a proof and state-modeling path, but the Rust
+promotion path should favor extraction-supported value-state APIs unless Pulse
+reference runtime support is proven.
