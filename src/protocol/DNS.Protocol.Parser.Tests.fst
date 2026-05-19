@@ -1013,6 +1013,11 @@ let valid_edns0_opt_parse_packet_test =
          | _ -> false)
     | None -> false)
 
+let generated_edns0_opt_gate_accepts_valid_opt_test =
+  assert_norm (
+    generated_edns0_opt_additional_packet_subset_applicable
+      valid_edns0_opt_dns_query == true)
+
 let nonroot_edns0_opt_dns_query : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -1031,6 +1036,11 @@ let nonroot_edns0_opt_dns_query : list FStar.UInt8.t =
 let nonroot_edns0_opt_parse_packet_test =
   assert_norm (parse_dns_packet_bytes nonroot_edns0_opt_dns_query == None)
 
+let generated_edns0_opt_gate_covers_nonroot_opt_rejection_test =
+  assert_norm (
+    generated_edns0_opt_additional_packet_subset_applicable
+      nonroot_edns0_opt_dns_query == true)
+
 let unsupported_edns_version_dns_query : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -1048,6 +1058,11 @@ let unsupported_edns_version_dns_query : list FStar.UInt8.t =
 
 let unsupported_edns_version_parse_packet_test =
   assert_norm (parse_dns_packet_bytes unsupported_edns_version_dns_query == None)
+
+let generated_edns0_opt_gate_covers_unsupported_version_test =
+  assert_norm (
+    generated_edns0_opt_additional_packet_subset_applicable
+      unsupported_edns_version_dns_query == true)
 
 let edns0_padding_option_dns_query : list FStar.UInt8.t =
   [
@@ -1083,6 +1098,11 @@ let edns0_padding_option_parse_packet_test =
          | _ -> false)
     | None -> false)
 
+let generated_edns0_opt_gate_accepts_padding_option_test =
+  assert_norm (
+    generated_edns0_opt_additional_packet_subset_applicable
+      edns0_padding_option_dns_query == true)
+
 let edns0_unknown_option_dns_query : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -1105,6 +1125,11 @@ let edns0_unknown_option_parse_packet_test =
   assert_norm (match parse_dns_packet_bytes edns0_unknown_option_dns_query with
                | Some _ -> true
                | None -> false)
+
+let generated_edns0_opt_gate_accepts_unknown_option_test =
+  assert_norm (
+    generated_edns0_opt_additional_packet_subset_applicable
+      edns0_unknown_option_dns_query == true)
 
 let edns0_unknown_option_preserved_test =
   assert_norm (
@@ -1198,6 +1223,11 @@ let serialized_padding_opt_parse_packet_test =
          | _ -> false)
     | None -> false)
 
+let generated_edns0_opt_gate_accepts_serialized_padding_test =
+  assert_norm (
+    generated_edns0_opt_additional_packet_subset_applicable
+      serialized_padding_opt_dns_query == true)
+
 let truncated_edns_option_header_dns_query : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -1216,6 +1246,11 @@ let truncated_edns_option_header_dns_query : list FStar.UInt8.t =
 
 let truncated_edns_option_header_parse_packet_test =
   assert_norm (parse_dns_packet_bytes truncated_edns_option_header_dns_query == None)
+
+let generated_edns0_opt_gate_covers_truncated_option_header_test =
+  assert_norm (
+    generated_edns0_opt_additional_packet_subset_applicable
+      truncated_edns_option_header_dns_query == true)
 
 let truncated_edns_option_data_dns_query : list FStar.UInt8.t =
   [
@@ -1237,6 +1272,11 @@ let truncated_edns_option_data_dns_query : list FStar.UInt8.t =
 
 let truncated_edns_option_data_parse_packet_test =
   assert_norm (parse_dns_packet_bytes truncated_edns_option_data_dns_query == None)
+
+let generated_edns0_opt_gate_covers_truncated_option_data_test =
+  assert_norm (
+    generated_edns0_opt_additional_packet_subset_applicable
+      truncated_edns_option_data_dns_query == true)
 
 let valid_cname_rdata_dns_response : list FStar.UInt8.t =
   [
@@ -2338,8 +2378,8 @@ let boundary_accepts_edns0_opt_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_edns0_opt_dns_query ==
                parse_dns_packet_bytes valid_edns0_opt_dns_query)
 
-let boundary_generated_subset_skips_edns0_opt_test =
-  assert_norm (everparse_boundary_generated_subset_applicable valid_edns0_opt_dns_query == false)
+let boundary_generated_subset_covers_edns0_opt_test =
+  assert_norm (everparse_boundary_generated_subset_applicable valid_edns0_opt_dns_query == true)
 
 let boundary_rejects_nonroot_edns0_opt_test =
   assert_norm (parse_dns_packet_bytes_at_boundary nonroot_edns0_opt_dns_query ==
@@ -2349,21 +2389,36 @@ let boundary_rejects_unsupported_edns_version_test =
   assert_norm (parse_dns_packet_bytes_at_boundary unsupported_edns_version_dns_query ==
                parse_dns_packet_bytes unsupported_edns_version_dns_query)
 
+let boundary_generated_subset_covers_unsupported_edns_version_test =
+  assert_norm (everparse_boundary_generated_subset_applicable unsupported_edns_version_dns_query == true)
+
 let boundary_accepts_edns0_padding_option_test =
   assert_norm (parse_dns_packet_bytes_at_boundary edns0_padding_option_dns_query ==
                parse_dns_packet_bytes edns0_padding_option_dns_query)
+
+let boundary_generated_subset_covers_edns0_padding_option_test =
+  assert_norm (everparse_boundary_generated_subset_applicable edns0_padding_option_dns_query == true)
 
 let boundary_accepts_edns0_unknown_option_test =
   assert_norm (parse_dns_packet_bytes_at_boundary edns0_unknown_option_dns_query ==
                parse_dns_packet_bytes edns0_unknown_option_dns_query)
 
+let boundary_generated_subset_covers_edns0_unknown_option_test =
+  assert_norm (everparse_boundary_generated_subset_applicable edns0_unknown_option_dns_query == true)
+
 let boundary_rejects_truncated_edns_option_header_test =
   assert_norm (parse_dns_packet_bytes_at_boundary truncated_edns_option_header_dns_query ==
                parse_dns_packet_bytes truncated_edns_option_header_dns_query)
 
+let boundary_generated_subset_covers_truncated_edns_option_header_test =
+  assert_norm (everparse_boundary_generated_subset_applicable truncated_edns_option_header_dns_query == true)
+
 let boundary_rejects_truncated_edns_option_data_test =
   assert_norm (parse_dns_packet_bytes_at_boundary truncated_edns_option_data_dns_query ==
                parse_dns_packet_bytes truncated_edns_option_data_dns_query)
+
+let boundary_generated_subset_covers_truncated_edns_option_data_test =
+  assert_norm (everparse_boundary_generated_subset_applicable truncated_edns_option_data_dns_query == true)
 
 let boundary_accepts_cname_rdata_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_cname_rdata_dns_response ==
@@ -2511,7 +2566,8 @@ let boundary_backend_status_test =
                everparse_generated_mx_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_soa_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_srv_answer_rr_gate_active_at_boundary == true /\
-               everparse_generated_txt_answer_rr_gate_active_at_boundary == true)
+               everparse_generated_txt_answer_rr_gate_active_at_boundary == true /\
+               everparse_generated_edns0_opt_additional_rr_gate_active_at_boundary == true)
 
 let boundary_equivalence_acceptance_lemma_smoke_test =
   assert_norm (parse_dns_packet_bytes valid_single_question_dns_query ==

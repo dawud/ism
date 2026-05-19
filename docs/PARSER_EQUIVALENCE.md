@@ -37,7 +37,9 @@ The generated validator gate currently covers:
 - generated MX exchange-name shape checks for uncompressed names;
 - generated SOA mname/rname/timer shape checks for uncompressed names;
 - generated SRV target-name shape checks for uncompressed names;
-- generated TXT character-string shape checks.
+- generated TXT character-string shape checks;
+- generated EDNS0 OPT additional-RR checks for root-owner/version-0 shape and
+  structurally bounded option headers/data.
 
 The generated-subset predicate is:
 
@@ -45,16 +47,16 @@ The generated-subset predicate is:
 
 Examples outside that generated validator subset may still be accepted by the
 active boundary when the reference parser accepts them. That includes supported
-compressed RR owner/RDATA names and EDNS0 OPT records. These cases remain part
-of the handwritten reference-parser construction path until the generated
-grammar grows equivalent coverage.
+compressed RR owner/RDATA names. These cases remain part of the handwritten
+reference-parser construction path until the generated grammar grows equivalent
+coverage.
 
 ## Production Gap
 
 Phase 1 is not production-complete until one of these is true:
 
 - the EverParse-generated grammar constructs full packets for every accepted
-  production DNS packet shape, including compression and EDNS0 coverage; or
+  production DNS packet shape, including compression and broader RR coverage; or
 - the repository carries a proof-backed coexistence decision that keeps the
   handwritten parser as a verified reference construction layer behind a
   generated validator gate.

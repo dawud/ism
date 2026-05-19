@@ -3,9 +3,9 @@
 // uncompressed QNAME question validation, a first single-answer RR subset, and
 // fixed-RDLENGTH A/AAAA answer subsets, first name-RDATA answer subsets, the
 // first MX answer subset, the first SOA answer subset, the first SRV answer
-// subset, and the first TXT answer subset. Broader RR-section validation
-// remains in the handwritten reference parser until the generated boundary is
-// expanded.
+// subset, the first TXT answer subset, and the first EDNS0 OPT additional-RR
+// subset. Broader RR-section validation remains in the handwritten reference
+// parser until the generated boundary is expanded.
 
 typedef struct _dns_flags {
   UINT16BE qr : 1;
@@ -67,6 +67,12 @@ typedef struct _dns_txt_string {
   UINT8 string_len;
   UINT8 text[string_len];
 } dns_txt_string;
+
+typedef struct _dns_edns_option {
+  UINT16BE option_code;
+  UINT16BE option_length;
+  UINT8 option_data[option_length];
+} dns_edns_option;
 
 entrypoint typedef struct _dns_uncompressed_question (UINT32 qname_length)
 where qname_length >= 1 && qname_length <= 255
@@ -315,3 +321,51 @@ where qname_length >= 1 && qname_length <= 255 &&
   UINT16BE rdlength { rdlength == rdata_length };
   dns_txt_string strings[:byte-size rdata_length];
 } dns_uncompressed_question_txt_answer_packet;
+
+entrypoint typedef struct _dns_opt_additional_packet (
+  UINT32 option_payload_length
+)
+where option_payload_length <= 65535
+{
+  UINT16BE id;
+  dns_flags flags;
+  UINT16BE qdcount { qdcount == 0 };
+  UINT16BE ancount { ancount == 0 };
+  UINT16BE nscount { nscount == 0 };
+  UINT16BE arcount { arcount == 1 };
+  UINT8 opt_root { opt_root == 0 };
+  UINT16BE rtype { rtype == 41 };
+  UINT16BE udp_payload_size;
+  UINT8 extended_rcode;
+  UINT8 edns_version { edns_version == 0 };
+  UINT16BE opt_flags;
+  UINT16BE rdlength { rdlength == option_payload_length };
+  dns_edns_option options[:byte-size option_payload_length];
+} dns_opt_additional_packet;
+
+entrypoint typedef struct _dns_uncompressed_question_opt_additional_packet (
+  UINT32 qname_length,
+  UINT32 option_payload_length
+)
+where qname_length >= 1 && qname_length <= 255 &&
+      option_payload_length <= 65535
+{
+  UINT16BE id;
+  dns_flags flags;
+  UINT16BE qdcount { qdcount == 1 };
+  UINT16BE ancount { ancount == 0 };
+  UINT16BE nscount { nscount == 0 };
+  UINT16BE arcount { arcount == 1 };
+  dns_label question_labels[:byte-size (qname_length - 1)];
+  UINT8 question_root { question_root == 0 };
+  UINT16BE qtype;
+  UINT16BE qclass;
+  UINT8 opt_root { opt_root == 0 };
+  UINT16BE rtype { rtype == 41 };
+  UINT16BE udp_payload_size;
+  UINT8 extended_rcode;
+  UINT8 edns_version { edns_version == 0 };
+  UINT16BE opt_flags;
+  UINT16BE rdlength { rdlength == option_payload_length };
+  dns_edns_option options[:byte-size option_payload_length];
+} dns_uncompressed_question_opt_additional_packet;

@@ -935,6 +935,78 @@ let generated_uncompressed_question_answer_packet_subset_applicable input =
          L.length input = 26 + qname_length + rr_name_length + rdata_length)
   | None -> false
 
+val generated_edns0_opt_additional_packet_fields :
+  input:list FStar.UInt8.t ->
+  Tot (option (option generated_dns_name_length * generated_dns_name_length * nat))
+
+let generated_edns0_opt_additional_packet_fields input =
+  let parse_opt_additional additional_input question_qname_length_opt =
+    match DNS.Name.parse_qname 128 additional_input with
+    | Some (rr_name, rr_tail) ->
+        DNS.Name.lemma_parser_rejecting 128 additional_input;
+        let rr_name_length_nat = DNS.Name.dns_name_length rr_name in
+        assert (rr_name_length_nat > 0);
+        assert (rr_name_length_nat <= 255);
+        let rr_name_length:generated_dns_name_length = rr_name_length_nat in
+        begin match rr_tail with
+        | rt_hi :: rt_lo ::
+          _rc_hi :: _rc_lo ::
+          _ttl_0 :: _ttl_1 :: _ttl_2 :: _ttl_3 ::
+          rdlen_hi :: rdlen_lo ::
+          rdata_tail ->
+            let rr_type = FStar.UInt16.v (u16_from_be rt_hi rt_lo) in
+            let rdata_length:nat = FStar.UInt16.v (u16_from_be rdlen_hi rdlen_lo) in
+            if rr_type = 41 && L.length rdata_tail = rdata_length then
+              Some (question_qname_length_opt, rr_name_length, rdata_length)
+            else
+              None
+        | _ -> None
+        end
+    | None -> None in
+  match parse_header_bytes input with
+  | Some (h, after_header) ->
+      if FStar.UInt16.v h.ancount = 0 &&
+         FStar.UInt16.v h.nscount = 0 &&
+         FStar.UInt16.v h.arcount = 1 then
+        if FStar.UInt16.v h.qdcount = 0 then
+          parse_opt_additional after_header None
+        else if FStar.UInt16.v h.qdcount = 1 then
+          match DNS.Name.parse_qname 128 after_header with
+          | Some (question_name, question_tail) ->
+              DNS.Name.lemma_parser_rejecting 128 after_header;
+              let question_qname_length_nat = DNS.Name.dns_name_length question_name in
+              assert (question_qname_length_nat > 0);
+              assert (question_qname_length_nat <= 255);
+              let question_qname_length:generated_dns_name_length = question_qname_length_nat in
+              if L.length question_tail < 4 then
+                None
+              else
+                let (_, after_question) = L.splitAt 4 question_tail in
+                parse_opt_additional after_question (Some question_qname_length)
+          | None -> None
+        else
+          None
+      else
+        None
+  | None -> None
+
+val generated_edns0_opt_additional_packet_subset_applicable :
+  input:list FStar.UInt8.t ->
+  Tot bool
+
+let generated_edns0_opt_additional_packet_subset_applicable input =
+  match generated_edns0_opt_additional_packet_fields input with
+  | Some (question_qname_length_opt, rr_name_length, option_payload_length) ->
+      rr_name_length > 0 &&
+      rr_name_length <= 255 &&
+      option_payload_length <= 65535 &&
+      (match question_qname_length_opt with
+       | Some question_qname_length ->
+           question_qname_length > 0 &&
+           question_qname_length <= 255
+       | None -> true)
+  | None -> false
+
 val validate_generated_uncompressed_question_subset_buffer :
   buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
   len:FStar.UInt32.t ->
@@ -1087,6 +1159,45 @@ let validate_generated_uncompressed_question_answer_packet_subset_buffer buffer 
   | None ->
       false
 
+val validate_generated_edns0_opt_additional_packet_subset_buffer :
+  buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
+  len:FStar.UInt32.t ->
+  bytes:list FStar.UInt8.t{
+    L.length bytes == FStar.UInt32.v len /\
+    generated_edns0_opt_additional_packet_subset_applicable bytes == true
+  } ->
+  Stack bool
+    (requires (fun h0 ->
+      LowStar.Buffer.live h0 buffer /\
+      FStar.UInt32.v len <= LowStar.Buffer.length buffer))
+    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+
+let validate_generated_edns0_opt_additional_packet_subset_buffer buffer len bytes =
+  match generated_edns0_opt_additional_packet_fields bytes with
+  | Some (question_qname_length_opt, _, option_payload_length_nat) ->
+      assert (option_payload_length_nat <= 65535);
+      let option_payload_length = FStar.UInt32.uint_to_t option_payload_length_nat in
+      assert (FStar.UInt32.v option_payload_length == option_payload_length_nat);
+      begin match question_qname_length_opt with
+      | Some question_qname_length_nat ->
+          assert (question_qname_length_nat > 0);
+          assert (question_qname_length_nat <= 255);
+          let question_qname_length = FStar.UInt32.uint_to_t question_qname_length_nat in
+          assert (FStar.UInt32.v question_qname_length == question_qname_length_nat);
+          EPR.check_dns_uncompressed_question_opt_additional_packet
+            question_qname_length
+            option_payload_length
+            buffer
+            len
+      | None ->
+          EPR.check_dns_opt_additional_packet
+            option_payload_length
+            buffer
+            len
+      end
+  | None ->
+      false
+
 val validate_generated_subset_gate_buffer :
   buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
   len:FStar.UInt32.t ->
@@ -1098,7 +1209,9 @@ val validate_generated_subset_gate_buffer :
     (ensures (fun h0 _ h1 -> modifies_none h0 h1))
 
 let validate_generated_subset_gate_buffer buffer len bytes =
-  if generated_uncompressed_question_answer_packet_subset_applicable bytes then
+  if generated_edns0_opt_additional_packet_subset_applicable bytes then
+    validate_generated_edns0_opt_additional_packet_subset_buffer buffer len bytes
+  else if generated_uncompressed_question_answer_packet_subset_applicable bytes then
     validate_generated_uncompressed_question_answer_packet_subset_buffer buffer len bytes
   else if generated_uncompressed_question_subset_applicable bytes then
     validate_generated_uncompressed_question_subset_buffer buffer len bytes
