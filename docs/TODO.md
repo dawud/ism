@@ -49,7 +49,7 @@ The containerized `make extract` command now completes and emits C/H files under
   - [x] Test F* weekly releases in the migration lane on a scheduled cadence.
   - [x] Decide whether post-Low* migration means Pulse, EverParse-generated C boundaries, or a legacy Low* toolchain. See [DECISIONS.md](DECISIONS.md): Pulse is an evaluation track, EverParse remains the parser production path, and legacy Low*/KaRaMeL stays pinned until a migration lane proves a replacement.
   - [/] Prototype a small transport or shell-boundary module in Pulse in the non-blocking migration lane. Current work adds `migration/DNS.Migration.PulseShellBoundary.fst`, a minimal authenticated stream-byte capacity transition over a Pulse-owned `ref`, and verifies it through the migration-only `make verify-pulse-pilot` target before the broader latest-F* compatibility check.
-  - [ ] Extract the Pulse pilot to safe Rust and assess generated-code quality, FFI shape, dependency surface, and threat-model impact.
+  - [/] Extract the Pulse pilot to safe Rust and assess generated-code quality, FFI shape, dependency surface, and threat-model impact. Current work adds `make assess-pulse-pilot-rust`, which verifies and emits the Pulse pilot `.krml` artifact, then attempts Rust translation. Rust translation is currently blocked because the generated pilot references `Pulse.Lib.Reference.op_Bang`, which KaRaMeL reports has no corresponding runtime implementation.
   - [ ] Promote a newer F* only after verification, extraction strategy, trusted-boundary review, and parser strategy are all clear.
 - [x] Remove parser proof debt:
   - [x] Replace `DNS.Name.cast_to_label`'s `assume` with a checked constructor path.

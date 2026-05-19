@@ -14,6 +14,7 @@ EVERPARSE_OUT_DIR = $(GENERATED_DIR)/everparse
 EVERPARSE_CMD ?= everparse.sh
 EVERPARSE_HOME ?= /opt/everparse
 PULSE_HOME ?= $(FSTAR_HOME)/lib/fstar/pulse
+PULSE_KRML ?= $(FSTAR_HOME)/bin/krml
 EVERPARSE_INCLUDE_DIRS = $(EVERPARSE_OUT_DIR) \
                          $(EVERPARSE_HOME)/src/3d/prelude/buffer \
                          $(EVERPARSE_HOME)/src/3d/prelude \
@@ -33,10 +34,22 @@ FSTAR_OPTS  = --odir $(OBJ_DIR) --cache_dir $(OBJ_DIR) \
               $(addprefix --include , $(SRC_DIRS))
 
 PULSE_PILOT_OBJ_DIR = $(OBJ_DIR)/pulse-pilot
+PULSE_PILOT_RUST_DIR = $(DIST_DIR)/pulse-rust
 PULSE_PILOT_FST_FILES = $(MIGRATION_DIR)/DNS.Migration.PulseShellBoundary.fst
+PULSE_PILOT_KRML_FILE = $(PULSE_PILOT_RUST_DIR)/DNS_Migration_PulseShellBoundary.krml
+PULSE_PILOT_RUST_LOG = $(PULSE_PILOT_RUST_DIR)/rust-translation.log
 PULSE_PILOT_FSTAR_OPTS = --odir $(PULSE_PILOT_OBJ_DIR) \
                          --cache_dir $(PULSE_PILOT_OBJ_DIR) \
                          $(addprefix --include , $(PULSE_INCLUDE_DIRS))
+PULSE_PILOT_KRML_EXTRACT_OPTS = -fsopt --no_cmi \
+                                -verify \
+                                -backend rust \
+                                -skip-translation \
+                                -tmpdir $(PULSE_PILOT_RUST_DIR) \
+                                $(addprefix -I , $(PULSE_INCLUDE_DIRS))
+PULSE_PILOT_RUST_TRANSLATE_OPTS = -backend rust \
+                                  -skip-compilation \
+                                  -tmpdir $(PULSE_PILOT_RUST_DIR)
 
 EVERPARSE_FSTAR_OPTS = --odir $(EVERPARSE_OUT_DIR) --cache_dir $(EVERPARSE_OUT_DIR) \
                        $(addprefix --include , $(EVERPARSE_INCLUDE_DIRS)) \
@@ -113,7 +126,7 @@ EXTRACT_FST_FILES = $(filter-out src/protocol/%.Tests.fst, $(PROTOCOL_FST_FILES)
 
 EVERPARSE_3D_FILES = $(wildcard $(EVERPARSE_SRC_DIR)/*.3d)
 
-.PHONY: all verify verify-pulse-pilot extract c-compile-smoke c-link-smoke everparse-generate everparse-verify clean
+.PHONY: all verify verify-pulse-pilot assess-pulse-pilot-rust extract c-compile-smoke c-link-smoke everparse-generate everparse-verify clean
 
 all: extract
 
@@ -129,6 +142,26 @@ verify-pulse-pilot:
 	@mkdir -p $(PULSE_PILOT_OBJ_DIR)
 	@echo "Verifying Pulse migration pilot..."
 	$(FSTAR_HOME)/bin/fstar.exe $(PULSE_PILOT_FSTAR_OPTS) $(PULSE_PILOT_FST_FILES)
+
+assess-pulse-pilot-rust:
+	@mkdir -p $(PULSE_PILOT_RUST_DIR)
+	@echo "Extracting Pulse migration pilot to KaRaMeL for Rust assessment..."
+	$(PULSE_KRML) $(PULSE_PILOT_KRML_EXTRACT_OPTS) $(PULSE_PILOT_FST_FILES)
+	@test -s $(PULSE_PILOT_KRML_FILE)
+	@echo "Attempting Pulse migration pilot Rust translation..."
+	@set +e; \
+	$(PULSE_KRML) $(PULSE_PILOT_RUST_TRANSLATE_OPTS) $(PULSE_PILOT_KRML_FILE) >$(PULSE_PILOT_RUST_LOG) 2>&1; \
+	status=$$?; \
+	if [ $$status -eq 0 ]; then \
+		echo "Pulse pilot Rust translation succeeded."; \
+	else \
+		if grep -q "Pulse.Lib.Reference.op_Bang has no corresponding implementation" $(PULSE_PILOT_RUST_LOG); then \
+			echo "Pulse pilot Rust translation is blocked by missing Pulse.Lib.Reference runtime support; see $(PULSE_PILOT_RUST_LOG)."; \
+		else \
+			cat $(PULSE_PILOT_RUST_LOG); \
+			exit $$status; \
+		fi; \
+	fi
 
 # 3. Extraction Stage
 extract: everparse-verify verify

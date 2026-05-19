@@ -79,4 +79,4 @@ jobs:
             -e HOME=/tmp \
             -v "${PWD}:/workspace" \
             localhost/verified-dns-server:fstar-migration \
-            bash -lc 'cd /workspace && make verify-pulse-pilot && make verify'
+            bash -lc 'cd /workspace && make verify-pulse-pilot && make assess-pulse-pilot-rust && make verify'

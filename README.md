@@ -76,14 +76,15 @@ podman run --rm \
 ```
 
 The migration image's default command verifies only the Pulse pilot. To also
-capture current incompatibilities in the legacy F*/Low* sources, run:
+capture the current Rust-extraction assessment and legacy F*/Low*
+incompatibilities, run:
 
 ```bash
 podman run --rm \
   --userns=keep-id \
   -v "$(pwd):/workspace:Z" \
   localhost/verified-dns-server:fstar-migration \
-  bash -lc 'make verify-pulse-pilot && make verify'
+  bash -lc 'make verify-pulse-pilot && make assess-pulse-pilot-rust && make verify'
 ```
 
 To run a specific build target, override the default command:
