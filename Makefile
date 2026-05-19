@@ -45,6 +45,10 @@ PULSE_VALUE_PILOT_RUST_LOG = $(PULSE_PILOT_RUST_DIR)/rust-value-translation.log
 PULSE_VALUE_PILOT_RUST_FILE = $(PULSE_PILOT_RUST_DIR)/dns/migration_pulseshellboundaryvalue.rs
 PULSE_RUST_SMOKE_FILE = $(PULSE_PILOT_RUST_DIR)/pulse_value_smoke.rs
 PULSE_RUST_SMOKE_BIN = $(PULSE_PILOT_RUST_DIR)/pulse-value-smoke
+PULSE_RUST_FFI_SOURCE = $(MIGRATION_DIR)/rust/pulse_value_ffi.rs
+PULSE_RUST_FFI_LIB = $(PULSE_PILOT_RUST_DIR)/libpulse_value_ffi.a
+PULSE_RUST_FFI_SMOKE_C_SOURCE = $(MIGRATION_DIR)/rust/pulse_value_ffi_smoke.c
+PULSE_RUST_FFI_SMOKE_BIN = $(PULSE_PILOT_RUST_DIR)/pulse-value-ffi-smoke
 RUSTC ?= rustc
 PULSE_PILOT_FSTAR_OPTS = --odir $(PULSE_PILOT_OBJ_DIR) \
                          --cache_dir $(PULSE_PILOT_OBJ_DIR) \
@@ -228,6 +232,10 @@ pulse-rust-smoke: assess-pulse-pilot-rust
 	$(RUSTC) --edition=2021 $(PULSE_RUST_SMOKE_FILE) -o $(PULSE_RUST_SMOKE_BIN)
 	$(PULSE_RUST_SMOKE_BIN)
 	@echo "Pulse value-state generated Rust compiled and ran successfully."
+	$(RUSTC) --edition=2021 --crate-type staticlib $(PULSE_RUST_FFI_SOURCE) -o $(PULSE_RUST_FFI_LIB)
+	$(CC) -std=c11 $(PULSE_RUST_FFI_SMOKE_C_SOURCE) $(PULSE_RUST_FFI_LIB) -lpthread -ldl -lm -o $(PULSE_RUST_FFI_SMOKE_BIN)
+	$(PULSE_RUST_FFI_SMOKE_BIN)
+	@echo "Pulse value-state Rust FFI wrapper compiled, linked, and ran successfully."
 
 # 3. Extraction Stage
 extract: everparse-verify verify

@@ -281,7 +281,9 @@ implementation in the current toolchain. A second value-state pilot avoids
 Pulse references, uses `FStar.UInt32.t` for the FFI-visible state, and translates
 to safe Rust when the unused `C` support module is dropped from the Rust backend
 pass. The generated value-state Rust now compiles and runs through the
-migration-only `make pulse-rust-smoke` gate. This keeps Pulse viable as a proof
-and state-modeling path, but the Rust promotion path should favor
+migration-only `make pulse-rust-smoke` gate, which also builds an unverified
+extern-friendly Rust `staticlib` wrapper and links it from C using only
+`uint32_t`/`uint8_t` value fields. This keeps Pulse viable as a proof and
+state-modeling path, but the Rust promotion path should favor
 extraction-supported value-state APIs unless Pulse reference runtime support is
 proven.

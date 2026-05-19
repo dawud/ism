@@ -78,6 +78,35 @@ packet protection, key updates, flow control, recovery, and connection lifecycle
 are trusted through the MsQuic shell stack and adapter interfaces listed in
 `docs/THREAT_MODEL.md`.
 
+## Pulse/Rust Migration ABI
+
+The migration lane also exercises a value-state Pulse shell-boundary pilot that
+extracts to Rust. It is not a production shell ABI yet, but `make
+pulse-rust-smoke` verifies the current FFI shape by:
+
+- extracting `migration/DNS.Migration.PulseShellBoundaryValue.fst` to Rust;
+- compiling an unverified Rust `staticlib` wrapper around the generated module;
+- linking a tiny C caller against that wrapper.
+
+The wrapper deliberately exposes only C-friendly value types:
+
+- `uint32_t buffered`
+- `uint32_t capacity`
+- `uint32_t phase`
+- `uint8_t accepted`
+
+Phase values are:
+
+- `0`: reading
+- `1`: processing
+- `2`: closed
+
+Invalid phase values are treated as `closed` before calling the generated Rust
+module. The wrapper owns no buffers and performs no DNS parsing, QUIC/TLS,
+allocation, or scheduling. It only adapts the generated value-state Rust
+functions to an extern-friendly shape so a future shell can call a stable
+boundary without depending on generated Rust enum layout.
+
 ## Buffer Ownership
 
 Each buffer crossing from the shell into verified code has a single writer for
@@ -173,6 +202,9 @@ The unverified shell must stay small and auditable.
   `DNS.ShellResponseBoundary` response handoff/completion harness plus the
   fixed-capacity C shell scaffold. This does not yet cover worker response
   construction, scheduler dispatch, or the MsQuic shell path.
+- Run `make pulse-rust-smoke` after migration-lane Pulse/Rust boundary changes
+  to compile the generated Rust, link the extern-friendly wrapper from C, and
+  keep the experimental ABI shape honest.
 - Keep generated EverParse wrapper symbols aligned with `make
   everparse-generate` and `make everparse-verify`.
 - Update `docs/THREAT_MODEL.md` whenever the shell gains or loses trusted
