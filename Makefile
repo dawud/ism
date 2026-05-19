@@ -5,6 +5,7 @@ INCLUDE_DIR = $(FSTAR_HOME)/ulib/.cache
 
 # Project Directories
 SRC_DIRS    = src/protocol src/security src/transport src/logic src/concurrency spec
+MIGRATION_DIR = migration
 OBJ_DIR     = obj
 DIST_DIR    = dist
 GENERATED_DIR = generated
@@ -12,16 +13,30 @@ EVERPARSE_SRC_DIR = everparse
 EVERPARSE_OUT_DIR = $(GENERATED_DIR)/everparse
 EVERPARSE_CMD ?= everparse.sh
 EVERPARSE_HOME ?= /opt/everparse
+PULSE_HOME ?= $(FSTAR_HOME)/lib/fstar/pulse
 EVERPARSE_INCLUDE_DIRS = $(EVERPARSE_OUT_DIR) \
                          $(EVERPARSE_HOME)/src/3d/prelude/buffer \
                          $(EVERPARSE_HOME)/src/3d/prelude \
                          $(EVERPARSE_HOME)/src/lowparse \
                          $(EVERPARSE_HOME)/krmllib \
                          $(EVERPARSE_HOME)/krmllib/obj
+PULSE_INCLUDE_DIRS = $(MIGRATION_DIR) \
+                     $(PULSE_HOME)/common \
+                     $(PULSE_HOME)/common.checked \
+                     $(PULSE_HOME)/pulse \
+                     $(PULSE_HOME)/pulse.checked \
+                     $(PULSE_HOME)/pulse/lib \
+                     $(PULSE_HOME)/pulse/lib/class
 
 # F* configuration
 FSTAR_OPTS  = --odir $(OBJ_DIR) --cache_dir $(OBJ_DIR) \
               $(addprefix --include , $(SRC_DIRS))
+
+PULSE_PILOT_OBJ_DIR = $(OBJ_DIR)/pulse-pilot
+PULSE_PILOT_FST_FILES = $(MIGRATION_DIR)/DNS.Migration.PulseShellBoundary.fst
+PULSE_PILOT_FSTAR_OPTS = --odir $(PULSE_PILOT_OBJ_DIR) \
+                         --cache_dir $(PULSE_PILOT_OBJ_DIR) \
+                         $(addprefix --include , $(PULSE_INCLUDE_DIRS))
 
 EVERPARSE_FSTAR_OPTS = --odir $(EVERPARSE_OUT_DIR) --cache_dir $(EVERPARSE_OUT_DIR) \
                        $(addprefix --include , $(EVERPARSE_INCLUDE_DIRS)) \
@@ -98,7 +113,7 @@ EXTRACT_FST_FILES = $(filter-out src/protocol/%.Tests.fst, $(PROTOCOL_FST_FILES)
 
 EVERPARSE_3D_FILES = $(wildcard $(EVERPARSE_SRC_DIR)/*.3d)
 
-.PHONY: all verify extract c-compile-smoke c-link-smoke everparse-generate everparse-verify clean
+.PHONY: all verify verify-pulse-pilot extract c-compile-smoke c-link-smoke everparse-generate everparse-verify clean
 
 all: extract
 
@@ -109,6 +124,11 @@ verify:
 	@mkdir -p $(OBJ_DIR)
 	@echo "Verifying Source Files..."
 	$(FSTAR_HOME)/bin/fstar.exe $(FSTAR_OPTS) $(ALL_FST_FILES)
+
+verify-pulse-pilot:
+	@mkdir -p $(PULSE_PILOT_OBJ_DIR)
+	@echo "Verifying Pulse migration pilot..."
+	$(FSTAR_HOME)/bin/fstar.exe $(PULSE_PILOT_FSTAR_OPTS) $(PULSE_PILOT_FST_FILES)
 
 # 3. Extraction Stage
 extract: everparse-verify verify

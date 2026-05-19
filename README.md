@@ -75,6 +75,17 @@ podman run --rm \
   localhost/verified-dns-server:fstar-migration
 ```
 
+The migration image's default command verifies only the Pulse pilot. To also
+capture current incompatibilities in the legacy F*/Low* sources, run:
+
+```bash
+podman run --rm \
+  --userns=keep-id \
+  -v "$(pwd):/workspace:Z" \
+  localhost/verified-dns-server:fstar-migration \
+  bash -lc 'make verify-pulse-pilot && make verify'
+```
+
 To run a specific build target, override the default command:
 
 ```bash

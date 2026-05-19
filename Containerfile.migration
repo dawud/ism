@@ -33,4 +33,4 @@ ENV HOME=/home/${USER_NAME}
 WORKDIR /workspace
 COPY --chown=${USER_NAME}:${USER_NAME} . /workspace
 
-CMD ["make", "verify"]
+CMD ["make", "verify-pulse-pilot"]
