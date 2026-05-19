@@ -33,6 +33,9 @@ Phase completion gates are recorded in [DECISIONS.md](DECISIONS.md). Keep this r
 *Goal: Create a zero-copy, verified parser and serializer for modern DNS messages.*
 - **Scope:** RFC 1034, RFC 1035, RFC 2181, RFC 3597, RFC 6891, RFC 6895, RFC 7830, RFC 8467, RFC 9499.
 - **Parser Strategy:** The handwritten parser is the bootstrap/reference parser; EverParse remains the production target. See [DECISIONS.md](DECISIONS.md).
+- **Equivalence Contract:** The current boundary/reference equivalence contract
+  and generated-subset limits are recorded in
+  [PARSER_EQUIVALENCE.md](PARSER_EQUIVALENCE.md).
 - **Tasks:**
   - Define `DNS_Packet`, `Header`, `Question`, and 43+ `Resource Record` types in F*.
   - Implement bidirectional mapping between F* sum types and IANA numeric constants.

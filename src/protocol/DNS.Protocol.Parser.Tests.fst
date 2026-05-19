@@ -2292,9 +2292,15 @@ let boundary_accepts_single_answer_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_single_answer_dns_response ==
                parse_dns_packet_bytes valid_single_answer_dns_response)
 
+let boundary_generated_subset_covers_single_answer_test =
+  assert_norm (everparse_boundary_generated_subset_applicable valid_single_answer_dns_response == true)
+
 let boundary_accepts_compressed_answer_name_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_compressed_answer_name_dns_response ==
                parse_dns_packet_bytes valid_compressed_answer_name_dns_response)
+
+let boundary_generated_subset_skips_compressed_answer_name_test =
+  assert_norm (everparse_boundary_generated_subset_applicable valid_compressed_answer_name_dns_response == false)
 
 let boundary_rejects_self_loop_compressed_answer_name_test =
   assert_norm (parse_dns_packet_bytes_at_boundary self_loop_compressed_answer_name_dns_response ==
@@ -2331,6 +2337,9 @@ let boundary_rejects_invalid_aaaa_rdata_length_test =
 let boundary_accepts_edns0_opt_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_edns0_opt_dns_query ==
                parse_dns_packet_bytes valid_edns0_opt_dns_query)
+
+let boundary_generated_subset_skips_edns0_opt_test =
+  assert_norm (everparse_boundary_generated_subset_applicable valid_edns0_opt_dns_query == false)
 
 let boundary_rejects_nonroot_edns0_opt_test =
   assert_norm (parse_dns_packet_bytes_at_boundary nonroot_edns0_opt_dns_query ==
@@ -2503,3 +2512,14 @@ let boundary_backend_status_test =
                everparse_generated_soa_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_srv_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_txt_answer_rr_gate_active_at_boundary == true)
+
+let boundary_equivalence_acceptance_lemma_smoke_test =
+  assert_norm (parse_dns_packet_bytes valid_single_question_dns_query ==
+               Some valid_single_question_dns_packet);
+  lemma_boundary_accepts_reference_result
+    valid_single_question_dns_query
+    valid_single_question_dns_packet
+
+let boundary_equivalence_rejection_lemma_smoke_test =
+  assert_norm (parse_dns_packet_bytes truncated_dns_header == None);
+  lemma_boundary_rejects_reference_rejection truncated_dns_header

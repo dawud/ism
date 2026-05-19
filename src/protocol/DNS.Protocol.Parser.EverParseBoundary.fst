@@ -60,6 +60,10 @@ let everparse_generated_srv_answer_rr_gate_active_at_boundary : bool =
 let everparse_generated_txt_answer_rr_gate_active_at_boundary : bool =
   everparse_generated_txt_answer_rr_gate_active
 
+let everparse_boundary_generated_subset_applicable (input:list FStar.UInt8.t) : bool =
+  generated_uncompressed_question_subset_applicable input ||
+  generated_uncompressed_question_answer_packet_subset_applicable input
+
 val parse_dns_packet_bytes_at_boundary :
   input:list FStar.UInt8.t ->
   Tot (option dns_packet)
@@ -83,3 +87,28 @@ val lemma_boundary_matches_reference :
 
 let lemma_boundary_matches_reference input =
   lemma_generated_matches_reference input
+
+val lemma_boundary_matches_reference_on_generated_subset :
+  input:list FStar.UInt8.t{everparse_boundary_generated_subset_applicable input == true} ->
+  Lemma (ensures (parse_dns_packet_bytes_at_boundary input ==
+                  parse_dns_packet_bytes input))
+
+let lemma_boundary_matches_reference_on_generated_subset input =
+  lemma_boundary_matches_reference input
+
+val lemma_boundary_accepts_reference_result :
+  input:list FStar.UInt8.t ->
+  p:dns_packet ->
+  Lemma (requires (parse_dns_packet_bytes input == Some p))
+        (ensures (parse_dns_packet_bytes_at_boundary input == Some p))
+
+let lemma_boundary_accepts_reference_result input p =
+  lemma_boundary_matches_reference input
+
+val lemma_boundary_rejects_reference_rejection :
+  input:list FStar.UInt8.t ->
+  Lemma (requires (parse_dns_packet_bytes input == None))
+        (ensures (parse_dns_packet_bytes_at_boundary input == None))
+
+let lemma_boundary_rejects_reference_rejection input =
+  lemma_boundary_matches_reference input
