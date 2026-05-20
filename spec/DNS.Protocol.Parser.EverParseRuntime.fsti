@@ -285,6 +285,8 @@ val check_dns_uncompressed_question_txt_answer_packet :
 val check_dns_uncompressed_question_compressed_answer_name_packet :
   qname_length:FStar.UInt32.t ->
   rdata_length:FStar.UInt32.t ->
+  rr_name_ptr_hi_value:FStar.UInt32.t ->
+  rr_name_ptr_lo_value:FStar.UInt32.t ->
   base:buffer FStar.UInt8.t ->
   len:FStar.UInt32.t ->
   Stack bool

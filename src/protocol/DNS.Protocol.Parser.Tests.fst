@@ -770,6 +770,47 @@ let generated_compressed_answer_name_gate_accepts_valid_test =
     generated_compressed_answer_name_packet_subset_applicable
       valid_compressed_answer_name_dns_response == true)
 
+let valid_compressed_answer_name_suffix_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x01uy; 0x61uy;
+    0x01uy; 0x62uy;
+    0x00uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0xc0uy; 0x0euy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x04uy;
+    0x01uy; 0x02uy; 0x03uy; 0x04uy
+  ]
+
+let valid_compressed_answer_name_suffix_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes valid_compressed_answer_name_suffix_dns_response with
+    | Some p ->
+        p.header.ancount == 1us /\
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.name == [[0x62uy]] /\
+             rr.rtype == A /\
+             rr.rdlen == 4us /\
+             FStar.Bytes.length rr.rdata == 4
+         | _ -> false)
+    | None -> false)
+
+let generated_compressed_answer_name_gate_accepts_suffix_pointer_test =
+  assert_norm (
+    generated_compressed_answer_name_packet_subset_applicable
+      valid_compressed_answer_name_suffix_dns_response == true)
+
 let self_loop_compressed_answer_name_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -2507,6 +2548,15 @@ let boundary_accepts_compressed_answer_name_test =
 
 let boundary_generated_subset_covers_compressed_answer_name_test =
   assert_norm (everparse_boundary_generated_subset_applicable valid_compressed_answer_name_dns_response == true)
+
+let boundary_accepts_compressed_answer_name_suffix_pointer_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary valid_compressed_answer_name_suffix_dns_response ==
+               parse_dns_packet_bytes valid_compressed_answer_name_suffix_dns_response)
+
+let boundary_generated_subset_covers_compressed_answer_name_suffix_pointer_test =
+  assert_norm (
+    everparse_boundary_generated_subset_applicable
+      valid_compressed_answer_name_suffix_dns_response == true)
 
 let boundary_rejects_self_loop_compressed_answer_name_test =
   assert_norm (parse_dns_packet_bytes_at_boundary self_loop_compressed_answer_name_dns_response ==

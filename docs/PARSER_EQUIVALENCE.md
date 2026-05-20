@@ -48,8 +48,8 @@ The generated validator gate currently covers:
 - generated SRV compressed target-name checks for the common `0xc00c` pointer
   to the question name;
 - generated TXT character-string shape checks;
-- generated RR owner-name compression checks for the common `0xc00c` pointer to
-  the question name;
+- generated RR owner-name compression checks for pointer offsets that resolve
+  to prior valid message names;
 - generated EDNS0 OPT additional-RR checks for root-owner/version-0 shape and
   structurally bounded option headers/data.
 
@@ -60,7 +60,6 @@ The generated-subset predicate is:
 Examples outside that generated validator subset may still be accepted by the
 active boundary when the reference parser accepts them. That includes supported
 compressed NS/CNAME/PTR, MX, SOA, and SRV RDATA pointers outside the current
-`0xc00c` subset, and compressed owner-name pointers outside the current
 `0xc00c` subset. These cases remain part of the handwritten reference-parser
 construction path until the generated grammar grows equivalent coverage.
 

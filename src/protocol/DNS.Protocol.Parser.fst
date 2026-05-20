@@ -937,7 +937,7 @@ let generated_uncompressed_question_answer_packet_subset_applicable input =
 
 val generated_compressed_answer_name_packet_fields :
   input:list FStar.UInt8.t ->
-  Tot (option (generated_dns_name_length * nat * nat))
+  Tot (option (generated_dns_name_length * nat * nat * nat * nat))
 
 let generated_compressed_answer_name_packet_fields input =
   match parse_header_bytes input with
@@ -966,10 +966,22 @@ let generated_compressed_answer_name_packet_fields input =
                 rdata_tail ->
                   let rr_type = FStar.UInt16.v (u16_from_be rt_hi rt_lo) in
                   let rdata_length:nat = FStar.UInt16.v (u16_from_be rdlen_hi rdlen_lo) in
-                  if ptr_hi = 0xc0uy &&
-                     ptr_lo = 0x0cuy &&
-                     L.length rdata_tail = rdata_length then
-                    Some (qname_length, rdata_length, rr_type)
+                  let rr_name_pointer = [ptr_hi; ptr_lo] in
+                  let rr_name_offset = 16 + qname_length_nat in
+                  if L.length rdata_tail = rdata_length then
+                    match DNS.Name.parse_qname_compressed
+                            128
+                            input
+                            rr_name_offset
+                            rr_name_pointer with
+                    | Some (_, []) ->
+                        let ptr_hi_nat = FStar.UInt8.v ptr_hi in
+                        let ptr_lo_nat = FStar.UInt8.v ptr_lo in
+                        if ptr_hi_nat >= 192 then
+                          Some (qname_length, rdata_length, rr_type, ptr_hi_nat, ptr_lo_nat)
+                        else
+                          None
+                    | _ -> None
                   else
                     None
               | _ -> None
@@ -985,10 +997,13 @@ val generated_compressed_answer_name_packet_subset_applicable :
 
 let generated_compressed_answer_name_packet_subset_applicable input =
   match generated_compressed_answer_name_packet_fields input with
-  | Some (qname_length, rdata_length, _) ->
+  | Some (qname_length, rdata_length, _, ptr_hi, ptr_lo) ->
       qname_length > 0 &&
       qname_length <= 255 &&
       rdata_length <= 65535 &&
+      ptr_hi >= 192 &&
+      ptr_hi <= 255 &&
+      ptr_lo <= 255 &&
       L.length input = 28 + qname_length + rdata_length
   | None -> false
 
@@ -1601,17 +1616,26 @@ val validate_generated_compressed_answer_name_packet_subset_buffer :
 
 let validate_generated_compressed_answer_name_packet_subset_buffer buffer len bytes =
   match generated_compressed_answer_name_packet_fields bytes with
-  | Some (qname_length_nat, rdata_length_nat, _) ->
+  | Some (qname_length_nat, rdata_length_nat, _, ptr_hi_nat, ptr_lo_nat) ->
       assert (qname_length_nat > 0);
       assert (qname_length_nat <= 255);
       assert (rdata_length_nat <= 65535);
+      assert (ptr_hi_nat >= 192);
+      assert (ptr_hi_nat <= 255);
+      assert (ptr_lo_nat <= 255);
       let qname_length = FStar.UInt32.uint_to_t qname_length_nat in
       assert (FStar.UInt32.v qname_length == qname_length_nat);
       let rdata_length = FStar.UInt32.uint_to_t rdata_length_nat in
       assert (FStar.UInt32.v rdata_length == rdata_length_nat);
+      let rr_name_ptr_hi_value = FStar.UInt32.uint_to_t ptr_hi_nat in
+      assert (FStar.UInt32.v rr_name_ptr_hi_value == ptr_hi_nat);
+      let rr_name_ptr_lo_value = FStar.UInt32.uint_to_t ptr_lo_nat in
+      assert (FStar.UInt32.v rr_name_ptr_lo_value == ptr_lo_nat);
       EPR.check_dns_uncompressed_question_compressed_answer_name_packet
         qname_length
         rdata_length
+        rr_name_ptr_hi_value
+        rr_name_ptr_lo_value
         buffer
         len
   | None ->
