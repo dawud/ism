@@ -6,9 +6,10 @@
 // subset, the first TXT answer subset, the first EDNS0 OPT additional-RR
 // subset, the first compressed-owner answer subset, the first compressed
 // name-RDATA answer subset, the first compressed MX exchange answer subset,
-// the first compressed SOA name answer subsets, and the first compressed SRV
-// target answer subset. Broader RR-section validation remains in the
-// handwritten reference parser until the generated boundary is expanded.
+// the first compressed SOA name answer subsets, the first both-compressed SOA
+// name answer subset, and the first compressed SRV target answer subset.
+// Broader RR-section validation remains in the handwritten reference parser
+// until the generated boundary is expanded.
 
 typedef struct _dns_flags {
   UINT16BE qr : 1;
@@ -393,6 +394,40 @@ where qname_length >= 1 && qname_length <= 255 &&
   UINT32BE expire;
   UINT32BE minimum;
 } dns_uncompressed_question_compressed_soa_rname_answer_packet;
+
+entrypoint typedef struct _dns_uncompressed_question_compressed_soa_answer_packet (
+  UINT32 qname_length,
+  UINT32 rr_name_length
+)
+where qname_length >= 1 && qname_length <= 255 &&
+      rr_name_length >= 1 && rr_name_length <= 255
+{
+  UINT16BE id;
+  dns_flags flags;
+  UINT16BE qdcount { qdcount == 1 };
+  UINT16BE ancount { ancount == 1 };
+  UINT16BE nscount { nscount == 0 };
+  UINT16BE arcount { arcount == 0 };
+  dns_label question_labels[:byte-size (qname_length - 1)];
+  UINT8 question_root { question_root == 0 };
+  UINT16BE qtype;
+  UINT16BE qclass;
+  dns_label rr_name_labels[:byte-size (rr_name_length - 1)];
+  UINT8 rr_name_root { rr_name_root == 0 };
+  UINT16BE rtype { rtype == 6 };
+  UINT16BE rclass;
+  UINT32BE ttl;
+  UINT16BE rdlength { rdlength == 24 };
+  UINT8 mname_ptr_hi { mname_ptr_hi == 192 };
+  UINT8 mname_ptr_lo { mname_ptr_lo == 12 };
+  UINT8 rname_ptr_hi { rname_ptr_hi == 192 };
+  UINT8 rname_ptr_lo { rname_ptr_lo == 12 };
+  UINT32BE serial;
+  UINT32BE refresh;
+  UINT32BE retry;
+  UINT32BE expire;
+  UINT32BE minimum;
+} dns_uncompressed_question_compressed_soa_answer_packet;
 
 entrypoint typedef struct _dns_uncompressed_question_srv_answer_packet (
   UINT32 qname_length,

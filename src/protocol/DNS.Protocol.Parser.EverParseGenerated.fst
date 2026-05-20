@@ -47,6 +47,8 @@ let everparse_generated_soa_answer_rr_gate_active : bool = true
 
 let everparse_generated_compressed_soa_answer_rr_gate_active : bool = true
 
+let everparse_generated_compressed_both_soa_answer_rr_gate_active : bool = true
+
 let everparse_generated_srv_answer_rr_gate_active : bool = true
 
 let everparse_generated_compressed_srv_answer_rr_gate_active : bool = true

@@ -1900,6 +1900,54 @@ let generated_compressed_soa_gate_accepts_rname_test =
     generated_compressed_soa_packet_subset_applicable
       compressed_soa_rname_dns_response == true)
 
+let compressed_both_soa_names_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x18uy;
+    0xc0uy; 0x0cuy;
+    0xc0uy; 0x0cuy;
+    0x00uy; 0x00uy; 0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x02uy;
+    0x00uy; 0x00uy; 0x00uy; 0x03uy;
+    0x00uy; 0x00uy; 0x00uy; 0x04uy;
+    0x00uy; 0x00uy; 0x00uy; 0x05uy
+  ]
+
+let compressed_both_soa_names_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes compressed_both_soa_names_dns_response with
+    | Some p ->
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.rtype == SOA /\
+             rr.rdlen == 24us /\
+             FStar.Bytes.length rr.rdata == 24
+         | _ -> false)
+    | None -> false)
+
+let generated_compressed_soa_gate_skips_both_names_test =
+  assert_norm (
+    generated_compressed_soa_packet_subset_applicable
+      compressed_both_soa_names_dns_response == false)
+
+let generated_compressed_both_soa_gate_accepts_names_test =
+  assert_norm (
+    generated_compressed_both_soa_packet_subset_applicable
+      compressed_both_soa_names_dns_response == true)
+
 let self_loop_compressed_soa_mname_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -1998,6 +2046,39 @@ let generated_compressed_soa_gate_skips_out_of_range_test =
   assert_norm (
     generated_compressed_soa_packet_subset_applicable
       out_of_range_compressed_soa_name_dns_response == false)
+
+let out_of_range_compressed_both_soa_names_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x18uy;
+    0xc0uy; 0x0cuy;
+    0xc0uy; 0xffuy;
+    0x00uy; 0x00uy; 0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x02uy;
+    0x00uy; 0x00uy; 0x00uy; 0x03uy;
+    0x00uy; 0x00uy; 0x00uy; 0x04uy;
+    0x00uy; 0x00uy; 0x00uy; 0x05uy
+  ]
+
+let out_of_range_compressed_both_soa_names_parse_packet_test =
+  assert_norm (parse_dns_packet_bytes out_of_range_compressed_both_soa_names_dns_response == None)
+
+let generated_compressed_both_soa_gate_skips_out_of_range_test =
+  assert_norm (
+    generated_compressed_both_soa_packet_subset_applicable
+      out_of_range_compressed_both_soa_names_dns_response == false)
 
 let valid_txt_rdata_dns_response : list FStar.UInt8.t =
   [
@@ -2589,6 +2670,13 @@ let boundary_accepts_compressed_soa_rname_test =
 let boundary_generated_subset_covers_compressed_soa_rname_test =
   assert_norm (everparse_boundary_generated_subset_applicable compressed_soa_rname_dns_response == true)
 
+let boundary_accepts_compressed_both_soa_names_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary compressed_both_soa_names_dns_response ==
+               parse_dns_packet_bytes compressed_both_soa_names_dns_response)
+
+let boundary_generated_subset_covers_compressed_both_soa_names_test =
+  assert_norm (everparse_boundary_generated_subset_applicable compressed_both_soa_names_dns_response == true)
+
 let boundary_rejects_self_loop_compressed_soa_mname_test =
   assert_norm (parse_dns_packet_bytes_at_boundary self_loop_compressed_soa_mname_dns_response ==
                parse_dns_packet_bytes self_loop_compressed_soa_mname_dns_response)
@@ -2600,6 +2688,10 @@ let boundary_rejects_self_loop_compressed_soa_rname_test =
 let boundary_rejects_out_of_range_compressed_soa_name_test =
   assert_norm (parse_dns_packet_bytes_at_boundary out_of_range_compressed_soa_name_dns_response ==
                parse_dns_packet_bytes out_of_range_compressed_soa_name_dns_response)
+
+let boundary_rejects_out_of_range_compressed_both_soa_names_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary out_of_range_compressed_both_soa_names_dns_response ==
+               parse_dns_packet_bytes out_of_range_compressed_both_soa_names_dns_response)
 
 let boundary_accepts_txt_rdata_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_txt_rdata_dns_response ==
@@ -2668,6 +2760,7 @@ let boundary_backend_status_test =
                everparse_generated_compressed_mx_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_soa_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_compressed_soa_answer_rr_gate_active_at_boundary == true /\
+               everparse_generated_compressed_both_soa_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_srv_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_compressed_srv_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_txt_answer_rr_gate_active_at_boundary == true /\

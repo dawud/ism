@@ -42,6 +42,8 @@ The generated validator gate currently covers:
 - generated SOA mname/rname/timer shape checks for uncompressed names;
 - generated SOA compressed mname/rname checks for the common `0xc00c` pointer
   to the question name when the other SOA name is uncompressed;
+- generated SOA both-compressed mname/rname checks for the common `0xc00c`
+  pointer to the question name;
 - generated SRV target-name shape checks for uncompressed names;
 - generated SRV compressed target-name checks for the common `0xc00c` pointer
   to the question name;
@@ -57,11 +59,10 @@ The generated-subset predicate is:
 
 Examples outside that generated validator subset may still be accepted by the
 active boundary when the reference parser accepts them. That includes supported
-SOA RDATA with both names compressed, compressed NS/CNAME/PTR, MX, SOA, and
-SRV RDATA pointers outside the current `0xc00c` subset, and compressed
-owner-name pointers outside the current `0xc00c` subset. These cases remain
-part of the handwritten reference-parser construction path until the generated
-grammar grows equivalent coverage.
+compressed NS/CNAME/PTR, MX, SOA, and SRV RDATA pointers outside the current
+`0xc00c` subset, and compressed owner-name pointers outside the current
+`0xc00c` subset. These cases remain part of the handwritten reference-parser
+construction path until the generated grammar grows equivalent coverage.
 
 ## Production Gap
 

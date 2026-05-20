@@ -1228,6 +1228,75 @@ let generated_compressed_soa_packet_subset_applicable input =
       L.length input = 48 + qname_length + rr_name_length + other_name_length
   | None -> false
 
+val generated_compressed_both_soa_packet_fields :
+  input:list FStar.UInt8.t ->
+  Tot (option (generated_dns_name_length * generated_dns_name_length))
+
+let generated_compressed_both_soa_packet_fields input =
+  match generated_uncompressed_question_answer_packet_fields input with
+  | Some (qname_length, rr_name_length, rdata_length, rr_type, _, _, _) ->
+      if rr_type = 6 &&
+         rdata_length = 24 &&
+         L.length input = 50 + qname_length + rr_name_length then
+        match parse_header_bytes input with
+        | Some (_, after_header) ->
+            begin match DNS.Name.parse_qname 128 after_header with
+            | Some (_, question_tail) ->
+                if L.length question_tail < 4 then
+                  None
+                else
+                  let (_, after_question) = L.splitAt 4 question_tail in
+                  begin match DNS.Name.parse_qname 128 after_question with
+                  | Some (_, rr_tail) ->
+                      begin match rr_tail with
+                      | _rt_hi :: _rt_lo ::
+                        _rc_hi :: _rc_lo ::
+                        _ttl_0 :: _ttl_1 :: _ttl_2 :: _ttl_3 ::
+                        _rdlen_hi :: _rdlen_lo ::
+                        m_ptr_hi :: m_ptr_lo ::
+                        r_ptr_hi :: r_ptr_lo ::
+                        _serial_0 :: _serial_1 :: _serial_2 :: _serial_3 ::
+                        _refresh_0 :: _refresh_1 :: _refresh_2 :: _refresh_3 ::
+                        _retry_0 :: _retry_1 :: _retry_2 :: _retry_3 ::
+                        _expire_0 :: _expire_1 :: _expire_2 :: _expire_3 ::
+                        _minimum_0 :: _minimum_1 :: _minimum_2 :: _minimum_3 :: [] ->
+                          if m_ptr_hi = 0xc0uy && m_ptr_lo = 0x0cuy &&
+                             r_ptr_hi = 0xc0uy && r_ptr_lo = 0x0cuy then begin
+                            assert (qname_length > 0);
+                            assert (qname_length <= 255);
+                            assert (rr_name_length > 0);
+                            assert (rr_name_length <= 255);
+                            let qn:generated_dns_name_length = qname_length in
+                            let rn:generated_dns_name_length = rr_name_length in
+                            Some (qn, rn)
+                          end
+                          else
+                            None
+                      | _ -> None
+                      end
+                  | None -> None
+                  end
+            | None -> None
+            end
+        | None -> None
+      else
+        None
+  | None -> None
+
+val generated_compressed_both_soa_packet_subset_applicable :
+  input:list FStar.UInt8.t ->
+  Tot bool
+
+let generated_compressed_both_soa_packet_subset_applicable input =
+  match generated_compressed_both_soa_packet_fields input with
+  | Some (qname_length, rr_name_length) ->
+      qname_length > 0 &&
+      qname_length <= 255 &&
+      rr_name_length > 0 &&
+      rr_name_length <= 255 &&
+      L.length input = 50 + qname_length + rr_name_length
+  | None -> false
+
 val generated_compressed_srv_packet_fields :
   input:list FStar.UInt8.t ->
   Tot (option (generated_dns_name_length * generated_dns_name_length))
@@ -1660,6 +1729,38 @@ let validate_generated_compressed_soa_packet_subset_buffer buffer len bytes =
   | None ->
       false
 
+val validate_generated_compressed_both_soa_packet_subset_buffer :
+  buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
+  len:FStar.UInt32.t ->
+  bytes:list FStar.UInt8.t{
+    L.length bytes == FStar.UInt32.v len /\
+    generated_compressed_both_soa_packet_subset_applicable bytes == true
+  } ->
+  Stack bool
+    (requires (fun h0 ->
+      LowStar.Buffer.live h0 buffer /\
+      FStar.UInt32.v len <= LowStar.Buffer.length buffer))
+    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+
+let validate_generated_compressed_both_soa_packet_subset_buffer buffer len bytes =
+  match generated_compressed_both_soa_packet_fields bytes with
+  | Some (qname_length_nat, rr_name_length_nat) ->
+      assert (qname_length_nat > 0);
+      assert (qname_length_nat <= 255);
+      assert (rr_name_length_nat > 0);
+      assert (rr_name_length_nat <= 255);
+      let qname_length = FStar.UInt32.uint_to_t qname_length_nat in
+      assert (FStar.UInt32.v qname_length == qname_length_nat);
+      let rr_name_length = FStar.UInt32.uint_to_t rr_name_length_nat in
+      assert (FStar.UInt32.v rr_name_length == rr_name_length_nat);
+      EPR.check_dns_uncompressed_question_compressed_soa_answer_packet
+        qname_length
+        rr_name_length
+        buffer
+        len
+  | None ->
+      false
+
 val validate_generated_compressed_srv_packet_subset_buffer :
   buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
   len:FStar.UInt32.t ->
@@ -1750,6 +1851,8 @@ let validate_generated_subset_gate_buffer buffer len bytes =
     validate_generated_compressed_name_rdata_packet_subset_buffer buffer len bytes
   else if generated_compressed_mx_packet_subset_applicable bytes then
     validate_generated_compressed_mx_packet_subset_buffer buffer len bytes
+  else if generated_compressed_both_soa_packet_subset_applicable bytes then
+    validate_generated_compressed_both_soa_packet_subset_buffer buffer len bytes
   else if generated_compressed_soa_packet_subset_applicable bytes then
     validate_generated_compressed_soa_packet_subset_buffer buffer len bytes
   else if generated_compressed_srv_packet_subset_applicable bytes then
