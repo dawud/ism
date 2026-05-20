@@ -201,11 +201,15 @@ where qname_length >= 1 && qname_length <= 255 &&
 entrypoint typedef struct _dns_uncompressed_question_compressed_name_rdata_answer_packet (
   UINT32 qname_length,
   UINT32 rr_name_length,
-  UINT32 expected_rtype
+  UINT32 expected_rtype,
+  UINT32 rdata_name_ptr_hi_value,
+  UINT32 rdata_name_ptr_lo_value
 )
 where qname_length >= 1 && qname_length <= 255 &&
       rr_name_length >= 1 && rr_name_length <= 255 &&
-      (expected_rtype == 2 || expected_rtype == 5 || expected_rtype == 12)
+      (expected_rtype == 2 || expected_rtype == 5 || expected_rtype == 12) &&
+      rdata_name_ptr_hi_value >= 192 && rdata_name_ptr_hi_value <= 255 &&
+      rdata_name_ptr_lo_value <= 255
 {
   UINT16BE id;
   dns_flags flags;
@@ -223,8 +227,8 @@ where qname_length >= 1 && qname_length <= 255 &&
   UINT16BE rclass;
   UINT32BE ttl;
   UINT16BE rdlength { rdlength == 2 };
-  UINT8 rdata_name_ptr_hi { rdata_name_ptr_hi == 192 };
-  UINT8 rdata_name_ptr_lo { rdata_name_ptr_lo == 12 };
+  UINT8 rdata_name_ptr_hi { rdata_name_ptr_hi == rdata_name_ptr_hi_value };
+  UINT8 rdata_name_ptr_lo { rdata_name_ptr_lo == rdata_name_ptr_lo_value };
 } dns_uncompressed_question_compressed_name_rdata_answer_packet;
 
 entrypoint typedef struct _dns_uncompressed_question_mx_answer_packet (

@@ -84,11 +84,13 @@ let generated_dns_uncompressed_question_name_rdata_answer_packet_validator
     expected_rtype
 
 let generated_dns_uncompressed_question_compressed_name_rdata_answer_packet_validator
-    qname_length rr_name_length expected_rtype =
+    qname_length rr_name_length expected_rtype rdata_name_ptr_hi_value rdata_name_ptr_lo_value =
   DNSProtocol.validate__dns_uncompressed_question_compressed_name_rdata_answer_packet
     qname_length
     rr_name_length
     expected_rtype
+    rdata_name_ptr_hi_value
+    rdata_name_ptr_lo_value
 
 let generated_dns_uncompressed_question_mx_answer_packet_validator
     qname_length rr_name_length exchange_name_length =

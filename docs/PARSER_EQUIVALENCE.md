@@ -34,8 +34,8 @@ The generated validator gate currently covers:
 - raw bounded RDATA;
 - generated A/AAAA fixed-RDLENGTH checks;
 - generated NS/CNAME/PTR name-RDATA shape checks for uncompressed names;
-- generated NS/CNAME/PTR compressed name-RDATA checks for the common `0xc00c`
-  pointer to the question name;
+- generated NS/CNAME/PTR compressed name-RDATA checks for pointer offsets that
+  resolve to prior valid message names;
 - generated MX exchange-name shape checks for uncompressed names;
 - generated MX compressed exchange-name checks for the common `0xc00c` pointer
   to the question name;
@@ -59,9 +59,9 @@ The generated-subset predicate is:
 
 Examples outside that generated validator subset may still be accepted by the
 active boundary when the reference parser accepts them. That includes supported
-compressed NS/CNAME/PTR, MX, SOA, and SRV RDATA pointers outside the current
-`0xc00c` subset. These cases remain part of the handwritten reference-parser
-construction path until the generated grammar grows equivalent coverage.
+compressed MX, SOA, and SRV RDATA pointers outside the current `0xc00c` subset.
+These cases remain part of the handwritten reference-parser construction path
+until the generated grammar grows equivalent coverage.
 
 ## Production Gap
 
