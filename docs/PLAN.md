@@ -164,6 +164,33 @@ Parser-test policy is recorded in [DECISIONS.md](DECISIONS.md). Initial tests sh
 
 These tests should eventually run against both the pure parser and the Low* buffer boundary.
 
+### Future Specification-Validation Evaluation
+
+Evaluate property-based specification validation as a complement to proofs and
+parser fixtures before declaring Phase 1 production-ready. The candidate method
+is to generate concrete input/output witnesses for pure specifications and test:
+
+- **Admissibility:** the precondition accepts the intended input.
+- **Soundness:** the postcondition accepts the intended output.
+- **Uniqueness or equivalence:** the postcondition rejects mutated alternative
+  outputs, or accepts only outputs related by an explicitly chosen equivalence.
+
+This is intended to detect underspecified contracts, not to replace proofs. The
+first evaluation targets should be deterministic, bounded relations where the
+specification can be evaluated as a concrete Boolean:
+
+- parser/reference-boundary equivalence for generated EverParse subsets;
+- parser and serializer round-trip contracts with mutated parsed records or
+  mutated wire bytes;
+- zone lookup, wildcard, and CNAME result contracts;
+- cache-entry validity for owner, class, TTL, and freshness constraints.
+
+Use mutation-based output generation for likely near-miss witnesses, such as
+wrong `rdlen`, wrong RR type, altered compressed pointer targets, extra records,
+stale cache entries, or incorrect CNAME chains. Keep any adopted harness
+bounded and reproducible so counterexamples can be promoted into ordinary parser
+or logic fixtures.
+
 ## 7. RFC Compliance Matrix
 
 Maintain a compliance matrix for each protocol area. See [DECISIONS.md](DECISIONS.md).
