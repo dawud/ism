@@ -34,6 +34,10 @@ let generated_dns_uncompressed_question_compressed_mx_answer_packet_validator_li
 
 let generated_dns_uncompressed_question_soa_answer_packet_validator_linked : bool = true
 
+let generated_dns_uncompressed_question_compressed_soa_mname_answer_packet_validator_linked : bool = true
+
+let generated_dns_uncompressed_question_compressed_soa_rname_answer_packet_validator_linked : bool = true
+
 let generated_dns_uncompressed_question_srv_answer_packet_validator_linked : bool = true
 
 let generated_dns_uncompressed_question_txt_answer_packet_validator_linked : bool = true
@@ -102,6 +106,20 @@ let generated_dns_uncompressed_question_soa_answer_packet_validator
     rr_name_length
     mname_length
     rname_length
+
+let generated_dns_uncompressed_question_compressed_soa_mname_answer_packet_validator
+    qname_length rr_name_length rname_length =
+  DNSProtocol.validate__dns_uncompressed_question_compressed_soa_mname_answer_packet
+    qname_length
+    rr_name_length
+    rname_length
+
+let generated_dns_uncompressed_question_compressed_soa_rname_answer_packet_validator
+    qname_length rr_name_length mname_length =
+  DNSProtocol.validate__dns_uncompressed_question_compressed_soa_rname_answer_packet
+    qname_length
+    rr_name_length
+    mname_length
 
 let generated_dns_uncompressed_question_srv_answer_packet_validator
     qname_length rr_name_length target_name_length =
