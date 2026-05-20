@@ -1421,6 +1421,11 @@ let generated_name_rdata_answer_gate_skips_compressed_name_test =
     generated_uncompressed_question_answer_packet_subset_applicable
       compressed_name_rdata_dns_response == false)
 
+let generated_compressed_name_rdata_gate_accepts_cname_test =
+  assert_norm (
+    generated_compressed_name_rdata_packet_subset_applicable
+      compressed_name_rdata_dns_response == true)
+
 let self_loop_compressed_name_rdata_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -1443,6 +1448,11 @@ let self_loop_compressed_name_rdata_dns_response : list FStar.UInt8.t =
 let self_loop_compressed_name_rdata_parse_packet_test =
   assert_norm (parse_dns_packet_bytes self_loop_compressed_name_rdata_dns_response == None)
 
+let generated_compressed_name_rdata_gate_skips_self_loop_test =
+  assert_norm (
+    generated_compressed_name_rdata_packet_subset_applicable
+      self_loop_compressed_name_rdata_dns_response == false)
+
 let out_of_range_compressed_name_rdata_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -1464,6 +1474,11 @@ let out_of_range_compressed_name_rdata_dns_response : list FStar.UInt8.t =
 
 let out_of_range_compressed_name_rdata_parse_packet_test =
   assert_norm (parse_dns_packet_bytes out_of_range_compressed_name_rdata_dns_response == None)
+
+let generated_compressed_name_rdata_gate_skips_out_of_range_test =
+  assert_norm (
+    generated_compressed_name_rdata_packet_subset_applicable
+      out_of_range_compressed_name_rdata_dns_response == false)
 
 let valid_mx_rdata_dns_response : list FStar.UInt8.t =
   [
@@ -2451,6 +2466,9 @@ let boundary_accepts_compressed_name_rdata_test =
   assert_norm (parse_dns_packet_bytes_at_boundary compressed_name_rdata_dns_response ==
                parse_dns_packet_bytes compressed_name_rdata_dns_response)
 
+let boundary_generated_subset_covers_compressed_name_rdata_test =
+  assert_norm (everparse_boundary_generated_subset_applicable compressed_name_rdata_dns_response == true)
+
 let boundary_rejects_self_loop_compressed_name_rdata_test =
   assert_norm (parse_dns_packet_bytes_at_boundary self_loop_compressed_name_rdata_dns_response ==
                parse_dns_packet_bytes self_loop_compressed_name_rdata_dns_response)
@@ -2578,6 +2596,7 @@ let boundary_backend_status_test =
                everparse_generated_single_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_a_aaaa_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_name_rdata_answer_rr_gate_active_at_boundary == true /\
+               everparse_generated_compressed_name_rdata_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_mx_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_soa_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_srv_answer_rr_gate_active_at_boundary == true /\

@@ -48,6 +48,9 @@ let everparse_generated_a_aaaa_answer_rr_gate_active_at_boundary : bool =
 let everparse_generated_name_rdata_answer_rr_gate_active_at_boundary : bool =
   everparse_generated_name_rdata_answer_rr_gate_active
 
+let everparse_generated_compressed_name_rdata_answer_rr_gate_active_at_boundary : bool =
+  everparse_generated_compressed_name_rdata_answer_rr_gate_active
+
 let everparse_generated_mx_answer_rr_gate_active_at_boundary : bool =
   everparse_generated_mx_answer_rr_gate_active
 
@@ -70,6 +73,7 @@ let everparse_boundary_generated_subset_applicable (input:list FStar.UInt8.t) : 
   generated_uncompressed_question_subset_applicable input ||
   generated_uncompressed_question_answer_packet_subset_applicable input ||
   generated_compressed_answer_name_packet_subset_applicable input ||
+  generated_compressed_name_rdata_packet_subset_applicable input ||
   generated_edns0_opt_additional_packet_subset_applicable input
 
 val parse_dns_packet_bytes_at_boundary :

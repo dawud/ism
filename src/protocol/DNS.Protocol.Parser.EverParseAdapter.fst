@@ -26,6 +26,8 @@ let generated_dns_uncompressed_question_aaaa_answer_packet_validator_linked : bo
 
 let generated_dns_uncompressed_question_name_rdata_answer_packet_validator_linked : bool = true
 
+let generated_dns_uncompressed_question_compressed_name_rdata_answer_packet_validator_linked : bool = true
+
 let generated_dns_uncompressed_question_mx_answer_packet_validator_linked : bool = true
 
 let generated_dns_uncompressed_question_soa_answer_packet_validator_linked : bool = true
@@ -69,6 +71,13 @@ let generated_dns_uncompressed_question_name_rdata_answer_packet_validator
     qname_length
     rr_name_length
     rdata_name_length
+    expected_rtype
+
+let generated_dns_uncompressed_question_compressed_name_rdata_answer_packet_validator
+    qname_length rr_name_length expected_rtype =
+  DNSProtocol.validate__dns_uncompressed_question_compressed_name_rdata_answer_packet
+    qname_length
+    rr_name_length
     expected_rtype
 
 let generated_dns_uncompressed_question_mx_answer_packet_validator

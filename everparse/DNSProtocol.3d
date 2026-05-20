@@ -4,9 +4,10 @@
 // fixed-RDLENGTH A/AAAA answer subsets, first name-RDATA answer subsets, the
 // first MX answer subset, the first SOA answer subset, the first SRV answer
 // subset, the first TXT answer subset, the first EDNS0 OPT additional-RR
-// subset, and the first compressed-owner answer subset. Broader RR-section
-// validation remains in the handwritten reference parser until the generated
-// boundary is expanded.
+// subset, the first compressed-owner answer subset, and the first
+// compressed name-RDATA answer subset. Broader RR-section validation remains
+// in the handwritten reference parser until the generated boundary is
+// expanded.
 
 typedef struct _dns_flags {
   UINT16BE qr : 1;
@@ -194,6 +195,35 @@ where qname_length >= 1 && qname_length <= 255 &&
   dns_label rdata_name_labels[:byte-size (rdata_name_length - 1)];
   UINT8 rdata_name_root { rdata_name_root == 0 };
 } dns_uncompressed_question_name_rdata_answer_packet;
+
+entrypoint typedef struct _dns_uncompressed_question_compressed_name_rdata_answer_packet (
+  UINT32 qname_length,
+  UINT32 rr_name_length,
+  UINT32 expected_rtype
+)
+where qname_length >= 1 && qname_length <= 255 &&
+      rr_name_length >= 1 && rr_name_length <= 255 &&
+      (expected_rtype == 2 || expected_rtype == 5 || expected_rtype == 12)
+{
+  UINT16BE id;
+  dns_flags flags;
+  UINT16BE qdcount { qdcount == 1 };
+  UINT16BE ancount { ancount == 1 };
+  UINT16BE nscount { nscount == 0 };
+  UINT16BE arcount { arcount == 0 };
+  dns_label question_labels[:byte-size (qname_length - 1)];
+  UINT8 question_root { question_root == 0 };
+  UINT16BE qtype;
+  UINT16BE qclass;
+  dns_label rr_name_labels[:byte-size (rr_name_length - 1)];
+  UINT8 rr_name_root { rr_name_root == 0 };
+  UINT16BE rtype { rtype == expected_rtype };
+  UINT16BE rclass;
+  UINT32BE ttl;
+  UINT16BE rdlength { rdlength == 2 };
+  UINT8 rdata_name_ptr_hi { rdata_name_ptr_hi == 192 };
+  UINT8 rdata_name_ptr_lo { rdata_name_ptr_lo == 12 };
+} dns_uncompressed_question_compressed_name_rdata_answer_packet;
 
 entrypoint typedef struct _dns_uncompressed_question_mx_answer_packet (
   UINT32 qname_length,
