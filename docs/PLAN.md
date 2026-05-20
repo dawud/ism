@@ -31,7 +31,7 @@ Phase completion gates are recorded in [DECISIONS.md](DECISIONS.md). Keep this r
 
 ### Phase 1: Formalized Wire Format & Verified Parsing
 *Goal: Create a zero-copy, verified parser and serializer for modern DNS messages.*
-- **Scope:** RFC 1034, RFC 1035, RFC 2181, RFC 3597, RFC 6891, RFC 6895, RFC 7830, RFC 8467, RFC 9499.
+- **Scope:** RFC 1034, RFC 1035, RFC 2181, RFC 3597, RFC 6891, RFC 6895, RFC 7830, RFC 8467, RFC 9267, RFC 9499.
 - **Parser Strategy:** The handwritten parser is the bootstrap/reference parser; EverParse remains the production target. See [DECISIONS.md](DECISIONS.md).
 - **Equivalence Contract:** The current boundary/reference equivalence contract
   and generated-subset limits are recorded in
@@ -190,6 +190,7 @@ Maintain a compliance matrix for each protocol area. See [DECISIONS.md](DECISION
 | [RFC 9001](https://datatracker.ietf.org/doc/html/rfc9001) | TLS for QUIC | QUIC handshake protection and key schedule | Trusted | None | TLS for QUIC is delegated to the MsQuic shell stack. |
 | [RFC 9002](https://datatracker.ietf.org/doc/html/rfc9002) | QUIC recovery | Loss detection and congestion control | Trusted | None | Recovery behavior is delegated to the MsQuic shell stack. |
 | [RFC 9250](https://datatracker.ietf.org/doc/html/rfc9250) | DoQ framing | Two-octet length prefix | Partial | Low* stream state verifies complete and split length-prefix parsing, bounded body copying, `ReadingMessage` progress to `Processing` with the completed DNS message length, conservative overlong-fragment rejection, bounded active stream lookup, capacity-bounded stream allocation, compacting active-stream close, worker dispatch through verified stream lookup, worker-side completed-buffer parsing into response bytes, capacity-checked response copy into a caller-provided Low* buffer, worker preparation of a MsQuic send descriptor for that buffer, send-completion/drop cleanup that closes the stream, a verified shell-event dispatcher over authenticated ingress, processing-ready, and send-completion/drop events, an emitted `DNS.ShellBoundary.dispatch_authenticated_stream_data` C ABI for authenticated ingress, emitted `DNS.ShellResponseBoundary` C ABIs for response send handoff/completion, and a fixed-capacity C shell scaffold over those generated ABIs. | Actual MsQuic send-path wiring, worker response-construction/dispatcher C symbols, response-buffer lifetime/aliasing proofs, real polling, event queues, C scheduler integration, and resource-bound proofs remain incomplete. |
+| [RFC 9267](https://datatracker.ietf.org/doc/html/rfc9267) | DNS RR processing anti-patterns | Parser hardening guidance for compression pointers, label/name lengths, RDLENGTH, and record counts | Reference | Parser and generated-boundary tests cover pointer loops, out-of-range pointers, label/name bounds, truncated RDATA, and section-count validation. | Informational Independent Submission; use as security review guidance rather than normative protocol behavior. |
 | [RFC 9499](https://datatracker.ietf.org/doc/html/rfc9499) | DNS terminology | Current DNS terms for global DNS, QNAME, bailiwick, and roles | Reference | Documentation alignment only | Use for terminology; no executable behavior is directly required. |
 
 Non-RFC standards dependencies to track separately:
