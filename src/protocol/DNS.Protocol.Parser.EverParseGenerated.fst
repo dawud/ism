@@ -41,6 +41,8 @@ let everparse_generated_compressed_name_rdata_answer_rr_gate_active : bool = tru
 
 let everparse_generated_mx_answer_rr_gate_active : bool = true
 
+let everparse_generated_compressed_mx_answer_rr_gate_active : bool = true
+
 let everparse_generated_soa_answer_rr_gate_active : bool = true
 
 let everparse_generated_srv_answer_rr_gate_active : bool = true
