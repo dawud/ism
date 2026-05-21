@@ -123,6 +123,43 @@ let everparse_boundary_generated_subset_applicable (input:list FStar.UInt8.t) : 
   | Some _ -> true
   | None -> false
 
+type reference_only_acceptance_case =
+  | ReferenceOnlyAnswerWithoutQuestion
+  | ReferenceOnlyMultipleQuestions
+  | ReferenceOnlyMultipleAnswers
+  | ReferenceOnlyAuthorityRecords
+  | ReferenceOnlyAdditionalRecords
+  | ReferenceOnlyOtherAcceptedShape
+
+val classify_reference_only_acceptance :
+  input:list FStar.UInt8.t ->
+  Tot (option reference_only_acceptance_case)
+
+let classify_reference_only_acceptance input =
+  match parse_dns_packet_bytes input with
+  | None -> None
+  | Some p ->
+      if everparse_boundary_generated_subset_applicable input then
+        None
+      else if FStar.UInt16.v p.header.qdcount = 0 &&
+              FStar.UInt16.v p.header.ancount > 0 then
+        Some ReferenceOnlyAnswerWithoutQuestion
+      else if FStar.UInt16.v p.header.qdcount > 1 then
+        Some ReferenceOnlyMultipleQuestions
+      else if FStar.UInt16.v p.header.ancount > 1 then
+        Some ReferenceOnlyMultipleAnswers
+      else if FStar.UInt16.v p.header.nscount > 0 then
+        Some ReferenceOnlyAuthorityRecords
+      else if FStar.UInt16.v p.header.arcount > 0 then
+        Some ReferenceOnlyAdditionalRecords
+      else
+        Some ReferenceOnlyOtherAcceptedShape
+
+let reference_only_acceptance_applicable (input:list FStar.UInt8.t) : bool =
+  match classify_reference_only_acceptance input with
+  | Some _ -> true
+  | None -> false
+
 val parse_dns_packet_bytes_at_boundary :
   input:list FStar.UInt8.t ->
   Tot (option dns_packet)

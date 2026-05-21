@@ -123,7 +123,7 @@ The containerized `make extract` command now completes and emits C/H files under
   - [x] Extend the generated boundary to cover compressed SRV target-name pointers to the question name.
   - [x] Extend the generated boundary to cover compressed SRV target-name pointers to prior valid message-name offsets.
   - [x] Document the boundary/reference equivalence contract and generated-subset limits in [PARSER_EQUIVALENCE.md](PARSER_EQUIVALENCE.md).
-  - [/] Replace the handwritten parser or document/prove behavioral equivalence before Phase 1 is production-ready. Current work documents the coexistence contract and adds generated-subset accept/reject lemmas showing boundary/reference agreement for packets covered by the generated validator gate; full replacement or a complete coexistence proof remains open.
+  - [/] Replace the handwritten parser or document/prove behavioral equivalence before Phase 1 is production-ready. Current work documents the coexistence contract, adds generated-subset accept/reject lemmas showing boundary/reference agreement for packets covered by the generated validator gate, and classifies accepted reference-only fallback shapes that are outside the generated subset; full replacement or a complete coexistence proof remains open.
 
 ## Next Technical Milestone
 

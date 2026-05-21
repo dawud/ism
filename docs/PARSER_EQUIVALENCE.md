@@ -69,6 +69,27 @@ active boundary when the reference parser accepts them. These cases remain part
 of the handwritten reference-parser construction path until the generated
 grammar grows equivalent coverage.
 
+## Reference-Only Accepted Shapes
+
+The reference-only fallback surface is classified by
+`classify_reference_only_acceptance`. These are packets accepted by the
+handwritten reference parser and active boundary, but not covered by the current
+generated validator subset:
+
+- `ReferenceOnlyAnswerWithoutQuestion`: response packets with answer records
+  and no question section;
+- `ReferenceOnlyMultipleQuestions`: packets with more than one question;
+- `ReferenceOnlyMultipleAnswers`: packets with more than one answer record;
+- `ReferenceOnlyAuthorityRecords`: packets with non-empty authority sections;
+- `ReferenceOnlyAdditionalRecords`: packets with additional records outside the
+  current generated EDNS0 OPT-only additional subset;
+- `ReferenceOnlyOtherAcceptedShape`: a catch-all for accepted reference-parser
+  shapes not otherwise classified.
+
+The parser tests include representative accepted fixtures for each named
+non-catch-all case and assert that the boundary still matches the reference
+parser while `everparse_boundary_generated_subset_applicable` is false.
+
 ## Production Gap
 
 Phase 1 is not production-complete until one of these is true:
