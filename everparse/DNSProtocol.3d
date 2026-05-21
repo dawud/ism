@@ -263,10 +263,14 @@ where qname_length >= 1 && qname_length <= 255 &&
 
 entrypoint typedef struct _dns_uncompressed_question_compressed_mx_answer_packet (
   UINT32 qname_length,
-  UINT32 rr_name_length
+  UINT32 rr_name_length,
+  UINT32 exchange_name_ptr_hi_value,
+  UINT32 exchange_name_ptr_lo_value
 )
 where qname_length >= 1 && qname_length <= 255 &&
-      rr_name_length >= 1 && rr_name_length <= 255
+      rr_name_length >= 1 && rr_name_length <= 255 &&
+      exchange_name_ptr_hi_value >= 192 && exchange_name_ptr_hi_value <= 255 &&
+      exchange_name_ptr_lo_value <= 255
 {
   UINT16BE id;
   dns_flags flags;
@@ -285,8 +289,8 @@ where qname_length >= 1 && qname_length <= 255 &&
   UINT32BE ttl;
   UINT16BE rdlength { rdlength == 4 };
   UINT16BE preference;
-  UINT8 exchange_name_ptr_hi { exchange_name_ptr_hi == 192 };
-  UINT8 exchange_name_ptr_lo { exchange_name_ptr_lo == 12 };
+  UINT8 exchange_name_ptr_hi { exchange_name_ptr_hi == exchange_name_ptr_hi_value };
+  UINT8 exchange_name_ptr_lo { exchange_name_ptr_lo == exchange_name_ptr_lo_value };
 } dns_uncompressed_question_compressed_mx_answer_packet;
 
 entrypoint typedef struct _dns_uncompressed_question_soa_answer_packet (

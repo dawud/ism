@@ -1724,6 +1724,46 @@ let generated_compressed_mx_gate_accepts_exchange_test =
     generated_compressed_mx_packet_subset_applicable
       compressed_mx_exchange_dns_response == true)
 
+let compressed_mx_exchange_suffix_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x01uy; 0x61uy;
+    0x01uy; 0x62uy;
+    0x00uy;
+    0x00uy; 0x0fuy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x0fuy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x04uy;
+    0x00uy; 0x0auy;
+    0xc0uy; 0x0euy
+  ]
+
+let compressed_mx_exchange_suffix_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes compressed_mx_exchange_suffix_dns_response with
+    | Some p ->
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.rtype == MX /\
+             rr.rdlen == 4us /\
+             FStar.Bytes.length rr.rdata == 4
+         | _ -> false)
+    | None -> false)
+
+let generated_compressed_mx_gate_accepts_suffix_pointer_test =
+  assert_norm (
+    generated_compressed_mx_packet_subset_applicable
+      compressed_mx_exchange_suffix_dns_response == true)
+
 let self_loop_compressed_mx_exchange_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -2733,6 +2773,15 @@ let boundary_accepts_compressed_mx_exchange_test =
 
 let boundary_generated_subset_covers_compressed_mx_exchange_test =
   assert_norm (everparse_boundary_generated_subset_applicable compressed_mx_exchange_dns_response == true)
+
+let boundary_accepts_compressed_mx_exchange_suffix_pointer_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary compressed_mx_exchange_suffix_dns_response ==
+               parse_dns_packet_bytes compressed_mx_exchange_suffix_dns_response)
+
+let boundary_generated_subset_covers_compressed_mx_exchange_suffix_pointer_test =
+  assert_norm (
+    everparse_boundary_generated_subset_applicable
+      compressed_mx_exchange_suffix_dns_response == true)
 
 let boundary_rejects_self_loop_compressed_mx_exchange_test =
   assert_norm (parse_dns_packet_bytes_at_boundary self_loop_compressed_mx_exchange_dns_response ==
