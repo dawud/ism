@@ -1344,7 +1344,7 @@ let generated_compressed_both_soa_packet_subset_applicable input =
 
 val generated_compressed_srv_packet_fields :
   input:list FStar.UInt8.t ->
-  Tot (option (generated_dns_name_length * generated_dns_name_length))
+  Tot (option (generated_dns_name_length * generated_dns_name_length * nat * nat))
 
 let generated_compressed_srv_packet_fields input =
   match generated_uncompressed_question_answer_packet_fields input with
@@ -1371,17 +1371,29 @@ let generated_compressed_srv_packet_fields input =
                         _weight_hi :: _weight_lo ::
                         _port_hi :: _port_lo ::
                         ptr_hi :: ptr_lo :: [] ->
-                          if ptr_hi = 0xc0uy && ptr_lo = 0x0cuy then begin
-                            assert (qname_length > 0);
-                            assert (qname_length <= 255);
-                            assert (rr_name_length > 0);
-                            assert (rr_name_length <= 255);
-                            let qn:generated_dns_name_length = qname_length in
-                            let rn:generated_dns_name_length = rr_name_length in
-                            Some (qn, rn)
+                          let target_offset = 32 + qname_length + rr_name_length in
+                          let target_name_pointer = [ptr_hi; ptr_lo] in
+                          begin match DNS.Name.parse_qname_compressed
+                                  128
+                                  input
+                                  target_offset
+                                  target_name_pointer with
+                          | Some (_, []) ->
+                              let ptr_hi_nat = FStar.UInt8.v ptr_hi in
+                              let ptr_lo_nat = FStar.UInt8.v ptr_lo in
+                              if ptr_hi_nat >= 192 then begin
+                                assert (qname_length > 0);
+                                assert (qname_length <= 255);
+                                assert (rr_name_length > 0);
+                                assert (rr_name_length <= 255);
+                                let qn:generated_dns_name_length = qname_length in
+                                let rn:generated_dns_name_length = rr_name_length in
+                                Some (qn, rn, ptr_hi_nat, ptr_lo_nat)
+                              end
+                              else
+                                None
+                          | _ -> None
                           end
-                          else
-                            None
                       | _ -> None
                       end
                   | None -> None
@@ -1399,11 +1411,14 @@ val generated_compressed_srv_packet_subset_applicable :
 
 let generated_compressed_srv_packet_subset_applicable input =
   match generated_compressed_srv_packet_fields input with
-  | Some (qname_length, rr_name_length) ->
+  | Some (qname_length, rr_name_length, ptr_hi, ptr_lo) ->
       qname_length > 0 &&
       qname_length <= 255 &&
       rr_name_length > 0 &&
       rr_name_length <= 255 &&
+      ptr_hi >= 192 &&
+      ptr_hi <= 255 &&
+      ptr_lo <= 255 &&
       L.length input = 34 + qname_length + rr_name_length
   | None -> false
 
@@ -1848,18 +1863,27 @@ val validate_generated_compressed_srv_packet_subset_buffer :
 
 let validate_generated_compressed_srv_packet_subset_buffer buffer len bytes =
   match generated_compressed_srv_packet_fields bytes with
-  | Some (qname_length_nat, rr_name_length_nat) ->
+  | Some (qname_length_nat, rr_name_length_nat, ptr_hi_nat, ptr_lo_nat) ->
       assert (qname_length_nat > 0);
       assert (qname_length_nat <= 255);
       assert (rr_name_length_nat > 0);
       assert (rr_name_length_nat <= 255);
+      assert (ptr_hi_nat >= 192);
+      assert (ptr_hi_nat <= 255);
+      assert (ptr_lo_nat <= 255);
       let qname_length = FStar.UInt32.uint_to_t qname_length_nat in
       assert (FStar.UInt32.v qname_length == qname_length_nat);
       let rr_name_length = FStar.UInt32.uint_to_t rr_name_length_nat in
       assert (FStar.UInt32.v rr_name_length == rr_name_length_nat);
+      let target_name_ptr_hi_value = FStar.UInt32.uint_to_t ptr_hi_nat in
+      assert (FStar.UInt32.v target_name_ptr_hi_value == ptr_hi_nat);
+      let target_name_ptr_lo_value = FStar.UInt32.uint_to_t ptr_lo_nat in
+      assert (FStar.UInt32.v target_name_ptr_lo_value == ptr_lo_nat);
       EPR.check_dns_uncompressed_question_compressed_srv_answer_packet
         qname_length
         rr_name_length
+        target_name_ptr_hi_value
+        target_name_ptr_lo_value
         buffer
         len
   | None ->

@@ -2502,6 +2502,48 @@ let generated_compressed_srv_gate_accepts_target_test =
     generated_compressed_srv_packet_subset_applicable
       compressed_srv_target_dns_response == true)
 
+let compressed_srv_target_suffix_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x01uy; 0x61uy;
+    0x01uy; 0x62uy;
+    0x00uy;
+    0x00uy; 0x21uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x21uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x08uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x02uy;
+    0x01uy; 0xbbuy;
+    0xc0uy; 0x0euy
+  ]
+
+let compressed_srv_target_suffix_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes compressed_srv_target_suffix_dns_response with
+    | Some p ->
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.rtype == SRV /\
+             rr.rdlen == 8us /\
+             FStar.Bytes.length rr.rdata == 8
+         | _ -> false)
+    | None -> false)
+
+let generated_compressed_srv_gate_accepts_suffix_pointer_test =
+  assert_norm (
+    generated_compressed_srv_packet_subset_applicable
+      compressed_srv_target_suffix_dns_response == true)
+
 let self_loop_compressed_srv_target_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -2878,6 +2920,15 @@ let boundary_accepts_compressed_srv_target_test =
 
 let boundary_generated_subset_covers_compressed_srv_target_test =
   assert_norm (everparse_boundary_generated_subset_applicable compressed_srv_target_dns_response == true)
+
+let boundary_accepts_compressed_srv_target_suffix_pointer_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary compressed_srv_target_suffix_dns_response ==
+               parse_dns_packet_bytes compressed_srv_target_suffix_dns_response)
+
+let boundary_generated_subset_covers_compressed_srv_target_suffix_pointer_test =
+  assert_norm (
+    everparse_boundary_generated_subset_applicable
+      compressed_srv_target_suffix_dns_response == true)
 
 let boundary_rejects_self_loop_compressed_srv_target_test =
   assert_norm (parse_dns_packet_bytes_at_boundary self_loop_compressed_srv_target_dns_response ==

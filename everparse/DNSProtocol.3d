@@ -471,10 +471,14 @@ where qname_length >= 1 && qname_length <= 255 &&
 
 entrypoint typedef struct _dns_uncompressed_question_compressed_srv_answer_packet (
   UINT32 qname_length,
-  UINT32 rr_name_length
+  UINT32 rr_name_length,
+  UINT32 target_name_ptr_hi_value,
+  UINT32 target_name_ptr_lo_value
 )
 where qname_length >= 1 && qname_length <= 255 &&
-      rr_name_length >= 1 && rr_name_length <= 255
+      rr_name_length >= 1 && rr_name_length <= 255 &&
+      target_name_ptr_hi_value >= 192 && target_name_ptr_hi_value <= 255 &&
+      target_name_ptr_lo_value <= 255
 {
   UINT16BE id;
   dns_flags flags;
@@ -495,8 +499,8 @@ where qname_length >= 1 && qname_length <= 255 &&
   UINT16BE priority;
   UINT16BE weight;
   UINT16BE port;
-  UINT8 target_name_ptr_hi { target_name_ptr_hi == 192 };
-  UINT8 target_name_ptr_lo { target_name_ptr_lo == 12 };
+  UINT8 target_name_ptr_hi { target_name_ptr_hi == target_name_ptr_hi_value };
+  UINT8 target_name_ptr_lo { target_name_ptr_lo == target_name_ptr_lo_value };
 } dns_uncompressed_question_compressed_srv_answer_packet;
 
 entrypoint typedef struct _dns_uncompressed_question_txt_answer_packet (

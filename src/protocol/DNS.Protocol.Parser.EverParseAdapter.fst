@@ -143,10 +143,12 @@ let generated_dns_uncompressed_question_srv_answer_packet_validator
     target_name_length
 
 let generated_dns_uncompressed_question_compressed_srv_answer_packet_validator
-    qname_length rr_name_length =
+    qname_length rr_name_length target_name_ptr_hi_value target_name_ptr_lo_value =
   DNSProtocol.validate__dns_uncompressed_question_compressed_srv_answer_packet
     qname_length
     rr_name_length
+    target_name_ptr_hi_value
+    target_name_ptr_lo_value
 
 let generated_dns_uncompressed_question_txt_answer_packet_validator
     qname_length rr_name_length rdata_length =
