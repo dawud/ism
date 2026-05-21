@@ -18,11 +18,15 @@ Those obligations are named in:
 
 - `lemma_boundary_matches_reference`
 - `lemma_boundary_matches_reference_on_generated_subset`
+- `lemma_generated_subset_accepts_reference_result`
+- `lemma_generated_subset_rejects_reference_rejection`
 - `lemma_boundary_accepts_reference_result`
 - `lemma_boundary_rejects_reference_rejection`
 
-The shared fixture tests also assert boundary/reference equality across the
-implemented valid and malformed packet examples.
+The generated-subset accept/reject lemmas make the coexistence contract explicit
+for packets covered by the generated validator gate. The shared fixture tests
+also assert boundary/reference equality across the implemented valid and
+malformed packet examples.
 
 ## Generated Subset
 
@@ -73,4 +77,7 @@ Phase 1 is not production-complete until one of these is true:
   generated validator gate.
 
 Until then, the handwritten parser remains the bootstrap/reference parser, and
-EverParse is the production-target validator subset.
+EverParse is the production-target validator subset. The current proof-backed
+coexistence contract is intentionally narrower than replacement: generated
+validators gate covered wire shapes, while the handwritten parser still
+constructs the packet value that downstream verified code consumes.

@@ -3134,6 +3134,26 @@ let boundary_equivalence_acceptance_lemma_smoke_test =
     valid_single_question_dns_query
     valid_single_question_dns_packet
 
+let generated_subset_equivalence_acceptance_lemma_smoke_test =
+  assert_norm (everparse_boundary_generated_subset_applicable
+                 valid_compressed_answer_name_dns_response == true);
+  assert_norm (match parse_dns_packet_bytes valid_compressed_answer_name_dns_response with
+               | Some _ -> true
+               | None -> false);
+  match parse_dns_packet_bytes valid_compressed_answer_name_dns_response with
+  | Some p ->
+      lemma_generated_subset_accepts_reference_result
+        valid_compressed_answer_name_dns_response
+        p
+  | None -> ()
+
+let generated_subset_equivalence_rejection_lemma_smoke_test =
+  assert_norm (everparse_boundary_generated_subset_applicable
+                 truncated_edns_option_header_dns_query == true);
+  assert_norm (parse_dns_packet_bytes truncated_edns_option_header_dns_query == None);
+  lemma_generated_subset_rejects_reference_rejection
+    truncated_edns_option_header_dns_query
+
 let boundary_equivalence_rejection_lemma_smoke_test =
   assert_norm (parse_dns_packet_bytes truncated_dns_header == None);
   lemma_boundary_rejects_reference_rejection truncated_dns_header

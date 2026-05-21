@@ -124,6 +124,23 @@ val lemma_boundary_matches_reference_on_generated_subset :
 let lemma_boundary_matches_reference_on_generated_subset input =
   lemma_boundary_matches_reference input
 
+val lemma_generated_subset_accepts_reference_result :
+  input:list FStar.UInt8.t{everparse_boundary_generated_subset_applicable input == true} ->
+  p:dns_packet ->
+  Lemma (requires (parse_dns_packet_bytes input == Some p))
+        (ensures (parse_dns_packet_bytes_at_boundary input == Some p))
+
+let lemma_generated_subset_accepts_reference_result input p =
+  lemma_boundary_matches_reference_on_generated_subset input
+
+val lemma_generated_subset_rejects_reference_rejection :
+  input:list FStar.UInt8.t{everparse_boundary_generated_subset_applicable input == true} ->
+  Lemma (requires (parse_dns_packet_bytes input == None))
+        (ensures (parse_dns_packet_bytes_at_boundary input == None))
+
+let lemma_generated_subset_rejects_reference_rejection input =
+  lemma_boundary_matches_reference_on_generated_subset input
+
 val lemma_boundary_accepts_reference_result :
   input:list FStar.UInt8.t ->
   p:dns_packet ->
