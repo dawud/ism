@@ -2798,12 +2798,20 @@ let boundary_accepts_single_answer_test =
 let boundary_generated_subset_covers_single_answer_test =
   assert_norm (everparse_boundary_generated_subset_applicable valid_single_answer_dns_response == true)
 
+let boundary_generated_subset_classifies_single_answer_test =
+  assert_norm (classify_generated_subset valid_single_answer_dns_response ==
+               Some GeneratedUncompressedAnswer)
+
 let boundary_accepts_compressed_answer_name_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_compressed_answer_name_dns_response ==
                parse_dns_packet_bytes valid_compressed_answer_name_dns_response)
 
 let boundary_generated_subset_covers_compressed_answer_name_test =
   assert_norm (everparse_boundary_generated_subset_applicable valid_compressed_answer_name_dns_response == true)
+
+let boundary_generated_subset_classifies_compressed_answer_name_test =
+  assert_norm (classify_generated_subset valid_compressed_answer_name_dns_response ==
+               Some GeneratedCompressedOwner)
 
 let boundary_accepts_compressed_answer_name_suffix_pointer_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_compressed_answer_name_suffix_dns_response ==
@@ -2852,6 +2860,10 @@ let boundary_accepts_edns0_opt_test =
 
 let boundary_generated_subset_covers_edns0_opt_test =
   assert_norm (everparse_boundary_generated_subset_applicable valid_edns0_opt_dns_query == true)
+
+let boundary_generated_subset_classifies_edns0_opt_test =
+  assert_norm (classify_generated_subset valid_edns0_opt_dns_query ==
+               Some GeneratedEdns0Opt)
 
 let boundary_rejects_nonroot_edns0_opt_test =
   assert_norm (parse_dns_packet_bytes_at_boundary nonroot_edns0_opt_dns_query ==
@@ -2911,6 +2923,10 @@ let boundary_accepts_compressed_name_rdata_test =
 let boundary_generated_subset_covers_compressed_name_rdata_test =
   assert_norm (everparse_boundary_generated_subset_applicable compressed_name_rdata_dns_response == true)
 
+let boundary_generated_subset_classifies_compressed_name_rdata_test =
+  assert_norm (classify_generated_subset compressed_name_rdata_dns_response ==
+               Some GeneratedCompressedNameRdata)
+
 let boundary_accepts_compressed_name_rdata_suffix_pointer_test =
   assert_norm (parse_dns_packet_bytes_at_boundary compressed_name_rdata_suffix_dns_response ==
                parse_dns_packet_bytes compressed_name_rdata_suffix_dns_response)
@@ -2951,6 +2967,10 @@ let boundary_accepts_compressed_mx_exchange_test =
 let boundary_generated_subset_covers_compressed_mx_exchange_test =
   assert_norm (everparse_boundary_generated_subset_applicable compressed_mx_exchange_dns_response == true)
 
+let boundary_generated_subset_classifies_compressed_mx_exchange_test =
+  assert_norm (classify_generated_subset compressed_mx_exchange_dns_response ==
+               Some GeneratedCompressedMx)
+
 let boundary_accepts_compressed_mx_exchange_suffix_pointer_test =
   assert_norm (parse_dns_packet_bytes_at_boundary compressed_mx_exchange_suffix_dns_response ==
                parse_dns_packet_bytes compressed_mx_exchange_suffix_dns_response)
@@ -2987,6 +3007,10 @@ let boundary_accepts_compressed_soa_mname_test =
 let boundary_generated_subset_covers_compressed_soa_mname_test =
   assert_norm (everparse_boundary_generated_subset_applicable compressed_soa_mname_dns_response == true)
 
+let boundary_generated_subset_classifies_compressed_soa_mname_test =
+  assert_norm (classify_generated_subset compressed_soa_mname_dns_response ==
+               Some GeneratedCompressedSoaOneName)
+
 let boundary_accepts_compressed_soa_mname_suffix_pointer_test =
   assert_norm (parse_dns_packet_bytes_at_boundary compressed_soa_mname_suffix_dns_response ==
                parse_dns_packet_bytes compressed_soa_mname_suffix_dns_response)
@@ -3018,6 +3042,10 @@ let boundary_accepts_compressed_both_soa_names_test =
 
 let boundary_generated_subset_covers_compressed_both_soa_names_test =
   assert_norm (everparse_boundary_generated_subset_applicable compressed_both_soa_names_dns_response == true)
+
+let boundary_generated_subset_classifies_compressed_both_soa_names_test =
+  assert_norm (classify_generated_subset compressed_both_soa_names_dns_response ==
+               Some GeneratedCompressedSoaBothNames)
 
 let boundary_accepts_compressed_both_soa_names_suffix_pointers_test =
   assert_norm (parse_dns_packet_bytes_at_boundary compressed_both_soa_names_suffix_dns_response ==
@@ -3082,6 +3110,10 @@ let boundary_accepts_compressed_srv_target_test =
 
 let boundary_generated_subset_covers_compressed_srv_target_test =
   assert_norm (everparse_boundary_generated_subset_applicable compressed_srv_target_dns_response == true)
+
+let boundary_generated_subset_classifies_compressed_srv_target_test =
+  assert_norm (classify_generated_subset compressed_srv_target_dns_response ==
+               Some GeneratedCompressedSrv)
 
 let boundary_accepts_compressed_srv_target_suffix_pointer_test =
   assert_norm (parse_dns_packet_bytes_at_boundary compressed_srv_target_suffix_dns_response ==
@@ -3150,6 +3182,8 @@ let generated_subset_equivalence_acceptance_lemma_smoke_test =
 let generated_subset_equivalence_rejection_lemma_smoke_test =
   assert_norm (everparse_boundary_generated_subset_applicable
                  truncated_edns_option_header_dns_query == true);
+  assert_norm (classify_generated_subset truncated_edns_option_header_dns_query ==
+               Some GeneratedEdns0Opt);
   assert_norm (parse_dns_packet_bytes truncated_edns_option_header_dns_query == None);
   lemma_generated_subset_rejects_reference_rejection
     truncated_edns_option_header_dns_query

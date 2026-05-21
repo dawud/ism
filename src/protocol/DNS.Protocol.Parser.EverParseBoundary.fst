@@ -81,16 +81,47 @@ let everparse_generated_compressed_answer_name_rr_gate_active_at_boundary : bool
 let everparse_generated_edns0_opt_additional_rr_gate_active_at_boundary : bool =
   everparse_generated_edns0_opt_additional_rr_gate_active
 
+type generated_subset_case =
+  | GeneratedQuestionOnly
+  | GeneratedUncompressedAnswer
+  | GeneratedCompressedOwner
+  | GeneratedCompressedNameRdata
+  | GeneratedCompressedMx
+  | GeneratedCompressedSoaBothNames
+  | GeneratedCompressedSoaOneName
+  | GeneratedCompressedSrv
+  | GeneratedEdns0Opt
+
+val classify_generated_subset :
+  input:list FStar.UInt8.t ->
+  Tot (option generated_subset_case)
+
+let classify_generated_subset input =
+  if generated_uncompressed_question_subset_applicable input then
+    Some GeneratedQuestionOnly
+  else if generated_uncompressed_question_answer_packet_subset_applicable input then
+    Some GeneratedUncompressedAnswer
+  else if generated_compressed_answer_name_packet_subset_applicable input then
+    Some GeneratedCompressedOwner
+  else if generated_compressed_name_rdata_packet_subset_applicable input then
+    Some GeneratedCompressedNameRdata
+  else if generated_compressed_mx_packet_subset_applicable input then
+    Some GeneratedCompressedMx
+  else if generated_compressed_both_soa_packet_subset_applicable input then
+    Some GeneratedCompressedSoaBothNames
+  else if generated_compressed_soa_packet_subset_applicable input then
+    Some GeneratedCompressedSoaOneName
+  else if generated_compressed_srv_packet_subset_applicable input then
+    Some GeneratedCompressedSrv
+  else if generated_edns0_opt_additional_packet_subset_applicable input then
+    Some GeneratedEdns0Opt
+  else
+    None
+
 let everparse_boundary_generated_subset_applicable (input:list FStar.UInt8.t) : bool =
-  generated_uncompressed_question_subset_applicable input ||
-  generated_uncompressed_question_answer_packet_subset_applicable input ||
-  generated_compressed_answer_name_packet_subset_applicable input ||
-  generated_compressed_name_rdata_packet_subset_applicable input ||
-  generated_compressed_mx_packet_subset_applicable input ||
-  generated_compressed_both_soa_packet_subset_applicable input ||
-  generated_compressed_soa_packet_subset_applicable input ||
-  generated_compressed_srv_packet_subset_applicable input ||
-  generated_edns0_opt_additional_packet_subset_applicable input
+  match classify_generated_subset input with
+  | Some _ -> true
+  | None -> false
 
 val parse_dns_packet_bytes_at_boundary :
   input:list FStar.UInt8.t ->

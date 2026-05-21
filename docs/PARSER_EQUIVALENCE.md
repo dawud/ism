@@ -30,34 +30,37 @@ malformed packet examples.
 
 ## Generated Subset
 
-The generated validator gate currently covers:
+The generated validator gate is classified by `classify_generated_subset`.
+The current cases are:
 
-- question-only packets with bounded uncompressed QNAMEs;
-- one-question/one-answer packets with bounded uncompressed question and owner
-  names;
+- `GeneratedQuestionOnly`: question-only packets with bounded uncompressed
+  QNAMEs;
+- `GeneratedUncompressedAnswer`: one-question/one-answer packets with bounded
+  uncompressed question and owner names;
 - raw bounded RDATA;
 - generated A/AAAA fixed-RDLENGTH checks;
 - generated NS/CNAME/PTR name-RDATA shape checks for uncompressed names;
-- generated NS/CNAME/PTR compressed name-RDATA checks for pointer offsets that
-  resolve to prior valid message names;
+- `GeneratedCompressedOwner`: RR owner-name compression checks for pointer
+  offsets that resolve to prior valid message names;
+- `GeneratedCompressedNameRdata`: NS/CNAME/PTR compressed name-RDATA checks
+  for pointer offsets that resolve to prior valid message names;
 - generated MX exchange-name shape checks for uncompressed names;
-- generated MX compressed exchange-name checks for pointer offsets that resolve
-  to prior valid message names;
+- `GeneratedCompressedMx`: MX compressed exchange-name checks for pointer
+  offsets that resolve to prior valid message names;
 - generated SOA mname/rname/timer shape checks for uncompressed names;
-- generated SOA compressed mname/rname checks for pointer offsets that resolve
-  to prior valid message names when the other SOA name is uncompressed;
-- generated SOA both-compressed mname/rname checks for pointer offsets that
-  resolve to prior valid message names;
+- `GeneratedCompressedSoaOneName`: SOA compressed mname/rname checks for
+  pointer offsets that resolve to prior valid message names when the other SOA
+  name is uncompressed;
+- `GeneratedCompressedSoaBothNames`: SOA both-compressed mname/rname checks for
+  pointer offsets that resolve to prior valid message names;
 - generated SRV target-name shape checks for uncompressed names;
-- generated SRV compressed target-name checks for pointer offsets that resolve
-  to prior valid message names;
+- `GeneratedCompressedSrv`: SRV compressed target-name checks for pointer
+  offsets that resolve to prior valid message names;
 - generated TXT character-string shape checks;
-- generated RR owner-name compression checks for pointer offsets that resolve
-  to prior valid message names;
-- generated EDNS0 OPT additional-RR checks for root-owner/version-0 shape and
-  structurally bounded option headers/data.
+- `GeneratedEdns0Opt`: EDNS0 OPT additional-RR checks for root-owner/version-0
+  shape and structurally bounded option headers/data.
 
-The generated-subset predicate is:
+The generated-subset predicate is derived from the classifier:
 
 - `everparse_boundary_generated_subset_applicable`
 
