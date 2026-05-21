@@ -2970,9 +2970,15 @@ let boundary_rejects_truncated_rdata_test =
   assert_norm (parse_dns_packet_bytes_at_boundary truncated_rdata_dns_response ==
                parse_dns_packet_bytes truncated_rdata_dns_response)
 
-let boundary_accepts_unknown_rr_type_test =
+let boundary_rejects_reference_only_unknown_rr_type_test =
+  assert_norm (parse_dns_packet_bytes unknown_rr_type_dns_response <>
+               None);
   assert_norm (parse_dns_packet_bytes_at_boundary unknown_rr_type_dns_response ==
-               parse_dns_packet_bytes unknown_rr_type_dns_response)
+               None);
+  assert_norm (everparse_boundary_generated_subset_applicable unknown_rr_type_dns_response == false);
+  assert_norm (reference_only_acceptance_applicable unknown_rr_type_dns_response == true);
+  assert_norm (classify_reference_only_acceptance unknown_rr_type_dns_response ==
+               Some ReferenceOnlyAnswerWithoutQuestion)
 
 let boundary_rejects_invalid_a_rdata_length_test =
   assert_norm (parse_dns_packet_bytes_at_boundary invalid_a_rdata_length_dns_response ==
@@ -2982,17 +2988,21 @@ let boundary_rejects_invalid_aaaa_rdata_length_test =
   assert_norm (parse_dns_packet_bytes_at_boundary invalid_aaaa_rdata_length_dns_response ==
                parse_dns_packet_bytes invalid_aaaa_rdata_length_dns_response)
 
-let boundary_reference_only_accepts_answer_without_question_test =
+let boundary_rejects_reference_only_answer_without_question_test =
+  assert_norm (parse_dns_packet_bytes serialized_a_answer_response <>
+               None);
   assert_norm (parse_dns_packet_bytes_at_boundary serialized_a_answer_response ==
-               parse_dns_packet_bytes serialized_a_answer_response);
+               None);
   assert_norm (everparse_boundary_generated_subset_applicable serialized_a_answer_response == false);
   assert_norm (reference_only_acceptance_applicable serialized_a_answer_response == true);
   assert_norm (classify_reference_only_acceptance serialized_a_answer_response ==
                Some ReferenceOnlyAnswerWithoutQuestion)
 
-let boundary_reference_only_accepts_multiple_questions_test =
+let boundary_rejects_reference_only_multiple_questions_test =
+  assert_norm (parse_dns_packet_bytes valid_two_question_dns_query <>
+               None);
   assert_norm (parse_dns_packet_bytes_at_boundary valid_two_question_dns_query ==
-               parse_dns_packet_bytes valid_two_question_dns_query);
+               None);
   assert_norm (everparse_boundary_generated_subset_applicable valid_two_question_dns_query == false);
   assert_norm (reference_only_acceptance_applicable valid_two_question_dns_query == true);
   assert_norm (classify_reference_only_acceptance valid_two_question_dns_query ==
@@ -3007,17 +3017,21 @@ let boundary_generated_subset_covers_multiple_answers_test =
                Some GeneratedUncompressedTwoAAnswers);
   assert_norm (classify_reference_only_acceptance valid_two_answer_dns_response == None)
 
-let boundary_reference_only_accepts_authority_record_test =
+let boundary_rejects_reference_only_authority_record_test =
+  assert_norm (parse_dns_packet_bytes valid_authority_ns_dns_response <>
+               None);
   assert_norm (parse_dns_packet_bytes_at_boundary valid_authority_ns_dns_response ==
-               parse_dns_packet_bytes valid_authority_ns_dns_response);
+               None);
   assert_norm (everparse_boundary_generated_subset_applicable valid_authority_ns_dns_response == false);
   assert_norm (reference_only_acceptance_applicable valid_authority_ns_dns_response == true);
   assert_norm (classify_reference_only_acceptance valid_authority_ns_dns_response ==
                Some ReferenceOnlyAuthorityRecords)
 
-let boundary_reference_only_accepts_nonopt_additional_record_test =
+let boundary_rejects_reference_only_nonopt_additional_record_test =
+  assert_norm (parse_dns_packet_bytes valid_nonopt_additional_dns_response <>
+               None);
   assert_norm (parse_dns_packet_bytes_at_boundary valid_nonopt_additional_dns_response ==
-               parse_dns_packet_bytes valid_nonopt_additional_dns_response);
+               None);
   assert_norm (everparse_boundary_generated_subset_applicable valid_nonopt_additional_dns_response == false);
   assert_norm (reference_only_acceptance_applicable valid_nonopt_additional_dns_response == true);
   assert_norm (classify_reference_only_acceptance valid_nonopt_additional_dns_response ==
@@ -3330,6 +3344,8 @@ let boundary_backend_status_test =
                everparse_generated_edns0_opt_additional_rr_gate_active_at_boundary == true)
 
 let boundary_equivalence_acceptance_lemma_smoke_test =
+  assert_norm (everparse_boundary_generated_subset_applicable
+                 valid_single_question_dns_query == true);
   assert_norm (parse_dns_packet_bytes valid_single_question_dns_query ==
                Some valid_single_question_dns_packet);
   lemma_boundary_accepts_reference_result

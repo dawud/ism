@@ -6,18 +6,25 @@ parser and the EverParse-generated production-target boundary.
 ## Current Boundary
 
 The active parser boundary is `EverParseGeneratedSubset` in
-`DNS.Protocol.Parser.EverParseBoundary`. The boundary routes packet construction
-through `parse_dns_packet_bytes_generated`, and the repository keeps the
-reference parser result as the semantic contract:
+`DNS.Protocol.Parser.EverParseBoundary`. The boundary uses the generated-subset
+classifier as the production acceptance gate. Packets inside the generated
+subset are constructed through `parse_dns_packet_bytes_generated`, which still
+uses the handwritten parser as the semantic construction layer. Packets outside
+the generated subset are rejected by the production boundary even if the
+handwritten reference parser can parse them.
 
-- `parse_dns_packet_bytes_at_boundary input == parse_dns_packet_bytes input`
-- reference acceptance implies boundary acceptance;
-- reference rejection implies boundary rejection.
+The boundary contract is now:
+
+- for generated-subset packets,
+  `parse_dns_packet_bytes_at_boundary input == parse_dns_packet_bytes input`;
+- for packets outside the generated subset,
+  `parse_dns_packet_bytes_at_boundary input == None`;
+- reference rejection still implies boundary rejection.
 
 Those obligations are named in:
 
-- `lemma_boundary_matches_reference`
 - `lemma_boundary_matches_reference_on_generated_subset`
+- `lemma_boundary_rejects_outside_generated_subset`
 - `lemma_generated_subset_accepts_reference_result`
 - `lemma_generated_subset_rejects_reference_rejection`
 - `lemma_boundary_accepts_reference_result`
@@ -67,16 +74,15 @@ The generated-subset predicate is derived from the classifier:
 - `everparse_boundary_generated_subset_applicable`
 
 Examples outside that generated validator subset may still be accepted by the
-active boundary when the reference parser accepts them. These cases remain part
-of the handwritten reference-parser construction path until the generated
-grammar grows equivalent coverage.
+handwritten reference parser, but they are rejected by the production boundary
+until the generated grammar grows equivalent coverage.
 
 ## Reference-Only Accepted Shapes
 
-The reference-only fallback surface is classified by
+The reference-only acceptance surface is classified by
 `classify_reference_only_acceptance`. These are packets accepted by the
-handwritten reference parser and active boundary, but not covered by the current
-generated validator subset:
+handwritten reference parser, but rejected by the active production boundary
+because they are not covered by the current generated validator subset:
 
 - `ReferenceOnlyAnswerWithoutQuestion`: response packets with answer records
   and no question section;
@@ -89,9 +95,9 @@ generated validator subset:
 - `ReferenceOnlyOtherAcceptedShape`: a catch-all for accepted reference-parser
   shapes not otherwise classified.
 
-The parser tests include representative accepted fixtures for each named
-non-catch-all case and assert that the boundary still matches the reference
-parser while `everparse_boundary_generated_subset_applicable` is false.
+The parser tests include representative accepted-reference fixtures for each
+named non-catch-all case and assert that the production boundary rejects them
+while `everparse_boundary_generated_subset_applicable` is false.
 
 ## Production Gap
 
@@ -103,8 +109,9 @@ Phase 1 is not production-complete until one of these is true:
   handwritten parser as a verified reference construction layer behind a
   generated validator gate.
 
-Until then, the handwritten parser remains the bootstrap/reference parser, and
-EverParse is the production-target validator subset. The current proof-backed
-coexistence contract is intentionally narrower than replacement: generated
-validators gate covered wire shapes, while the handwritten parser still
-constructs the packet value that downstream verified code consumes.
+The current production policy uses the second option in narrow form: generated
+validators gate the accepted wire shapes, while the handwritten parser still
+constructs the packet value that downstream verified code consumes for those
+covered shapes. The handwritten parser remains available as the
+bootstrap/reference parser, but reference-only accepted shapes are no longer
+accepted at the active production boundary.

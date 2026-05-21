@@ -171,7 +171,10 @@ val parse_dns_packet_bytes_at_boundary :
   Tot (option dns_packet)
 
 let parse_dns_packet_bytes_at_boundary input =
-  parse_dns_packet_bytes_generated input
+  if everparse_boundary_generated_subset_applicable input then
+    parse_dns_packet_bytes_generated input
+  else
+    None
 
 val validate_dns_packet_bytes_at_boundary :
   input:list FStar.UInt8.t ->
@@ -182,21 +185,20 @@ let validate_dns_packet_bytes_at_boundary input =
   | Some _ -> true
   | None -> false
 
-val lemma_boundary_matches_reference :
-  input:list FStar.UInt8.t ->
-  Lemma (ensures (parse_dns_packet_bytes_at_boundary input ==
-                  parse_dns_packet_bytes input))
-
-let lemma_boundary_matches_reference input =
-  lemma_generated_matches_reference input
-
 val lemma_boundary_matches_reference_on_generated_subset :
   input:list FStar.UInt8.t{everparse_boundary_generated_subset_applicable input == true} ->
   Lemma (ensures (parse_dns_packet_bytes_at_boundary input ==
                   parse_dns_packet_bytes input))
 
 let lemma_boundary_matches_reference_on_generated_subset input =
-  lemma_boundary_matches_reference input
+  lemma_generated_matches_reference input
+
+val lemma_boundary_rejects_outside_generated_subset :
+  input:list FStar.UInt8.t{everparse_boundary_generated_subset_applicable input == false} ->
+  Lemma (ensures (parse_dns_packet_bytes_at_boundary input == None))
+
+let lemma_boundary_rejects_outside_generated_subset input =
+  ()
 
 val lemma_generated_subset_accepts_reference_result :
   input:list FStar.UInt8.t{everparse_boundary_generated_subset_applicable input == true} ->
@@ -216,13 +218,13 @@ let lemma_generated_subset_rejects_reference_rejection input =
   lemma_boundary_matches_reference_on_generated_subset input
 
 val lemma_boundary_accepts_reference_result :
-  input:list FStar.UInt8.t ->
+  input:list FStar.UInt8.t{everparse_boundary_generated_subset_applicable input == true} ->
   p:dns_packet ->
   Lemma (requires (parse_dns_packet_bytes input == Some p))
         (ensures (parse_dns_packet_bytes_at_boundary input == Some p))
 
 let lemma_boundary_accepts_reference_result input p =
-  lemma_boundary_matches_reference input
+  lemma_boundary_matches_reference_on_generated_subset input
 
 val lemma_boundary_rejects_reference_rejection :
   input:list FStar.UInt8.t ->
@@ -230,4 +232,7 @@ val lemma_boundary_rejects_reference_rejection :
         (ensures (parse_dns_packet_bytes_at_boundary input == None))
 
 let lemma_boundary_rejects_reference_rejection input =
-  lemma_boundary_matches_reference input
+  if everparse_boundary_generated_subset_applicable input then
+    lemma_generated_matches_reference input
+  else
+    ()

@@ -2178,7 +2178,7 @@ let validate_generated_subset_gate_buffer buffer len bytes =
   else if generated_uncompressed_question_subset_applicable bytes then
     validate_generated_uncompressed_question_subset_buffer buffer len bytes
   else
-    true
+    false
 
 val read_buffer_range :
   buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
