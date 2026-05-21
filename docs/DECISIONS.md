@@ -306,3 +306,27 @@ extern-friendly Rust `staticlib` wrapper and links it from C using only
 state-modeling path, but the Rust promotion path should favor
 extraction-supported value-state APIs unless Pulse reference runtime support is
 proven.
+
+## DR-0015: Defer Aeneas Until a Concrete Rust Audit Use Case Exists
+
+**Status:** Accepted
+
+**Context:** Aeneas verifies Rust programs by translating Rust, through Charon
+LLBC, into functional representations for proof assistants including F*. This
+direction is useful for Rust-first code, while this project's main verification
+direction remains F*/Pulse to extracted Rust. Running Aeneas over generated Rust
+would not replace the source F* proof or prove the extraction pipeline itself.
+
+**Decision:** Do not add Aeneas to the active toolset, CI, or build gates yet.
+Keep it as a possible future audit tool for small, Rust-first boundary code
+only, such as handwritten extern wrappers, status/result mapping, buffer
+capacity checks, and panic-free adapter logic around extracted Rust. Revisit
+Aeneas only when there is a clear, realistic, and practical use case with a
+small target module and concrete properties worth proving.
+
+**Consequences:** Aeneas work should not appear as an active TODO, and the
+project should not spend toolchain or CI budget on it speculatively. If a future
+Rust shell adapter or Pulse/Rust wrapper introduces enough handwritten safe Rust
+to justify additional proof effort, evaluate Aeneas in the migration lane first
+and keep the trusted-boundary inventory current if the evaluation adds any new
+adapter assumptions.
