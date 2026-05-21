@@ -935,6 +935,101 @@ let generated_uncompressed_question_answer_packet_subset_applicable input =
          L.length input = 26 + qname_length + rr_name_length + rdata_length)
   | None -> false
 
+val generated_uncompressed_question_two_a_answer_packet_fields :
+  input:list FStar.UInt8.t ->
+  Tot (option (generated_dns_name_length * generated_dns_name_length * generated_dns_name_length))
+
+let generated_uncompressed_question_two_a_answer_packet_fields input =
+  match parse_header_bytes input with
+  | Some (h, after_header) ->
+      if FStar.UInt16.v h.qdcount = 1 &&
+         FStar.UInt16.v h.ancount = 2 &&
+         FStar.UInt16.v h.nscount = 0 &&
+         FStar.UInt16.v h.arcount = 0 then
+        match DNS.Name.parse_qname 128 after_header with
+        | Some (question_name, question_tail) ->
+            DNS.Name.lemma_parser_rejecting 128 after_header;
+            let qname_length_nat = DNS.Name.dns_name_length question_name in
+            assert (qname_length_nat > 0);
+            assert (qname_length_nat <= 255);
+            if L.length question_tail < 4 then
+              None
+            else
+              let (_, after_question) = L.splitAt 4 question_tail in
+              begin match DNS.Name.parse_qname 128 after_question with
+              | Some (first_rr_name, first_rr_tail) ->
+                  DNS.Name.lemma_parser_rejecting 128 after_question;
+                  let first_rr_name_length_nat =
+                    DNS.Name.dns_name_length first_rr_name in
+                  assert (first_rr_name_length_nat > 0);
+                  assert (first_rr_name_length_nat <= 255);
+                  begin match first_rr_tail with
+                  | rt_hi :: rt_lo ::
+                    _rc_hi :: _rc_lo ::
+                    _ttl_0 :: _ttl_1 :: _ttl_2 :: _ttl_3 ::
+                    rdlen_hi :: rdlen_lo ::
+                    _rdata_0 :: _rdata_1 :: _rdata_2 :: _rdata_3 ::
+                    after_first_answer ->
+                      let rr_type = FStar.UInt16.v (u16_from_be rt_hi rt_lo) in
+                      let rdata_length =
+                        FStar.UInt16.v (u16_from_be rdlen_hi rdlen_lo) in
+                      if rr_type = 1 && rdata_length = 4 then
+                        begin match DNS.Name.parse_qname 128 after_first_answer with
+                        | Some (second_rr_name, second_rr_tail) ->
+                            DNS.Name.lemma_parser_rejecting 128 after_first_answer;
+                            let second_rr_name_length_nat =
+                              DNS.Name.dns_name_length second_rr_name in
+                            assert (second_rr_name_length_nat > 0);
+                            assert (second_rr_name_length_nat <= 255);
+                            begin match second_rr_tail with
+                            | rt2_hi :: rt2_lo ::
+                              _rc2_hi :: _rc2_lo ::
+                              _ttl2_0 :: _ttl2_1 :: _ttl2_2 :: _ttl2_3 ::
+                              rdlen2_hi :: rdlen2_lo ::
+                              _rdata2_0 :: _rdata2_1 :: _rdata2_2 :: _rdata2_3 :: [] ->
+                                let rr2_type =
+                                  FStar.UInt16.v (u16_from_be rt2_hi rt2_lo) in
+                                let rdata2_length =
+                                  FStar.UInt16.v (u16_from_be rdlen2_hi rdlen2_lo) in
+                                if rr2_type = 1 && rdata2_length = 4 then
+                                  let qn:generated_dns_name_length = qname_length_nat in
+                                  let first:generated_dns_name_length =
+                                    first_rr_name_length_nat in
+                                  let second:generated_dns_name_length =
+                                    second_rr_name_length_nat in
+                                  Some (qn, first, second)
+                                else
+                                  None
+                            | _ -> None
+                            end
+                        | None -> None
+                        end
+                      else
+                        None
+                  | _ -> None
+                  end
+              | None -> None
+              end
+        | None -> None
+      else
+        None
+  | None -> None
+
+val generated_uncompressed_question_two_a_answer_packet_subset_applicable :
+  input:list FStar.UInt8.t ->
+  Tot bool
+
+let generated_uncompressed_question_two_a_answer_packet_subset_applicable input =
+  match generated_uncompressed_question_two_a_answer_packet_fields input with
+  | Some (qname_length, first_rr_name_length, second_rr_name_length) ->
+      qname_length > 0 &&
+      qname_length <= 255 &&
+      first_rr_name_length > 0 &&
+      first_rr_name_length <= 255 &&
+      second_rr_name_length > 0 &&
+      second_rr_name_length <= 255
+  | None -> false
+
 val generated_compressed_answer_name_packet_fields :
   input:list FStar.UInt8.t ->
   Tot (option (generated_dns_name_length * nat * nat * nat * nat))
@@ -1701,6 +1796,45 @@ let validate_generated_uncompressed_question_answer_packet_subset_buffer buffer 
   | None ->
       false
 
+val validate_generated_uncompressed_question_two_a_answer_packet_subset_buffer :
+  buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
+  len:FStar.UInt32.t ->
+  bytes:list FStar.UInt8.t{
+    L.length bytes == FStar.UInt32.v len /\
+    generated_uncompressed_question_two_a_answer_packet_subset_applicable bytes == true
+  } ->
+  Stack bool
+    (requires (fun h0 ->
+      LowStar.Buffer.live h0 buffer /\
+      FStar.UInt32.v len <= LowStar.Buffer.length buffer))
+    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+
+let validate_generated_uncompressed_question_two_a_answer_packet_subset_buffer buffer len bytes =
+  match generated_uncompressed_question_two_a_answer_packet_fields bytes with
+  | Some (qname_length_nat, first_rr_name_length_nat, second_rr_name_length_nat) ->
+      assert (qname_length_nat > 0);
+      assert (qname_length_nat <= 255);
+      assert (first_rr_name_length_nat > 0);
+      assert (first_rr_name_length_nat <= 255);
+      assert (second_rr_name_length_nat > 0);
+      assert (second_rr_name_length_nat <= 255);
+      let qname_length = FStar.UInt32.uint_to_t qname_length_nat in
+      assert (FStar.UInt32.v qname_length == qname_length_nat);
+      let first_rr_name_length =
+        FStar.UInt32.uint_to_t first_rr_name_length_nat in
+      assert (FStar.UInt32.v first_rr_name_length == first_rr_name_length_nat);
+      let second_rr_name_length =
+        FStar.UInt32.uint_to_t second_rr_name_length_nat in
+      assert (FStar.UInt32.v second_rr_name_length == second_rr_name_length_nat);
+      EPR.check_dns_uncompressed_question_two_a_answer_packet
+        qname_length
+        first_rr_name_length
+        second_rr_name_length
+        buffer
+        len
+  | None ->
+      false
+
 val validate_generated_compressed_answer_name_packet_subset_buffer :
   buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
   len:FStar.UInt32.t ->
@@ -2037,6 +2171,8 @@ let validate_generated_subset_gate_buffer buffer len bytes =
     validate_generated_compressed_soa_packet_subset_buffer buffer len bytes
   else if generated_compressed_srv_packet_subset_applicable bytes then
     validate_generated_compressed_srv_packet_subset_buffer buffer len bytes
+  else if generated_uncompressed_question_two_a_answer_packet_subset_applicable bytes then
+    validate_generated_uncompressed_question_two_a_answer_packet_subset_buffer buffer len bytes
   else if generated_uncompressed_question_answer_packet_subset_applicable bytes then
     validate_generated_uncompressed_question_answer_packet_subset_buffer buffer len bytes
   else if generated_uncompressed_question_subset_applicable bytes then

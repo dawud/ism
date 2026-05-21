@@ -39,6 +39,8 @@ The current cases are:
   uncompressed question and owner names;
 - raw bounded RDATA;
 - generated A/AAAA fixed-RDLENGTH checks;
+- `GeneratedUncompressedTwoAAnswers`: one-question/two-answer packets where
+  both answers have bounded uncompressed owner names and A RDATA;
 - generated NS/CNAME/PTR name-RDATA shape checks for uncompressed names;
 - `GeneratedCompressedOwner`: RR owner-name compression checks for pointer
   offsets that resolve to prior valid message names;
@@ -79,7 +81,8 @@ generated validator subset:
 - `ReferenceOnlyAnswerWithoutQuestion`: response packets with answer records
   and no question section;
 - `ReferenceOnlyMultipleQuestions`: packets with more than one question;
-- `ReferenceOnlyMultipleAnswers`: packets with more than one answer record;
+- `ReferenceOnlyMultipleAnswers`: packets with more than one answer record
+  outside the generated two-A-answer subset;
 - `ReferenceOnlyAuthorityRecords`: packets with non-empty authority sections;
 - `ReferenceOnlyAdditionalRecords`: packets with additional records outside the
   current generated EDNS0 OPT-only additional subset;

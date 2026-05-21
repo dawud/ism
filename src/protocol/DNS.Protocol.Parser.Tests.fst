@@ -439,6 +439,11 @@ let valid_two_answer_parse_packet_test =
         L.length p.additionals == 0
     | None -> false)
 
+let generated_two_a_answer_gate_accepts_valid_test =
+  assert_norm (
+    generated_uncompressed_question_two_a_answer_packet_subset_applicable
+      valid_two_answer_dns_response == true)
+
 let valid_authority_ns_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -2993,13 +2998,14 @@ let boundary_reference_only_accepts_multiple_questions_test =
   assert_norm (classify_reference_only_acceptance valid_two_question_dns_query ==
                Some ReferenceOnlyMultipleQuestions)
 
-let boundary_reference_only_accepts_multiple_answers_test =
+let boundary_generated_subset_covers_multiple_answers_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_two_answer_dns_response ==
                parse_dns_packet_bytes valid_two_answer_dns_response);
-  assert_norm (everparse_boundary_generated_subset_applicable valid_two_answer_dns_response == false);
-  assert_norm (reference_only_acceptance_applicable valid_two_answer_dns_response == true);
-  assert_norm (classify_reference_only_acceptance valid_two_answer_dns_response ==
-               Some ReferenceOnlyMultipleAnswers)
+  assert_norm (everparse_boundary_generated_subset_applicable valid_two_answer_dns_response == true);
+  assert_norm (reference_only_acceptance_applicable valid_two_answer_dns_response == false);
+  assert_norm (classify_generated_subset valid_two_answer_dns_response ==
+               Some GeneratedUncompressedTwoAAnswers);
+  assert_norm (classify_reference_only_acceptance valid_two_answer_dns_response == None)
 
 let boundary_reference_only_accepts_authority_record_test =
   assert_norm (parse_dns_packet_bytes_at_boundary valid_authority_ns_dns_response ==
@@ -3309,6 +3315,7 @@ let boundary_backend_status_test =
                everparse_generated_uncompressed_question_gate_active_at_boundary == true /\
                everparse_generated_single_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_a_aaaa_answer_rr_gate_active_at_boundary == true /\
+               everparse_generated_two_a_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_name_rdata_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_compressed_name_rdata_answer_rr_gate_active_at_boundary == true /\
                everparse_generated_mx_answer_rr_gate_active_at_boundary == true /\

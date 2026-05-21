@@ -35,6 +35,8 @@ let everparse_generated_single_answer_rr_gate_active : bool = true
 
 let everparse_generated_a_aaaa_answer_rr_gate_active : bool = true
 
+let everparse_generated_two_a_answer_rr_gate_active : bool = true
+
 let everparse_generated_name_rdata_answer_rr_gate_active : bool = true
 
 let everparse_generated_compressed_name_rdata_answer_rr_gate_active : bool = true

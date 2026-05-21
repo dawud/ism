@@ -45,6 +45,9 @@ let everparse_generated_single_answer_rr_gate_active_at_boundary : bool =
 let everparse_generated_a_aaaa_answer_rr_gate_active_at_boundary : bool =
   everparse_generated_a_aaaa_answer_rr_gate_active
 
+let everparse_generated_two_a_answer_rr_gate_active_at_boundary : bool =
+  everparse_generated_two_a_answer_rr_gate_active
+
 let everparse_generated_name_rdata_answer_rr_gate_active_at_boundary : bool =
   everparse_generated_name_rdata_answer_rr_gate_active
 
@@ -84,6 +87,7 @@ let everparse_generated_edns0_opt_additional_rr_gate_active_at_boundary : bool =
 type generated_subset_case =
   | GeneratedQuestionOnly
   | GeneratedUncompressedAnswer
+  | GeneratedUncompressedTwoAAnswers
   | GeneratedCompressedOwner
   | GeneratedCompressedNameRdata
   | GeneratedCompressedMx
@@ -99,6 +103,8 @@ val classify_generated_subset :
 let classify_generated_subset input =
   if generated_uncompressed_question_subset_applicable input then
     Some GeneratedQuestionOnly
+  else if generated_uncompressed_question_two_a_answer_packet_subset_applicable input then
+    Some GeneratedUncompressedTwoAAnswers
   else if generated_uncompressed_question_answer_packet_subset_applicable input then
     Some GeneratedUncompressedAnswer
   else if generated_compressed_answer_name_packet_subset_applicable input then

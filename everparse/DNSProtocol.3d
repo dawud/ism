@@ -1,13 +1,14 @@
 // DNS wire-format seed for the EverParse production parser boundary.
 // This starts with fixed-size RFC 1035 header validation, bounded
-// uncompressed QNAME question validation, a first single-answer RR subset, and
-// fixed-RDLENGTH A/AAAA answer subsets, first name-RDATA answer subsets, the
-// first MX answer subset, the first SOA answer subset, the first SRV answer
-// subset, the first TXT answer subset, the first EDNS0 OPT additional-RR
-// subset, the first compressed-owner answer subset, the first compressed
-// name-RDATA answer subset, the first compressed MX exchange answer subset,
-// the first compressed SOA name answer subsets, the first both-compressed SOA
-// name answer subset, and the first compressed SRV target answer subset.
+// uncompressed QNAME question validation, a first single-answer RR subset,
+// fixed-RDLENGTH A/AAAA answer subsets, a two-A-answer subset, first name-RDATA
+// answer subsets, the first MX answer subset, the first SOA answer subset, the
+// first SRV answer subset, the first TXT answer subset, the first EDNS0 OPT
+// additional-RR subset, the first compressed-owner answer subset, the first
+// compressed name-RDATA answer subset, the first compressed MX exchange answer
+// subset, the first compressed SOA name answer subsets, the first
+// both-compressed SOA name answer subset, and the first compressed SRV target
+// answer subset.
 // Broader RR-section validation remains in the handwritten reference parser
 // until the generated boundary is expanded.
 
@@ -166,6 +167,41 @@ where qname_length >= 1 && qname_length <= 255 &&
   UINT16BE rdlength { rdlength == 16 };
   UINT8 rdata[16];
 } dns_uncompressed_question_aaaa_answer_packet;
+
+entrypoint typedef struct _dns_uncompressed_question_two_a_answer_packet (
+  UINT32 qname_length,
+  UINT32 first_rr_name_length,
+  UINT32 second_rr_name_length
+)
+where qname_length >= 1 && qname_length <= 255 &&
+      first_rr_name_length >= 1 && first_rr_name_length <= 255 &&
+      second_rr_name_length >= 1 && second_rr_name_length <= 255
+{
+  UINT16BE id;
+  dns_flags flags;
+  UINT16BE qdcount { qdcount == 1 };
+  UINT16BE ancount { ancount == 2 };
+  UINT16BE nscount { nscount == 0 };
+  UINT16BE arcount { arcount == 0 };
+  dns_label question_labels[:byte-size (qname_length - 1)];
+  UINT8 question_root { question_root == 0 };
+  UINT16BE qtype;
+  UINT16BE qclass;
+  dns_label first_rr_name_labels[:byte-size (first_rr_name_length - 1)];
+  UINT8 first_rr_name_root { first_rr_name_root == 0 };
+  UINT16BE first_rtype { first_rtype == 1 };
+  UINT16BE first_rclass;
+  UINT32BE first_ttl;
+  UINT16BE first_rdlength { first_rdlength == 4 };
+  UINT8 first_rdata[4];
+  dns_label second_rr_name_labels[:byte-size (second_rr_name_length - 1)];
+  UINT8 second_rr_name_root { second_rr_name_root == 0 };
+  UINT16BE second_rtype { second_rtype == 1 };
+  UINT16BE second_rclass;
+  UINT32BE second_ttl;
+  UINT16BE second_rdlength { second_rdlength == 4 };
+  UINT8 second_rdata[4];
+} dns_uncompressed_question_two_a_answer_packet;
 
 entrypoint typedef struct _dns_uncompressed_question_name_rdata_answer_packet (
   UINT32 qname_length,
