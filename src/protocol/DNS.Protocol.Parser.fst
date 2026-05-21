@@ -1165,7 +1165,7 @@ let generated_compressed_mx_packet_subset_applicable input =
 
 val generated_compressed_soa_packet_fields :
   input:list FStar.UInt8.t ->
-  Tot (option (bool * generated_dns_name_length * generated_dns_name_length * generated_dns_name_length))
+  Tot (option (bool * generated_dns_name_length * generated_dns_name_length * generated_dns_name_length * nat * nat))
 
 let generated_compressed_soa_packet_fields input =
   match generated_uncompressed_question_answer_packet_fields input with
@@ -1190,12 +1190,21 @@ let generated_compressed_soa_packet_fields input =
                         _rdlen_hi :: _rdlen_lo ::
                         m_ptr_hi :: m_ptr_lo ::
                         rname_tail ->
-                          if m_ptr_hi = 0xc0uy && m_ptr_lo = 0x0cuy then
+                          let mname_offset = 26 + qname_length + rr_name_length in
+                          let mname_pointer = [m_ptr_hi; m_ptr_lo] in
+                          begin match DNS.Name.parse_qname_compressed
+                                        128
+                                        input
+                                        mname_offset
+                                        mname_pointer with
+                          | Some (_, []) ->
                             begin match DNS.Name.parse_qname 128 rname_tail with
                             | Some (rname, timers) ->
                                 if L.length timers = 20 then begin
                                   DNS.Name.lemma_parser_rejecting 128 rname_tail;
                                   let rname_length_nat = DNS.Name.dns_name_length rname in
+                                  let m_ptr_hi_nat = FStar.UInt8.v m_ptr_hi in
+                                  let m_ptr_lo_nat = FStar.UInt8.v m_ptr_lo in
                                   assert (qname_length > 0);
                                   assert (qname_length <= 255);
                                   assert (rr_name_length > 0);
@@ -1203,11 +1212,12 @@ let generated_compressed_soa_packet_fields input =
                                   assert (rname_length_nat > 0);
                                   assert (rname_length_nat <= 255);
                                   if rdata_length = 22 + rname_length_nat &&
+                                     m_ptr_hi_nat >= 192 &&
                                      L.length input = 48 + qname_length + rr_name_length + rname_length_nat then
                                     let qn:generated_dns_name_length = qname_length in
                                     let rn:generated_dns_name_length = rr_name_length in
                                     let other:generated_dns_name_length = rname_length_nat in
-                                    Some (true, qn, rn, other)
+                                    Some (true, qn, rn, other, m_ptr_hi_nat, m_ptr_lo_nat)
                                   else
                                     None
                                 end
@@ -1215,16 +1225,24 @@ let generated_compressed_soa_packet_fields input =
                                   None
                             | None -> None
                             end
-                          else
+                          | _ ->
                             begin match DNS.Name.parse_qname 128 (m_ptr_hi :: m_ptr_lo :: rname_tail) with
                             | Some (mname, after_mname) ->
                                 begin match after_mname with
                                 | r_ptr_hi :: r_ptr_lo :: timers ->
-                                    if r_ptr_hi = 0xc0uy &&
-                                       r_ptr_lo = 0x0cuy &&
-                                       L.length timers = 20 then begin
+                                    let mname_length_nat = DNS.Name.dns_name_length mname in
+                                    let rname_offset = mname_offset + mname_length_nat in
+                                    let rname_pointer = [r_ptr_hi; r_ptr_lo] in
+                                    begin match DNS.Name.parse_qname_compressed
+                                                  128
+                                                  input
+                                                  rname_offset
+                                                  rname_pointer with
+                                    | Some (_, []) ->
+                                      if L.length timers = 20 then begin
                                       DNS.Name.lemma_parser_rejecting 128 (m_ptr_hi :: m_ptr_lo :: rname_tail);
-                                      let mname_length_nat = DNS.Name.dns_name_length mname in
+                                      let r_ptr_hi_nat = FStar.UInt8.v r_ptr_hi in
+                                      let r_ptr_lo_nat = FStar.UInt8.v r_ptr_lo in
                                       assert (qname_length > 0);
                                       assert (qname_length <= 255);
                                       assert (rr_name_length > 0);
@@ -1232,20 +1250,24 @@ let generated_compressed_soa_packet_fields input =
                                       assert (mname_length_nat > 0);
                                       assert (mname_length_nat <= 255);
                                       if rdata_length = 22 + mname_length_nat &&
+                                         r_ptr_hi_nat >= 192 &&
                                          L.length input = 48 + qname_length + rr_name_length + mname_length_nat then
                                         let qn:generated_dns_name_length = qname_length in
                                         let rn:generated_dns_name_length = rr_name_length in
                                         let other:generated_dns_name_length = mname_length_nat in
-                                        Some (false, qn, rn, other)
+                                        Some (false, qn, rn, other, r_ptr_hi_nat, r_ptr_lo_nat)
                                       else
                                         None
                                     end
                                     else
                                       None
+                                    | _ -> None
+                                    end
                                 | _ -> None
                                 end
                             | None -> None
                             end
+                          end
                       | _ -> None
                       end
                   | None -> None
@@ -1263,19 +1285,22 @@ val generated_compressed_soa_packet_subset_applicable :
 
 let generated_compressed_soa_packet_subset_applicable input =
   match generated_compressed_soa_packet_fields input with
-  | Some (_, qname_length, rr_name_length, other_name_length) ->
+  | Some (_, qname_length, rr_name_length, other_name_length, ptr_hi, ptr_lo) ->
       qname_length > 0 &&
       qname_length <= 255 &&
       rr_name_length > 0 &&
       rr_name_length <= 255 &&
       other_name_length > 0 &&
       other_name_length <= 255 &&
+      ptr_hi >= 192 &&
+      ptr_hi <= 255 &&
+      ptr_lo <= 255 &&
       L.length input = 48 + qname_length + rr_name_length + other_name_length
   | None -> false
 
 val generated_compressed_both_soa_packet_fields :
   input:list FStar.UInt8.t ->
-  Tot (option (generated_dns_name_length * generated_dns_name_length))
+  Tot (option (generated_dns_name_length * generated_dns_name_length * nat * nat * nat * nat))
 
 let generated_compressed_both_soa_packet_fields input =
   match generated_uncompressed_question_answer_packet_fields input with
@@ -1305,18 +1330,42 @@ let generated_compressed_both_soa_packet_fields input =
                         _retry_0 :: _retry_1 :: _retry_2 :: _retry_3 ::
                         _expire_0 :: _expire_1 :: _expire_2 :: _expire_3 ::
                         _minimum_0 :: _minimum_1 :: _minimum_2 :: _minimum_3 :: [] ->
-                          if m_ptr_hi = 0xc0uy && m_ptr_lo = 0x0cuy &&
-                             r_ptr_hi = 0xc0uy && r_ptr_lo = 0x0cuy then begin
-                            assert (qname_length > 0);
-                            assert (qname_length <= 255);
-                            assert (rr_name_length > 0);
-                            assert (rr_name_length <= 255);
-                            let qn:generated_dns_name_length = qname_length in
-                            let rn:generated_dns_name_length = rr_name_length in
-                            Some (qn, rn)
+                          let mname_offset = 26 + qname_length + rr_name_length in
+                          let rname_offset = mname_offset + 2 in
+                          let mname_pointer = [m_ptr_hi; m_ptr_lo] in
+                          let rname_pointer = [r_ptr_hi; r_ptr_lo] in
+                          begin match DNS.Name.parse_qname_compressed
+                                        128
+                                        input
+                                        mname_offset
+                                        mname_pointer with
+                          | Some (_, []) ->
+                              begin match DNS.Name.parse_qname_compressed
+                                            128
+                                            input
+                                            rname_offset
+                                            rname_pointer with
+                              | Some (_, []) ->
+                                  let m_ptr_hi_nat = FStar.UInt8.v m_ptr_hi in
+                                  let m_ptr_lo_nat = FStar.UInt8.v m_ptr_lo in
+                                  let r_ptr_hi_nat = FStar.UInt8.v r_ptr_hi in
+                                  let r_ptr_lo_nat = FStar.UInt8.v r_ptr_lo in
+                                  if m_ptr_hi_nat >= 192 &&
+                                     r_ptr_hi_nat >= 192 then begin
+                                    assert (qname_length > 0);
+                                    assert (qname_length <= 255);
+                                    assert (rr_name_length > 0);
+                                    assert (rr_name_length <= 255);
+                                    let qn:generated_dns_name_length = qname_length in
+                                    let rn:generated_dns_name_length = rr_name_length in
+                                    Some (qn, rn, m_ptr_hi_nat, m_ptr_lo_nat, r_ptr_hi_nat, r_ptr_lo_nat)
+                                  end
+                                  else
+                                    None
+                              | _ -> None
+                              end
+                          | _ -> None
                           end
-                          else
-                            None
                       | _ -> None
                       end
                   | None -> None
@@ -1334,11 +1383,17 @@ val generated_compressed_both_soa_packet_subset_applicable :
 
 let generated_compressed_both_soa_packet_subset_applicable input =
   match generated_compressed_both_soa_packet_fields input with
-  | Some (qname_length, rr_name_length) ->
+  | Some (qname_length, rr_name_length, m_ptr_hi, m_ptr_lo, r_ptr_hi, r_ptr_lo) ->
       qname_length > 0 &&
       qname_length <= 255 &&
       rr_name_length > 0 &&
       rr_name_length <= 255 &&
+      m_ptr_hi >= 192 &&
+      m_ptr_hi <= 255 &&
+      m_ptr_lo <= 255 &&
+      r_ptr_hi >= 192 &&
+      r_ptr_hi <= 255 &&
+      r_ptr_lo <= 255 &&
       L.length input = 50 + qname_length + rr_name_length
   | None -> false
 
@@ -1786,24 +1841,33 @@ val validate_generated_compressed_soa_packet_subset_buffer :
 
 let validate_generated_compressed_soa_packet_subset_buffer buffer len bytes =
   match generated_compressed_soa_packet_fields bytes with
-  | Some (mname_compressed, qname_length_nat, rr_name_length_nat, other_name_length_nat) ->
+  | Some (mname_compressed, qname_length_nat, rr_name_length_nat, other_name_length_nat, ptr_hi_nat, ptr_lo_nat) ->
       assert (qname_length_nat > 0);
       assert (qname_length_nat <= 255);
       assert (rr_name_length_nat > 0);
       assert (rr_name_length_nat <= 255);
       assert (other_name_length_nat > 0);
       assert (other_name_length_nat <= 255);
+      assert (ptr_hi_nat >= 192);
+      assert (ptr_hi_nat <= 255);
+      assert (ptr_lo_nat <= 255);
       let qname_length = FStar.UInt32.uint_to_t qname_length_nat in
       assert (FStar.UInt32.v qname_length == qname_length_nat);
       let rr_name_length = FStar.UInt32.uint_to_t rr_name_length_nat in
       assert (FStar.UInt32.v rr_name_length == rr_name_length_nat);
       let other_name_length = FStar.UInt32.uint_to_t other_name_length_nat in
       assert (FStar.UInt32.v other_name_length == other_name_length_nat);
+      let ptr_hi_value = FStar.UInt32.uint_to_t ptr_hi_nat in
+      assert (FStar.UInt32.v ptr_hi_value == ptr_hi_nat);
+      let ptr_lo_value = FStar.UInt32.uint_to_t ptr_lo_nat in
+      assert (FStar.UInt32.v ptr_lo_value == ptr_lo_nat);
       if mname_compressed then
         EPR.check_dns_uncompressed_question_compressed_soa_mname_answer_packet
           qname_length
           rr_name_length
           other_name_length
+          ptr_hi_value
+          ptr_lo_value
           buffer
           len
       else
@@ -1811,6 +1875,8 @@ let validate_generated_compressed_soa_packet_subset_buffer buffer len bytes =
           qname_length
           rr_name_length
           other_name_length
+          ptr_hi_value
+          ptr_lo_value
           buffer
           len
   | None ->
@@ -1831,18 +1897,36 @@ val validate_generated_compressed_both_soa_packet_subset_buffer :
 
 let validate_generated_compressed_both_soa_packet_subset_buffer buffer len bytes =
   match generated_compressed_both_soa_packet_fields bytes with
-  | Some (qname_length_nat, rr_name_length_nat) ->
+  | Some (qname_length_nat, rr_name_length_nat, m_ptr_hi_nat, m_ptr_lo_nat, r_ptr_hi_nat, r_ptr_lo_nat) ->
       assert (qname_length_nat > 0);
       assert (qname_length_nat <= 255);
       assert (rr_name_length_nat > 0);
       assert (rr_name_length_nat <= 255);
+      assert (m_ptr_hi_nat >= 192);
+      assert (m_ptr_hi_nat <= 255);
+      assert (m_ptr_lo_nat <= 255);
+      assert (r_ptr_hi_nat >= 192);
+      assert (r_ptr_hi_nat <= 255);
+      assert (r_ptr_lo_nat <= 255);
       let qname_length = FStar.UInt32.uint_to_t qname_length_nat in
       assert (FStar.UInt32.v qname_length == qname_length_nat);
       let rr_name_length = FStar.UInt32.uint_to_t rr_name_length_nat in
       assert (FStar.UInt32.v rr_name_length == rr_name_length_nat);
+      let mname_ptr_hi_value = FStar.UInt32.uint_to_t m_ptr_hi_nat in
+      assert (FStar.UInt32.v mname_ptr_hi_value == m_ptr_hi_nat);
+      let mname_ptr_lo_value = FStar.UInt32.uint_to_t m_ptr_lo_nat in
+      assert (FStar.UInt32.v mname_ptr_lo_value == m_ptr_lo_nat);
+      let rname_ptr_hi_value = FStar.UInt32.uint_to_t r_ptr_hi_nat in
+      assert (FStar.UInt32.v rname_ptr_hi_value == r_ptr_hi_nat);
+      let rname_ptr_lo_value = FStar.UInt32.uint_to_t r_ptr_lo_nat in
+      assert (FStar.UInt32.v rname_ptr_lo_value == r_ptr_lo_nat);
       EPR.check_dns_uncompressed_question_compressed_soa_answer_packet
         qname_length
         rr_name_length
+        mname_ptr_hi_value
+        mname_ptr_lo_value
+        rname_ptr_hi_value
+        rname_ptr_lo_value
         buffer
         len
   | None ->

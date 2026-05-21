@@ -202,6 +202,8 @@ val check_dns_uncompressed_question_compressed_soa_mname_answer_packet :
   qname_length:FStar.UInt32.t ->
   rr_name_length:FStar.UInt32.t ->
   rname_length:FStar.UInt32.t ->
+  mname_ptr_hi_value:FStar.UInt32.t ->
+  mname_ptr_lo_value:FStar.UInt32.t ->
   base:buffer FStar.UInt8.t ->
   len:FStar.UInt32.t ->
   Stack bool
@@ -217,6 +219,8 @@ val check_dns_uncompressed_question_compressed_soa_rname_answer_packet :
   qname_length:FStar.UInt32.t ->
   rr_name_length:FStar.UInt32.t ->
   mname_length:FStar.UInt32.t ->
+  rname_ptr_hi_value:FStar.UInt32.t ->
+  rname_ptr_lo_value:FStar.UInt32.t ->
   base:buffer FStar.UInt8.t ->
   len:FStar.UInt32.t ->
   Stack bool
@@ -231,6 +235,10 @@ val check_dns_uncompressed_question_compressed_soa_rname_answer_packet :
 val check_dns_uncompressed_question_compressed_soa_answer_packet :
   qname_length:FStar.UInt32.t ->
   rr_name_length:FStar.UInt32.t ->
+  mname_ptr_hi_value:FStar.UInt32.t ->
+  mname_ptr_lo_value:FStar.UInt32.t ->
+  rname_ptr_hi_value:FStar.UInt32.t ->
+  rname_ptr_lo_value:FStar.UInt32.t ->
   base:buffer FStar.UInt8.t ->
   len:FStar.UInt32.t ->
   Stack bool

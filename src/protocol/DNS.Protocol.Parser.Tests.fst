@@ -2020,6 +2020,96 @@ let generated_compressed_soa_gate_accepts_rname_test =
     generated_compressed_soa_packet_subset_applicable
       compressed_soa_rname_dns_response == true)
 
+let compressed_soa_mname_suffix_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x01uy; 0x61uy;
+    0x01uy; 0x62uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x17uy;
+    0xc0uy; 0x0euy;
+    0x00uy;
+    0x00uy; 0x00uy; 0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x02uy;
+    0x00uy; 0x00uy; 0x00uy; 0x03uy;
+    0x00uy; 0x00uy; 0x00uy; 0x04uy;
+    0x00uy; 0x00uy; 0x00uy; 0x05uy
+  ]
+
+let compressed_soa_mname_suffix_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes compressed_soa_mname_suffix_dns_response with
+    | Some p ->
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.rtype == SOA /\
+             rr.rdlen == 23us /\
+             FStar.Bytes.length rr.rdata == 23
+         | _ -> false)
+    | None -> false)
+
+let generated_compressed_soa_gate_accepts_mname_suffix_pointer_test =
+  assert_norm (
+    generated_compressed_soa_packet_subset_applicable
+      compressed_soa_mname_suffix_dns_response == true)
+
+let compressed_soa_rname_suffix_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x01uy; 0x61uy;
+    0x01uy; 0x62uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x17uy;
+    0x00uy;
+    0xc0uy; 0x0euy;
+    0x00uy; 0x00uy; 0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x02uy;
+    0x00uy; 0x00uy; 0x00uy; 0x03uy;
+    0x00uy; 0x00uy; 0x00uy; 0x04uy;
+    0x00uy; 0x00uy; 0x00uy; 0x05uy
+  ]
+
+let compressed_soa_rname_suffix_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes compressed_soa_rname_suffix_dns_response with
+    | Some p ->
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.rtype == SOA /\
+             rr.rdlen == 23us /\
+             FStar.Bytes.length rr.rdata == 23
+         | _ -> false)
+    | None -> false)
+
+let generated_compressed_soa_gate_accepts_rname_suffix_pointer_test =
+  assert_norm (
+    generated_compressed_soa_packet_subset_applicable
+      compressed_soa_rname_suffix_dns_response == true)
+
 let compressed_both_soa_names_dns_response : list FStar.UInt8.t =
   [
     0x12uy; 0x34uy;
@@ -2067,6 +2157,51 @@ let generated_compressed_both_soa_gate_accepts_names_test =
   assert_norm (
     generated_compressed_both_soa_packet_subset_applicable
       compressed_both_soa_names_dns_response == true)
+
+let compressed_both_soa_names_suffix_dns_response : list FStar.UInt8.t =
+  [
+    0x12uy; 0x34uy;
+    0x81uy; 0x80uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy;
+    0x00uy; 0x00uy;
+    0x01uy; 0x61uy;
+    0x01uy; 0x62uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy;
+    0x00uy; 0x06uy;
+    0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x3cuy;
+    0x00uy; 0x18uy;
+    0xc0uy; 0x0euy;
+    0xc0uy; 0x0euy;
+    0x00uy; 0x00uy; 0x00uy; 0x01uy;
+    0x00uy; 0x00uy; 0x00uy; 0x02uy;
+    0x00uy; 0x00uy; 0x00uy; 0x03uy;
+    0x00uy; 0x00uy; 0x00uy; 0x04uy;
+    0x00uy; 0x00uy; 0x00uy; 0x05uy
+  ]
+
+let compressed_both_soa_names_suffix_parse_packet_test =
+  assert_norm (
+    match parse_dns_packet_bytes compressed_both_soa_names_suffix_dns_response with
+    | Some p ->
+        L.length p.answers == 1 /\
+        (match p.answers with
+         | rr :: [] ->
+             rr.rtype == SOA /\
+             rr.rdlen == 24us /\
+             FStar.Bytes.length rr.rdata == 24
+         | _ -> false)
+    | None -> false)
+
+let generated_compressed_both_soa_gate_accepts_suffix_pointers_test =
+  assert_norm (
+    generated_compressed_both_soa_packet_subset_applicable
+      compressed_both_soa_names_suffix_dns_response == true)
 
 let self_loop_compressed_soa_mname_dns_response : list FStar.UInt8.t =
   [
@@ -2852,6 +2987,15 @@ let boundary_accepts_compressed_soa_mname_test =
 let boundary_generated_subset_covers_compressed_soa_mname_test =
   assert_norm (everparse_boundary_generated_subset_applicable compressed_soa_mname_dns_response == true)
 
+let boundary_accepts_compressed_soa_mname_suffix_pointer_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary compressed_soa_mname_suffix_dns_response ==
+               parse_dns_packet_bytes compressed_soa_mname_suffix_dns_response)
+
+let boundary_generated_subset_covers_compressed_soa_mname_suffix_pointer_test =
+  assert_norm (
+    everparse_boundary_generated_subset_applicable
+      compressed_soa_mname_suffix_dns_response == true)
+
 let boundary_accepts_compressed_soa_rname_test =
   assert_norm (parse_dns_packet_bytes_at_boundary compressed_soa_rname_dns_response ==
                parse_dns_packet_bytes compressed_soa_rname_dns_response)
@@ -2859,12 +3003,30 @@ let boundary_accepts_compressed_soa_rname_test =
 let boundary_generated_subset_covers_compressed_soa_rname_test =
   assert_norm (everparse_boundary_generated_subset_applicable compressed_soa_rname_dns_response == true)
 
+let boundary_accepts_compressed_soa_rname_suffix_pointer_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary compressed_soa_rname_suffix_dns_response ==
+               parse_dns_packet_bytes compressed_soa_rname_suffix_dns_response)
+
+let boundary_generated_subset_covers_compressed_soa_rname_suffix_pointer_test =
+  assert_norm (
+    everparse_boundary_generated_subset_applicable
+      compressed_soa_rname_suffix_dns_response == true)
+
 let boundary_accepts_compressed_both_soa_names_test =
   assert_norm (parse_dns_packet_bytes_at_boundary compressed_both_soa_names_dns_response ==
                parse_dns_packet_bytes compressed_both_soa_names_dns_response)
 
 let boundary_generated_subset_covers_compressed_both_soa_names_test =
   assert_norm (everparse_boundary_generated_subset_applicable compressed_both_soa_names_dns_response == true)
+
+let boundary_accepts_compressed_both_soa_names_suffix_pointers_test =
+  assert_norm (parse_dns_packet_bytes_at_boundary compressed_both_soa_names_suffix_dns_response ==
+               parse_dns_packet_bytes compressed_both_soa_names_suffix_dns_response)
+
+let boundary_generated_subset_covers_compressed_both_soa_names_suffix_pointers_test =
+  assert_norm (
+    everparse_boundary_generated_subset_applicable
+      compressed_both_soa_names_suffix_dns_response == true)
 
 let boundary_rejects_self_loop_compressed_soa_mname_test =
   assert_norm (parse_dns_packet_bytes_at_boundary self_loop_compressed_soa_mname_dns_response ==

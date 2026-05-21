@@ -40,10 +40,10 @@ The generated validator gate currently covers:
 - generated MX compressed exchange-name checks for pointer offsets that resolve
   to prior valid message names;
 - generated SOA mname/rname/timer shape checks for uncompressed names;
-- generated SOA compressed mname/rname checks for the common `0xc00c` pointer
-  to the question name when the other SOA name is uncompressed;
-- generated SOA both-compressed mname/rname checks for the common `0xc00c`
-  pointer to the question name;
+- generated SOA compressed mname/rname checks for pointer offsets that resolve
+  to prior valid message names when the other SOA name is uncompressed;
+- generated SOA both-compressed mname/rname checks for pointer offsets that
+  resolve to prior valid message names;
 - generated SRV target-name shape checks for uncompressed names;
 - generated SRV compressed target-name checks for pointer offsets that resolve
   to prior valid message names;
@@ -58,10 +58,9 @@ The generated-subset predicate is:
 - `everparse_boundary_generated_subset_applicable`
 
 Examples outside that generated validator subset may still be accepted by the
-active boundary when the reference parser accepts them. That includes supported
-compressed SOA RDATA pointers outside the current `0xc00c` subset. These cases
-remain part of the handwritten reference-parser construction path until the
-generated grammar grows equivalent coverage.
+active boundary when the reference parser accepts them. These cases remain part
+of the handwritten reference-parser construction path until the generated
+grammar grows equivalent coverage.
 
 ## Production Gap
 
