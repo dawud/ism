@@ -198,10 +198,11 @@ The unverified shell must stay small and auditable.
 - Run `make c-compile-smoke` after extraction-sensitive changes to
   syntax-check the generated C bundle and EverParse wrapper.
 - Run `make c-link-smoke` after generated C boundary changes to link and run
-  the current protocol/EverParse, `DNS.ShellBoundary` ingress, and
-  `DNS.ShellResponseBoundary` response handoff/completion harness plus the
-  fixed-capacity C shell scaffold. This does not yet cover worker response
-  construction, scheduler dispatch, or the MsQuic shell path.
+  the current protocol/EverParse generated-wrapper strict-subset checks,
+  `DNS.ShellBoundary` ingress, and `DNS.ShellResponseBoundary` response
+  handoff/completion harness plus the fixed-capacity C shell scaffold. This does
+  not yet cover worker response construction, scheduler dispatch, or the MsQuic
+  shell path.
 - Run `make pulse-rust-smoke` after migration-lane Pulse/Rust boundary changes
   to compile the generated Rust, link the extern-friendly wrapper from C, and
   keep the experimental ABI shape honest.
