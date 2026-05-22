@@ -108,10 +108,17 @@ The C compile smoke gate syntax-checks the current KaRaMeL bundle and the genera
 
 The C link smoke gate links and runs a tiny harness against the current extracted protocol bundle, generated EverParse wrapper, shell ingress boundary, minimal worker error-response boundary, C-shaped scheduler helpers, response send handoff/completion boundary, and fixed-capacity C shell scaffold. It does not link the rich `DNS.ShellScheduler.dispatch_shell_event` union or any MsQuic shell code yet.
 
-The remaining warning-15 debt is concentrated in the protocol model:
+The remaining warning-15 debt is concentrated in the linked stream/worker path
+and protocol model:
+- minimal worker error-response construction and stream lookup/close still use
+  mathematical-integer proof structure;
+- DoQ stream accumulation helpers still use mathematical-integer arithmetic;
 - GC-backed list representations in `DNS.Name` and `DNS.Protocol`;
 - `dns_packet`, `question`, and `resource_record` records that still carry list-backed fields;
 - trusted-adapter boundaries that should stay visible until the generated EverParse or Low* replacement exists.
+
+Response-handoff and scheduler send-completion conditionals now use
+machine-integer helpers and no longer appear as separate warning-15 entries.
 
 ### F* Release Policy
 

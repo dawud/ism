@@ -35,7 +35,7 @@ let prepare_response_send_for_stream ctx_ptr response_buffer response_len fin_co
     EGRESS.msrf_stream_id = s.STREAM.sc_id;
     EGRESS.msrf_data = response_buffer;
     EGRESS.msrf_len = response_len;
-    EGRESS.msrf_fin = FStar.UInt8.v fin_code <> 0;
+    EGRESS.msrf_fin = not (FStar.UInt8.eq fin_code 0uy);
   } in
   let descriptor = EGRESS.prepare_response_send () ctx_ptr response in
   descriptor.EGRESS.mssd_len
@@ -45,7 +45,7 @@ val send_outcome_of_code :
   Tot COMPLETE.msquic_send_outcome
 
 let send_outcome_of_code code =
-  if FStar.UInt8.v code = 0 then
+  if FStar.UInt8.eq code 0uy then
     COMPLETE.SendCompleted
   else
     COMPLETE.SendDropped

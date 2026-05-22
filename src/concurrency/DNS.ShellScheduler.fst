@@ -191,7 +191,7 @@ let dispatch_response_send_finished_for_stream_event
     EGRESS.mssd_fin = true;
   } in
   let outcome =
-    if FStar.UInt8.v outcome_code = 0 then
+    if FStar.UInt8.eq outcome_code 0uy then
       COMPLETE.SendCompleted
     else
       COMPLETE.SendDropped in

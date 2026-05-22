@@ -214,8 +214,8 @@ val prepare_worker_minimal_error_response_send :
 
 let prepare_worker_minimal_error_response_send ctx_ptr response_buffer response_capacity request_len =
   let s = LowStar.Buffer.index ctx_ptr 0ul in
-  if FStar.UInt32.v request_len < 12 ||
-     FStar.UInt32.v request_len > FStar.UInt32.v response_capacity then
+  if FStar.UInt32.lt request_len 12ul ||
+     FStar.UInt32.gt request_len response_capacity then
     0ul
   else
     begin
