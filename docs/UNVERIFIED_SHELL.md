@@ -57,16 +57,17 @@ established by construction or checked before the call:
 
 `DNS.ShellBoundary.dispatch_authenticated_stream_data` is included in the
 `make c-link-smoke` generated C boundary harness, and
-`DNS.ShellResponseBoundary` covers generated C response send handoff/completion.
-`shell/ism_shell.c` owns a fixed-capacity connection/stream table over those
-generated ABIs for local scaffold testing. It does not own sockets, MsQuic
-callbacks, polling, timers, dynamic allocation, or production event queues.
-`DNS.ShellScheduler` and the worker path it reaches are included in the
-`make extract` smoke gate, but worker response construction and scheduler
-dispatch symbols are not part of the linked shell ABI yet. Direct lower-level
-calls remain available as verified boundaries, but new C shell integration
-should target `DNS.ShellBoundary` for ingress and `DNS.ShellResponseBoundary`
-for response handoff/completion first.
+`DNS.ShellBoundary.process_ready_stream_for_response` covers minimal worker
+error-response construction for an already-processing stream.
+`DNS.ShellResponseBoundary` covers generated C response send
+handoff/completion. `shell/ism_shell.c` owns a fixed-capacity connection/stream
+table over those generated ABIs for local scaffold testing. It does not own
+sockets, MsQuic callbacks, polling, timers, dynamic allocation, or production
+event queues. `DNS.ShellScheduler` remains in the `make extract` smoke gate,
+but its event dispatch symbol is not part of the linked shell ABI yet. Direct
+lower-level calls remain available as verified boundaries, but new C shell
+integration should target `DNS.ShellBoundary` for ingress/processing and
+`DNS.ShellResponseBoundary` for response handoff/completion first.
 
 `DNS.Security.Handshake.process_crypto_frame` and
 `DNS.Security.Gateway.decrypt_and_validate` are legacy transitional adapter
@@ -141,6 +142,8 @@ when. It must maintain the logical ownership expected by the verified model:
 
 - Prefer `DNS.ShellBoundary.dispatch_authenticated_stream_data` for generated C
   authenticated ingress.
+- Prefer `DNS.ShellBoundary.process_ready_stream_for_response` for generated C
+  minimal worker error-response on streams already marked `Processing`.
 - Prefer `DNS.ShellResponseBoundary.prepare_response_send_for_stream` and
   `DNS.ShellResponseBoundary.complete_response_send_for_stream` for generated C
   response handoff and send-completion/drop cleanup.
@@ -199,10 +202,10 @@ The unverified shell must stay small and auditable.
   syntax-check the generated C bundle and EverParse wrapper.
 - Run `make c-link-smoke` after generated C boundary changes to link and run
   the current protocol/EverParse generated-wrapper strict-subset checks,
-  `DNS.ShellBoundary` ingress, and `DNS.ShellResponseBoundary` response
-  handoff/completion harness plus the fixed-capacity C shell scaffold. This does
-  not yet cover worker response construction, scheduler dispatch, or the MsQuic
-  shell path.
+  `DNS.ShellBoundary` ingress/minimal worker error-response, and
+  `DNS.ShellResponseBoundary` response handoff/completion harness plus the
+  fixed-capacity C shell scaffold. This does not yet cover scheduler dispatch
+  or the MsQuic shell path.
 - Run `make pulse-rust-smoke` after migration-lane Pulse/Rust boundary changes
   to compile the generated Rust, link the extern-friendly wrapper from C, and
   keep the experimental ABI shape honest.

@@ -159,6 +159,87 @@ let prepare_worker_response_send root ctx_ptr response_buffer response_capacity 
         None
   | None -> None
 
+val copy_request_prefix_to_response :
+  request_buffer:buffer FStar.UInt8.t ->
+  response_buffer:buffer FStar.UInt8.t ->
+  request_len:FStar.UInt32.t ->
+  pos:nat ->
+  ST unit
+    (requires (fun h0 ->
+      live h0 request_buffer /\
+      live h0 response_buffer /\
+      FStar.UInt32.v request_len <= LowStar.Buffer.length request_buffer /\
+      FStar.UInt32.v request_len <= LowStar.Buffer.length response_buffer /\
+      pos <= FStar.UInt32.v request_len /\
+      FStar.UInt32.v request_len <= 4294967295))
+    (ensures (fun h0 _ h1 ->
+      modifies (loc_buffer response_buffer) h0 h1 /\
+      live h1 response_buffer))
+    (decreases (FStar.UInt32.v request_len - pos))
+
+let rec copy_request_prefix_to_response request_buffer response_buffer request_len pos =
+  if pos = FStar.UInt32.v request_len then
+    ()
+  else
+    begin
+      assert (pos < FStar.UInt32.v request_len);
+      assert (pos < LowStar.Buffer.length request_buffer);
+      assert (pos < LowStar.Buffer.length response_buffer);
+      assert (pos <= 4294967295);
+      let idx = FStar.UInt32.uint_to_t pos in
+      assert (FStar.UInt32.v idx == pos);
+      let byte = LowStar.Buffer.index request_buffer idx in
+      LowStar.Buffer.upd response_buffer idx byte;
+      assert (pos + 1 <= FStar.UInt32.v request_len);
+      copy_request_prefix_to_response request_buffer response_buffer request_len (pos + 1)
+    end
+
+val prepare_worker_minimal_error_response_send :
+  ctx_ptr:buffer stream_context ->
+  response_buffer:buffer FStar.UInt8.t ->
+  response_capacity:FStar.UInt32.t ->
+  request_len:FStar.UInt32.t ->
+  ST FStar.UInt32.t
+    (requires (fun h0 ->
+      live h0 ctx_ptr /\
+      LowStar.Buffer.length ctx_ptr >= 1 /\
+      live h0 response_buffer /\
+      FStar.UInt32.v response_capacity <= LowStar.Buffer.length response_buffer /\
+      (let ctx = FStar.Seq.index (LowStar.Buffer.as_seq h0 ctx_ptr) 0 in
+       live h0 ctx.sc_buf /\
+       FStar.UInt32.v request_len <= LowStar.Buffer.length ctx.sc_buf)))
+    (ensures (fun h0 _ h1 ->
+      modifies (loc_buffer response_buffer) h0 h1 /\
+      live h1 response_buffer))
+
+let prepare_worker_minimal_error_response_send ctx_ptr response_buffer response_capacity request_len =
+  let s = LowStar.Buffer.index ctx_ptr 0ul in
+  if FStar.UInt32.v request_len < 12 ||
+     FStar.UInt32.v request_len > FStar.UInt32.v response_capacity then
+    0ul
+  else
+    begin
+      assert (FStar.UInt32.v request_len <= LowStar.Buffer.length response_buffer);
+      assert (2 < LowStar.Buffer.length response_buffer);
+      assert (3 < LowStar.Buffer.length response_buffer);
+      assert (6 < LowStar.Buffer.length response_buffer);
+      assert (7 < LowStar.Buffer.length response_buffer);
+      assert (8 < LowStar.Buffer.length response_buffer);
+      assert (9 < LowStar.Buffer.length response_buffer);
+      assert (10 < LowStar.Buffer.length response_buffer);
+      assert (11 < LowStar.Buffer.length response_buffer);
+      copy_request_prefix_to_response s.sc_buf response_buffer request_len 0;
+      LowStar.Buffer.upd response_buffer 2ul 0x81uy;
+      LowStar.Buffer.upd response_buffer 3ul 0x03uy;
+      LowStar.Buffer.upd response_buffer 6ul 0x00uy;
+      LowStar.Buffer.upd response_buffer 7ul 0x00uy;
+      LowStar.Buffer.upd response_buffer 8ul 0x00uy;
+      LowStar.Buffer.upd response_buffer 9ul 0x00uy;
+      LowStar.Buffer.upd response_buffer 10ul 0x00uy;
+      LowStar.Buffer.upd response_buffer 11ul 0x00uy;
+      request_len
+    end
+
 (* The Worker Harness *)
 (* This loop represents a thread processing a single QUIC connection *)
 val worker_loop_with_root :

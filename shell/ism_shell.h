@@ -51,6 +51,14 @@ ism_shell_prepare_response_send(
   bool fin
 );
 
+uint32_t
+ism_shell_process_ready_stream(
+  ism_shell_connection *conn,
+  uint64_t stream_id,
+  uint8_t *response_buffer,
+  uint32_t response_capacity
+);
+
 uint8_t
 ism_shell_complete_response_send(
   ism_shell_connection *conn,
