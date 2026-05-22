@@ -144,6 +144,34 @@ ism_shell_on_authenticated_stream_data(
     );
 }
 
+uint8_t
+ism_shell_dispatch_authenticated_stream_data(
+  ism_shell_connection *conn,
+  uint64_t stream_id,
+  uint8_t *data,
+  uint32_t len
+)
+{
+  DNS_QUIC_StreamMapping_stream_context *stream =
+    ism_shell_open_stream(conn, stream_id);
+  if (stream == NULL)
+  {
+    return DNS_ShellBoundary_shell_phase_code(
+      (DNS_QUIC_StreamMapping_stream_phase){
+        .tag = DNS_QUIC_StreamMapping_Done
+      }
+    );
+  }
+
+  return
+    DNS_ShellBoundary_dispatch_authenticated_stream_data_via_scheduler(
+      stream,
+      stream_id,
+      data,
+      len
+    );
+}
+
 uint32_t
 ism_shell_prepare_response_send(
   ism_shell_connection *conn,
@@ -186,6 +214,23 @@ ism_shell_process_ready_stream(
     );
 }
 
+uint32_t
+ism_shell_dispatch_ready_stream(
+  ism_shell_connection *conn,
+  uint64_t stream_id,
+  uint8_t *response_buffer,
+  uint32_t response_capacity
+)
+{
+  return
+    DNS_ShellBoundary_dispatch_ready_stream_for_response_via_scheduler(
+      &conn->ctx,
+      response_buffer,
+      response_capacity,
+      stream_id
+    );
+}
+
 uint8_t
 ism_shell_complete_response_send(
   ism_shell_connection *conn,
@@ -197,6 +242,36 @@ ism_shell_complete_response_send(
 {
   uint8_t result =
     DNS_ShellResponseBoundary_complete_response_send_for_stream(
+      &conn->ctx,
+      response_buffer,
+      response_len,
+      stream_id,
+      dropped ? 1U : 0U
+    );
+
+  for (uint32_t i = 0U; i < ISM_SHELL_MAX_STREAMS; i++)
+  {
+    if (conn->streams[i].active && conn->streams[i].ctx.sc_id == stream_id)
+    {
+      ism_shell_sync_stream_slots(conn);
+      break;
+    }
+  }
+
+  return result;
+}
+
+uint8_t
+ism_shell_dispatch_response_send_finished(
+  ism_shell_connection *conn,
+  uint64_t stream_id,
+  uint8_t *response_buffer,
+  uint32_t response_len,
+  bool dropped
+)
+{
+  uint8_t result =
+    DNS_ShellBoundary_dispatch_response_send_finished_via_scheduler(
       &conn->ctx,
       response_buffer,
       response_len,

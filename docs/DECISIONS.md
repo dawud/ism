@@ -107,14 +107,16 @@ in `docs/TODO.md` and the threat model.
 `dist/`, `make c-compile-smoke` syntax-checks the generated artifacts, and
 `make c-link-smoke` links and runs a tiny generated-boundary harness covering
 the protocol/EverParse parser boundary, `DNS.ShellBoundary` ingress and minimal
-worker error-response ABIs, and `DNS.ShellResponseBoundary` response send
-handoff/completion ABI, plus the fixed-capacity C shell scaffold over those
-generated boundaries.
+worker error-response ABIs, C-shaped scheduler helper ABIs for ingress,
+minimal worker error-response, and send completion, and
+`DNS.ShellResponseBoundary` response send handoff/completion ABI, plus the
+fixed-capacity C shell scaffold over those generated boundaries.
 KaRaMeL still reports warning-15 diagnostics for GC-backed lists,
 mathematical integers, and specification-oriented definitions. The current
 extraction gate verifies all scaffold modules but only emits a clean parser,
 authenticated-ingress, minimal worker error-response construction, response send
-handoff/completion, and fixed-capacity shell-scaffold link surface.
+handoff/completion, C-shaped scheduler helper, and fixed-capacity
+shell-scaffold link surface.
 
 **Decision:** Treat current extraction as a generated-artifact smoke test, not
 proof that generated output is production C. Classify warning-15 debt as
@@ -122,9 +124,11 @@ specification-only code, executable code needing Low* rewrites, compatibility
 header use, or generated/trusted adapter boundary work.
 
 **Consequences:** Extraction warning debt must be reduced or explicitly
-classified before extraction becomes a production gate. Worker
-response-construction and dispatcher C link coverage remain separate follow-up
-work once those symbols are rewritten or emitted in a stable shell-facing form.
+classified before extraction becomes a production gate. Full worker
+response-construction and the rich `DNS.ShellScheduler.dispatch_shell_event`
+union remain verification-only follow-up work until those paths are rewritten or
+emitted in a stable shell-facing form without pulling non-Low* globals into the
+linked C surface.
 
 ## DR-0008: Pin the Stable F* Lane to v2026.03.24
 

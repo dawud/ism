@@ -7,6 +7,7 @@ bool ism_smoke_shell_scaffold(void)
 {
   ism_shell_connection conn;
   ism_shell_connection worker_conn;
+  ism_shell_connection dispatcher_conn;
   uint8_t zero_length_doq_message[] = { 0U, 0U };
   uint8_t response_buffer[1] = { 0U };
   uint8_t exact_a_query[] = {
@@ -25,10 +26,12 @@ bool ism_smoke_shell_scaffold(void)
     0x00U, 0x01U
   };
   uint8_t worker_response[128] = { 0U };
+  uint8_t dispatcher_response[128] = { 0U };
   const uint64_t first_stream_id = 7U;
   const uint64_t second_stream_id = 9U;
   const uint64_t third_stream_id = 11U;
   const uint64_t worker_stream_id = 13U;
+  const uint64_t dispatcher_stream_id = 15U;
 
   ism_shell_connection_init(&conn);
 
@@ -152,6 +155,49 @@ bool ism_smoke_shell_scaffold(void)
       worker_response[7] != 0x00U ||
       worker_response[31] != 0x00U ||
       worker_response[32] != 0x01U)
+  {
+    return false;
+  }
+
+  ism_shell_connection_init(&dispatcher_conn);
+
+  if (ism_shell_dispatch_authenticated_stream_data(
+        &dispatcher_conn,
+        dispatcher_stream_id,
+        exact_a_query,
+        (uint32_t)sizeof exact_a_query
+      ) != 2U)
+  {
+    return false;
+  }
+
+  uint32_t dispatcher_response_len =
+    ism_shell_dispatch_ready_stream(
+      &dispatcher_conn,
+      dispatcher_stream_id,
+      dispatcher_response,
+      (uint32_t)sizeof dispatcher_response
+    );
+
+  if (dispatcher_response_len != 33U ||
+      dispatcher_response[0] != 0x12U ||
+      dispatcher_response[1] != 0x34U ||
+      dispatcher_response[2] != 0x81U ||
+      dispatcher_response[3] != 0x03U ||
+      dispatcher_response[6] != 0x00U ||
+      dispatcher_response[7] != 0x00U)
+  {
+    return false;
+  }
+
+  if (ism_shell_dispatch_response_send_finished(
+        &dispatcher_conn,
+        dispatcher_stream_id,
+        dispatcher_response,
+        dispatcher_response_len,
+        false
+      ) != 1U ||
+      dispatcher_conn.ctx.cc_num != 0U)
   {
     return false;
   }

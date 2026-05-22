@@ -42,6 +42,14 @@ ism_shell_on_authenticated_stream_data(
   uint32_t len
 );
 
+uint8_t
+ism_shell_dispatch_authenticated_stream_data(
+  ism_shell_connection *conn,
+  uint64_t stream_id,
+  uint8_t *data,
+  uint32_t len
+);
+
 uint32_t
 ism_shell_prepare_response_send(
   ism_shell_connection *conn,
@@ -59,8 +67,25 @@ ism_shell_process_ready_stream(
   uint32_t response_capacity
 );
 
+uint32_t
+ism_shell_dispatch_ready_stream(
+  ism_shell_connection *conn,
+  uint64_t stream_id,
+  uint8_t *response_buffer,
+  uint32_t response_capacity
+);
+
 uint8_t
 ism_shell_complete_response_send(
+  ism_shell_connection *conn,
+  uint64_t stream_id,
+  uint8_t *response_buffer,
+  uint32_t response_len,
+  bool dropped
+);
+
+uint8_t
+ism_shell_dispatch_response_send_finished(
   ism_shell_connection *conn,
   uint64_t stream_id,
   uint8_t *response_buffer,
