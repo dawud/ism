@@ -108,17 +108,19 @@ The C compile smoke gate syntax-checks the current KaRaMeL bundle and the genera
 
 The C link smoke gate links and runs a tiny harness against the current extracted protocol bundle, generated EverParse wrapper, shell ingress boundary, minimal worker error-response boundary, C-shaped scheduler helpers, response send handoff/completion boundary, and fixed-capacity C shell scaffold. It does not link the rich `DNS.ShellScheduler.dispatch_shell_event` union or any MsQuic shell code yet.
 
-The remaining warning-15 debt is concentrated in the linked stream/worker path
-and protocol model:
-- minimal worker error-response construction and stream lookup/close still use
-  mathematical-integer proof structure;
+The remaining warning-15 debt is concentrated in the linked stream lookup,
+stream accumulation, and protocol model:
+- shell/scheduler minimal worker dispatch still inherits mathematical-integer
+  debt from stream lookup and request-length conversion;
+- stream lookup/close still use mathematical-integer proof structure;
 - DoQ stream accumulation helpers still use mathematical-integer arithmetic;
 - GC-backed list representations in `DNS.Name` and `DNS.Protocol`;
 - `dns_packet`, `question`, and `resource_record` records that still carry list-backed fields;
 - trusted-adapter boundaries that should stay visible until the generated EverParse or Low* replacement exists.
 
-Response-handoff and scheduler send-completion conditionals now use
-machine-integer helpers and no longer appear as separate warning-15 entries.
+Response-handoff, scheduler send-completion, and minimal worker error-response
+construction now use machine-integer-friendly code and no longer appear as
+separate warning-15 entries.
 
 ### F* Release Policy
 
@@ -223,7 +225,7 @@ Maintain a compliance matrix for each protocol area. See [DECISIONS.md](DECISION
 | [RFC 9000](https://datatracker.ietf.org/doc/html/rfc9000) | QUIC transport | Streams, connection lifecycle, and flow-control model | Trusted | None | Transport is delegated to the MsQuic shell stack. |
 | [RFC 9001](https://datatracker.ietf.org/doc/html/rfc9001) | TLS for QUIC | QUIC handshake protection and key schedule | Trusted | None | TLS for QUIC is delegated to the MsQuic shell stack. |
 | [RFC 9002](https://datatracker.ietf.org/doc/html/rfc9002) | QUIC recovery | Loss detection and congestion control | Trusted | None | Recovery behavior is delegated to the MsQuic shell stack. |
-| [RFC 9250](https://datatracker.ietf.org/doc/html/rfc9250) | DoQ framing | Two-octet length prefix | Partial | Low* stream state verifies complete and split length-prefix parsing, bounded body copying, `ReadingMessage` progress to `Processing` with the completed DNS message length, conservative overlong-fragment rejection, bounded active stream lookup, capacity-bounded stream allocation, compacting active-stream close, worker dispatch through verified stream lookup, worker-side completed-buffer parsing into response bytes, capacity-checked response copy into a caller-provided Low* buffer, worker preparation of a MsQuic send descriptor for that buffer, send-completion/drop cleanup that closes the stream, a verified shell-event dispatcher over authenticated ingress, processing-ready, and send-completion/drop events, emitted `DNS.ShellBoundary.dispatch_authenticated_stream_data`, `DNS.ShellBoundary.process_ready_stream_for_response`, and `DNS.ShellBoundary.*_via_scheduler` C ABIs for authenticated ingress, minimal worker error-response, and scheduler-helper coverage, emitted `DNS.ShellResponseBoundary` C ABIs for response send handoff/completion, and a fixed-capacity C shell scaffold over those generated ABIs. | Actual MsQuic send-path wiring, rich-dispatcher C symbols, response-buffer lifetime/aliasing proofs, real polling, event queues, C scheduler integration, and resource-bound proofs remain incomplete. |
+| [RFC 9250](https://datatracker.ietf.org/doc/html/rfc9250) | DoQ framing | Two-octet length prefix | Partial | Low* stream state verifies complete and split length-prefix parsing, bounded body copying, `ReadingMessage` progress to `Processing` with the completed DNS message length, conservative overlong-fragment rejection, bounded active stream lookup, capacity-bounded stream allocation, compacting active-stream close, worker dispatch through verified stream lookup, worker-side completed-buffer parsing into response bytes, capacity-checked response copy into a caller-provided Low* buffer, worker preparation of a MsQuic send descriptor for that buffer, send-completion/drop cleanup that closes the stream, a verified shell-event dispatcher over authenticated ingress, processing-ready, and send-completion/drop events, emitted `DNS.ShellBoundary.dispatch_authenticated_stream_data`, `DNS.ShellBoundary.process_ready_stream_for_response`, and `DNS.ShellBoundary.*_via_scheduler` C ABIs for authenticated ingress, minimal 12-byte FORMERR worker error-response, and scheduler-helper coverage, emitted `DNS.ShellResponseBoundary` C ABIs for response send handoff/completion, and a fixed-capacity C shell scaffold over those generated ABIs. | Actual MsQuic send-path wiring, rich-dispatcher C symbols, response-buffer lifetime/aliasing proofs, real polling, event queues, C scheduler integration, and resource-bound proofs remain incomplete. |
 | [RFC 9267](https://datatracker.ietf.org/doc/html/rfc9267) | DNS RR processing anti-patterns | Parser hardening guidance for compression pointers, label/name lengths, RDLENGTH, and record counts | Reference | Parser and generated-boundary tests cover pointer loops, out-of-range pointers, label/name bounds, truncated RDATA, and section-count validation. | Informational Independent Submission; use as security review guidance rather than normative protocol behavior. |
 | [RFC 9499](https://datatracker.ietf.org/doc/html/rfc9499) | DNS terminology | Current DNS terms for global DNS, QNAME, bailiwick, and roles | Reference | Documentation alignment only | Use for terminology; no executable behavior is directly required. |
 
@@ -231,7 +233,7 @@ Non-RFC standards dependencies to track separately:
 - [draft-ietf-tls-ecdhe-mlkem](https://datatracker.ietf.org/doc/draft-ietf-tls-ecdhe-mlkem/) for hybrid ML-KEM + X25519 TLS 1.3 key agreement until an RFC is published.
 - [draft-ietf-tls-mldsa](https://datatracker.ietf.org/doc/draft-ietf-tls-mldsa/) for ML-DSA in TLS 1.3 until an RFC is published.
 
-Extraction status: containerized `make extract` is now a CI smoke gate. It verifies all F*/spec modules first, then sends the current protocol/security/transport boundary plus `DNS.Zone.RadixTree`, `DNS.Worker`, `DNS.ShellScheduler`, `DNS.ShellBoundary`, and `DNS.ShellResponseBoundary` to KaRaMeL; broader Phase 3/4 cache/concurrency scaffolds remain verification-only. `make c-compile-smoke` syntax-checks the extracted C bundle and EverParse wrapper, and `make c-link-smoke` links and runs the current emitted protocol/EverParse, shell-ingress, minimal worker error-response, scheduler-helper, response handoff/completion, and fixed-capacity C shell scaffold without linking a final shell binary.
+Extraction status: containerized `make extract` is now a CI smoke gate. It verifies all F*/spec modules first, then sends the current protocol/security/transport boundary plus `DNS.Zone.RadixTree`, `DNS.Worker`, `DNS.ShellScheduler`, `DNS.ShellBoundary`, and `DNS.ShellResponseBoundary` to KaRaMeL; broader Phase 3/4 cache/concurrency scaffolds remain verification-only. `make c-compile-smoke` syntax-checks the extracted C bundle and EverParse wrapper, and `make c-link-smoke` links and runs the current emitted protocol/EverParse, shell-ingress, minimal 12-byte FORMERR worker error-response, scheduler-helper, response handoff/completion, and fixed-capacity C shell scaffold without linking a final shell binary.
 
 ## 8. Threat Model Summary
 - **Spoofing:** Mitigated by TLS 1.3 identity and verified Bailiwick checks.

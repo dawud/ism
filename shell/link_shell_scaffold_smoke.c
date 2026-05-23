@@ -144,17 +144,19 @@ bool ism_smoke_shell_scaffold(void)
       (uint32_t)sizeof worker_response
     );
 
-  if (worker_response_len != 33U ||
+  if (worker_response_len != 12U ||
       worker_response[0] != 0x12U ||
       worker_response[1] != 0x34U ||
       worker_response[2] != 0x81U ||
       worker_response[3] != 0x03U ||
       worker_response[4] != 0x00U ||
-      worker_response[5] != 0x01U ||
+      worker_response[5] != 0x00U ||
       worker_response[6] != 0x00U ||
       worker_response[7] != 0x00U ||
-      worker_response[31] != 0x00U ||
-      worker_response[32] != 0x01U)
+      worker_response[8] != 0x00U ||
+      worker_response[9] != 0x00U ||
+      worker_response[10] != 0x00U ||
+      worker_response[11] != 0x00U)
   {
     return false;
   }
@@ -179,13 +181,19 @@ bool ism_smoke_shell_scaffold(void)
       (uint32_t)sizeof dispatcher_response
     );
 
-  if (dispatcher_response_len != 33U ||
+  if (dispatcher_response_len != 12U ||
       dispatcher_response[0] != 0x12U ||
       dispatcher_response[1] != 0x34U ||
       dispatcher_response[2] != 0x81U ||
       dispatcher_response[3] != 0x03U ||
+      dispatcher_response[4] != 0x00U ||
+      dispatcher_response[5] != 0x00U ||
       dispatcher_response[6] != 0x00U ||
-      dispatcher_response[7] != 0x00U)
+      dispatcher_response[7] != 0x00U ||
+      dispatcher_response[8] != 0x00U ||
+      dispatcher_response[9] != 0x00U ||
+      dispatcher_response[10] != 0x00U ||
+      dispatcher_response[11] != 0x00U)
   {
     return false;
   }
