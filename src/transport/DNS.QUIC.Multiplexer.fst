@@ -67,7 +67,7 @@ val find_stream_from :
     (decreases (FStar.UInt32.v count - FStar.UInt32.v idx))
 
 let rec find_stream_from active capacity count id idx =
-  if FStar.UInt32.v idx = FStar.UInt32.v count then
+  if FStar.UInt32.eq idx count then
     None
   else
     begin
@@ -79,7 +79,9 @@ let rec find_stream_from active capacity count id idx =
       else
         begin
           assert (FStar.UInt32.v idx + 1 <= FStar.UInt32.v count);
-          let next_idx = FStar.UInt32.uint_to_t (FStar.UInt32.v idx + 1) in
+          assert (FStar.UInt32.v idx + 1 < 4294967296);
+          let next_idx = FStar.UInt32.add idx 1ul in
+          assert (FStar.UInt32.v next_idx = FStar.UInt32.v idx + 1);
           find_stream_from active capacity count id next_idx
         end
     end
@@ -100,7 +102,7 @@ val close_stream_from :
     (decreases (FStar.UInt32.v count - FStar.UInt32.v idx))
 
 let rec close_stream_from active capacity count id idx =
-  if FStar.UInt32.v idx = FStar.UInt32.v count then
+  if FStar.UInt32.eq idx count then
     false
   else
     begin
@@ -108,7 +110,9 @@ let rec close_stream_from active capacity count id idx =
       let stream = LowStar.Buffer.index stream_ptr 0ul in
       if stream.sc_id = id then
         begin
-          let last_idx = FStar.UInt32.uint_to_t (FStar.UInt32.v count - 1) in
+          assert (FStar.UInt32.v count > 0);
+          let last_idx = FStar.UInt32.sub count 1ul in
+          assert (FStar.UInt32.v last_idx = FStar.UInt32.v count - 1);
           let last_ptr = LowStar.Buffer.index active last_idx in
           LowStar.Buffer.upd active idx last_ptr;
           true
@@ -116,7 +120,9 @@ let rec close_stream_from active capacity count id idx =
       else
         begin
           assert (FStar.UInt32.v idx + 1 <= FStar.UInt32.v count);
-          let next_idx = FStar.UInt32.uint_to_t (FStar.UInt32.v idx + 1) in
+          assert (FStar.UInt32.v idx + 1 < 4294967296);
+          let next_idx = FStar.UInt32.add idx 1ul in
+          assert (FStar.UInt32.v next_idx = FStar.UInt32.v idx + 1);
           close_stream_from active capacity count id next_idx
         end
     end
@@ -139,7 +145,7 @@ val find_stream :
 
 let find_stream conn_ptr id =
   let conn = LowStar.Buffer.index conn_ptr 0ul in
-  if FStar.UInt32.v conn.cc_num = 0 then
+  if FStar.UInt32.eq conn.cc_num 0ul then
     None
   else
     find_stream_from conn.cc_active conn.cc_capacity conn.cc_num id 0ul
@@ -159,12 +165,14 @@ val allocate_stream :
 
 let allocate_stream conn_ptr id =
   let conn = LowStar.Buffer.index conn_ptr 0ul in
-  if FStar.UInt32.v conn.cc_num < FStar.UInt32.v conn.cc_capacity &&
-     FStar.UInt32.v conn.cc_num < 4294967295 then
+  if FStar.UInt32.lt conn.cc_num conn.cc_capacity &&
+     FStar.UInt32.lt conn.cc_num 0xfffffffful then
     let stream_ptr = LowStar.Buffer.index conn.cc_active conn.cc_num in
     let stream = LowStar.Buffer.index stream_ptr 0ul in
     let next_stream = { stream with sc_id = id; sc_phase = ReadingLength 0ul } in
-    let next_count = FStar.UInt32.uint_to_t (FStar.UInt32.v conn.cc_num + 1) in
+    assert (FStar.UInt32.v conn.cc_num + 1 < 4294967296);
+    let next_count = FStar.UInt32.add conn.cc_num 1ul in
+    assert (FStar.UInt32.v next_count = FStar.UInt32.v conn.cc_num + 1);
     LowStar.Buffer.upd stream_ptr 0ul next_stream;
     LowStar.Buffer.upd conn_ptr 0ul { conn with cc_num = next_count };
     Some stream_ptr
@@ -188,10 +196,11 @@ val close_stream :
 
 let close_stream conn_ptr id =
   let conn = LowStar.Buffer.index conn_ptr 0ul in
-  if FStar.UInt32.v conn.cc_num = 0 then
+  if FStar.UInt32.eq conn.cc_num 0ul then
     ()
   else
-    let next_count = FStar.UInt32.uint_to_t (FStar.UInt32.v conn.cc_num - 1) in
+    let next_count = FStar.UInt32.sub conn.cc_num 1ul in
+    assert (FStar.UInt32.v next_count = FStar.UInt32.v conn.cc_num - 1);
     let closed = close_stream_from conn.cc_active conn.cc_capacity conn.cc_num id 0ul in
     if closed then
       LowStar.Buffer.upd conn_ptr 0ul { conn with cc_num = next_count }

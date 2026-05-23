@@ -78,12 +78,11 @@ let process_ready_stream_for_response conn response_buffer response_capacity str
       let stream = LowStar.Buffer.index ctx_ptr 0ul in
       begin match stream.STREAM.sc_phase with
       | STREAM.Processing request_len ->
-          let request_len32 = FStar.UInt32.uint_to_t (FStar.UInt16.v request_len) in
           WORKER.prepare_worker_minimal_error_response_send
             ctx_ptr
             response_buffer
             response_capacity
-            request_len32
+            request_len
       | _ -> 0ul
       end
   | None -> 0ul

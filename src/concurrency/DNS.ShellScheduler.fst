@@ -149,12 +149,11 @@ let dispatch_minimal_worker_error_response_event conn response_buffer response_c
       let stream = LowStar.Buffer.index ctx_ptr 0ul in
       begin match stream.sc_phase with
       | Processing request_len ->
-          let request_len32 = FStar.UInt32.uint_to_t (FStar.UInt16.v request_len) in
           WORKER.prepare_worker_minimal_error_response_send
             ctx_ptr
             response_buffer
             response_capacity
-            request_len32
+            request_len
       | _ -> 0ul
       end
   | None -> 0ul

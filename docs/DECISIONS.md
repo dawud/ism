@@ -113,13 +113,13 @@ minimal worker error-response, and send completion, and
 fixed-capacity C shell scaffold over those generated boundaries.
 KaRaMeL still reports warning-15 diagnostics for GC-backed lists,
 mathematical integers, and specification-oriented definitions. Response-handoff,
-scheduler send-completion, and minimal worker error-response construction use
-machine-integer-friendly code, but stream lookup/close, stream accumulation,
-and the protocol model still carry warning debt. The current extraction gate
-verifies all scaffold modules but only emits a clean parser,
-authenticated-ingress, minimal 12-byte FORMERR worker error-response
-construction, response send handoff/completion, C-shaped scheduler helper, and
-fixed-capacity shell-scaffold link surface.
+scheduler send-completion, minimal worker error-response construction,
+shell/scheduler minimal-worker dispatch, and stream lookup/close use
+machine-integer-friendly code, but stream accumulation and the protocol model
+still carry warning debt. The current extraction gate verifies all scaffold
+modules but only emits a clean parser, authenticated-ingress, minimal 12-byte
+FORMERR worker error-response construction, response send handoff/completion,
+C-shaped scheduler helper, and fixed-capacity shell-scaffold link surface.
 
 **Decision:** Treat current extraction as a generated-artifact smoke test, not
 proof that generated output is production C. Classify warning-15 debt as
