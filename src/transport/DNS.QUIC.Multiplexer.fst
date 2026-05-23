@@ -169,7 +169,7 @@ let allocate_stream conn_ptr id =
      FStar.UInt32.lt conn.cc_num 0xfffffffful then
     let stream_ptr = LowStar.Buffer.index conn.cc_active conn.cc_num in
     let stream = LowStar.Buffer.index stream_ptr 0ul in
-    let next_stream = { stream with sc_id = id; sc_phase = ReadingLength 0ul } in
+    let next_stream = { stream with sc_id = id; sc_phase = ReadingLength } in
     assert (FStar.UInt32.v conn.cc_num + 1 < 4294967296);
     let next_count = FStar.UInt32.add conn.cc_num 1ul in
     assert (FStar.UInt32.v next_count = FStar.UInt32.v conn.cc_num + 1);

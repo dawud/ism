@@ -8,8 +8,7 @@ ism_shell_reset_stream(ism_shell_stream *stream)
 {
   stream->ctx.sc_id = 0U;
   stream->ctx.sc_phase = (DNS_QUIC_StreamMapping_stream_phase){
-    .tag = DNS_QUIC_StreamMapping_ReadingLength,
-    { .case_ReadingLength = 0U }
+    .tag = DNS_QUIC_StreamMapping_ReadingLength
   };
   stream->ctx.sc_buf = stream->message_buffer;
   stream->active = false;
@@ -102,8 +101,7 @@ DNS_QUIC_StreamMapping_stream_context
     {
       slot->ctx.sc_id = stream_id;
       slot->ctx.sc_phase = (DNS_QUIC_StreamMapping_stream_phase){
-        .tag = DNS_QUIC_StreamMapping_ReadingLength,
-        { .case_ReadingLength = 0U }
+        .tag = DNS_QUIC_StreamMapping_ReadingLength
       };
       slot->ctx.sc_buf = slot->message_buffer;
       slot->active = true;

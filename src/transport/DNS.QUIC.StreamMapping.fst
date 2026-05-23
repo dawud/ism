@@ -11,7 +11,8 @@ open FStar.UInt64
 
 (* The state machine for a single QUIC stream *)
 type stream_phase =
-  | ReadingLength  of (acc: FStar.UInt32.t)
+  | ReadingLength
+  | ReadingLengthHigh of (hi:FStar.UInt8.t)
   | ReadingMessage of (expected: FStar.UInt16.t * current: FStar.UInt32.t)
   | Processing of (expected:FStar.UInt16.t)
   | Done
@@ -28,7 +29,14 @@ type stream_context = {
 
 val u16_from_be_bytes : hi:FStar.UInt8.t -> lo:FStar.UInt8.t -> Tot FStar.UInt16.t
 let u16_from_be_bytes hi lo =
-  FStar.UInt16.uint_to_t (Prims.op_Addition (Prims.op_Multiply (FStar.UInt8.v hi) 256) (FStar.UInt8.v lo))
+  let hi16 = FStar.UInt16.uint_to_t (FStar.UInt8.v hi) in
+  let lo16 = FStar.UInt16.uint_to_t (FStar.UInt8.v lo) in
+  assert (FStar.UInt16.v hi16 < 256);
+  assert (FStar.UInt16.v lo16 < 256);
+  let shifted = FStar.UInt16.shift_left hi16 8ul in
+  assert (FStar.UInt16.v shifted <= 65280);
+  assert (FStar.UInt16.v shifted + FStar.UInt16.v lo16 <= 65535);
+  FStar.UInt16.add shifted lo16
 
 val parse_u16_from_fragment :
     data:buffer FStar.UInt8.t ->
@@ -45,63 +53,50 @@ let parse_u16_from_fragment data =
 
 val body_bytes_after_prefix : len:FStar.UInt32.t -> Tot FStar.UInt32.t
 let body_bytes_after_prefix len =
-  if FStar.UInt32.v len >= 2 then
-    FStar.UInt32.uint_to_t (FStar.UInt32.v len - 2)
+  if FStar.UInt32.gte len 2ul then
+    FStar.UInt32.sub len 2ul
   else
     0ul
 
 val body_bytes_after_stored_prefix : len:FStar.UInt32.t -> Tot FStar.UInt32.t
 let body_bytes_after_stored_prefix len =
-  if FStar.UInt32.v len >= 1 then
-    FStar.UInt32.uint_to_t (FStar.UInt32.v len - 1)
+  if FStar.UInt32.gte len 1ul then
+    FStar.UInt32.sub len 1ul
   else
     0ul
 
-val stored_prefix_high : hi:FStar.UInt8.t -> Tot FStar.UInt32.t
-let stored_prefix_high hi =
-  FStar.UInt32.uint_to_t (FStar.UInt8.v hi + 1)
-
-val stored_prefix_high_value : acc:FStar.UInt32.t -> Tot nat
-let stored_prefix_high_value acc =
-  if FStar.UInt32.v acc > 0 && FStar.UInt32.v acc <= 256 then
-    FStar.UInt32.v acc - 1
-  else
-    0
-
-val u16_from_stored_high : acc:FStar.UInt32.t -> lo:FStar.UInt8.t -> Tot FStar.UInt16.t
-let u16_from_stored_high acc lo =
-  let hi = stored_prefix_high_value acc in
-  assert (hi < 256);
-  assert (FStar.UInt8.v lo < 256);
-  FStar.UInt16.uint_to_t (Prims.op_Addition (Prims.op_Multiply hi 256) (FStar.UInt8.v lo))
+val u16_to_u32 : n:FStar.UInt16.t -> Tot FStar.UInt32.t
+let u16_to_u32 n =
+  FStar.UInt32.uint_to_t (FStar.UInt16.v n)
 
 val advance_message :
     expected:FStar.UInt16.t ->
     current:FStar.UInt32.t ->
-    incoming:FStar.UInt32.t ->
+    incoming:FStar.UInt32.t{
+      FStar.UInt32.v current + FStar.UInt32.v incoming < 4294967296} ->
     Tot stream_phase
 
 let advance_message expected current incoming =
-  let total_len = Prims.op_Addition (FStar.UInt32.v current) (FStar.UInt32.v incoming) in
-  if total_len >= FStar.UInt16.v expected then
+  assert (FStar.UInt32.v current + FStar.UInt32.v incoming < 4294967296);
+  let total_len = FStar.UInt32.add current incoming in
+  let expected32 = u16_to_u32 expected in
+  if FStar.UInt32.gte total_len expected32 then
     Processing expected
   else
     begin
-      assert (total_len < FStar.UInt16.v expected);
-      assert (total_len < 65536);
-      ReadingMessage (expected, FStar.UInt32.uint_to_t total_len)
+      assert (FStar.UInt32.v total_len < FStar.UInt16.v expected);
+      ReadingMessage (expected, total_len)
     end
 
 val remaining_message : expected:FStar.UInt16.t -> current:FStar.UInt32.t -> Tot FStar.UInt32.t
 let remaining_message expected current =
-  if FStar.UInt32.v current >= FStar.UInt16.v expected then
+  let expected32 = u16_to_u32 expected in
+  if FStar.UInt32.gte current expected32 then
     0ul
   else
     begin
-      let n = FStar.UInt16.v expected - FStar.UInt32.v current in
-      assert (n <= FStar.UInt16.v expected);
-      assert (n < 65536);
-      FStar.UInt32.uint_to_t n
+      assert (FStar.UInt32.v expected32 - FStar.UInt32.v current < 4294967296);
+      FStar.UInt32.sub expected32 current
     end
 
 val advance_message_checked :
@@ -112,14 +107,18 @@ val advance_message_checked :
 
 let advance_message_checked expected current incoming =
   let remaining = remaining_message expected current in
-  if FStar.UInt32.v incoming > FStar.UInt32.v remaining then
+  if FStar.UInt32.gt incoming remaining then
     Done
   else
+    begin
+      assert (FStar.UInt32.v incoming <= FStar.UInt32.v remaining);
+      assert (FStar.UInt32.v current + FStar.UInt32.v incoming < 4294967296);
     advance_message expected current incoming
+    end
 
 val bounded_copy_len : available:FStar.UInt32.t -> wanted:FStar.UInt32.t -> Tot FStar.UInt32.t
 let bounded_copy_len available wanted =
-  if FStar.UInt32.v available < FStar.UInt32.v wanted then available else wanted
+  if FStar.UInt32.lt available wanted then available else wanted
 
 val next_stream_phase :
     ctx:stream_context ->
@@ -133,30 +132,30 @@ val next_stream_phase :
 
 let next_stream_phase ctx data len =
   match ctx.sc_phase with
-  | ReadingLength acc ->
-      if FStar.UInt32.v acc > 0 then
-        if FStar.UInt32.v len >= 1 then
-          begin
-            assert (LowStar.Buffer.length data >= 1);
-            let lo = LowStar.Buffer.index data 0ul in
-            let expected = u16_from_stored_high acc lo in
-            let body_len = body_bytes_after_stored_prefix len in
-            advance_message_checked expected 0ul body_len
-          end
-        else
-          ctx.sc_phase
-      else if FStar.UInt32.v len >= 2 then
+  | ReadingLengthHigh hi ->
+      if FStar.UInt32.gte len 1ul then
+        begin
+          assert (LowStar.Buffer.length data >= 1);
+          let lo = LowStar.Buffer.index data 0ul in
+          let expected = u16_from_be_bytes hi lo in
+          let body_len = body_bytes_after_stored_prefix len in
+          advance_message_checked expected 0ul body_len
+        end
+      else
+        ctx.sc_phase
+  | ReadingLength ->
+      if FStar.UInt32.gte len 2ul then
         begin
           assert (LowStar.Buffer.length data >= 2);
           let expected = parse_u16_from_fragment data in
           let body_len = body_bytes_after_prefix len in
           advance_message_checked expected 0ul body_len
         end
-      else if FStar.UInt32.v len = 1 then
+      else if FStar.UInt32.eq len 1ul then
         begin
           assert (LowStar.Buffer.length data >= 1);
           let hi = LowStar.Buffer.index data 0ul in
-          ReadingLength (stored_prefix_high hi)
+          ReadingLengthHigh hi
         end
       else
         ctx.sc_phase
@@ -181,35 +180,35 @@ val copy_body_bytes :
 
 let copy_body_bytes ctx data len =
   match ctx.sc_phase with
-  | ReadingLength acc ->
-      if FStar.UInt32.v acc > 0 then
-        if FStar.UInt32.v len >= 1 then
-          begin
-            assert (LowStar.Buffer.length data >= 1);
-            let lo = LowStar.Buffer.index data 0ul in
-            let expected = u16_from_stored_high acc lo in
-            let available = body_bytes_after_stored_prefix len in
-            let wanted = remaining_message expected 0ul in
-            let count = bounded_copy_len available wanted in
-            if FStar.UInt32.v count > 0 then
-              begin
-                assert (FStar.UInt32.v count <= FStar.UInt32.v available);
-                assert (FStar.UInt32.v count <= FStar.UInt16.v expected);
-                LowStar.Buffer.blit data 1ul ctx.sc_buf 0ul count
-              end
-            else
-              ()
-          end
-        else
-          ()
-      else if FStar.UInt32.v len >= 2 then
+  | ReadingLengthHigh hi ->
+      if FStar.UInt32.gte len 1ul then
+        begin
+          assert (LowStar.Buffer.length data >= 1);
+          let lo = LowStar.Buffer.index data 0ul in
+          let expected = u16_from_be_bytes hi lo in
+          let available = body_bytes_after_stored_prefix len in
+          let wanted = remaining_message expected 0ul in
+          let count = bounded_copy_len available wanted in
+          if FStar.UInt32.gt count 0ul then
+            begin
+              assert (FStar.UInt32.v count <= FStar.UInt32.v available);
+              assert (FStar.UInt32.v count <= FStar.UInt16.v expected);
+              LowStar.Buffer.blit data 1ul ctx.sc_buf 0ul count
+            end
+          else
+            ()
+        end
+      else
+        ()
+  | ReadingLength ->
+      if FStar.UInt32.gte len 2ul then
         begin
           assert (LowStar.Buffer.length data >= 2);
           let expected = parse_u16_from_fragment data in
           let available = body_bytes_after_prefix len in
           let wanted = remaining_message expected 0ul in
           let count = bounded_copy_len available wanted in
-          if FStar.UInt32.v count > 0 then
+          if FStar.UInt32.gt count 0ul then
             begin
               assert (FStar.UInt32.v count <= FStar.UInt32.v available);
               assert (FStar.UInt32.v count <= FStar.UInt16.v expected);
@@ -221,11 +220,11 @@ let copy_body_bytes ctx data len =
       else
         ()
   | ReadingMessage (expected, current) ->
-      if FStar.UInt32.v current < FStar.UInt16.v expected then
+      if FStar.UInt32.lt current (u16_to_u32 expected) then
         begin
           let wanted = remaining_message expected current in
           let count = bounded_copy_len len wanted in
-          if FStar.UInt32.v count > 0 then
+          if FStar.UInt32.gt count 0ul then
             begin
               assert (FStar.UInt32.v count <= FStar.UInt32.v len);
               assert (FStar.UInt32.v count <= FStar.UInt16.v expected - FStar.UInt32.v current);

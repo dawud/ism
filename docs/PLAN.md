@@ -108,17 +108,20 @@ The C compile smoke gate syntax-checks the current KaRaMeL bundle and the genera
 
 The C link smoke gate links and runs a tiny harness against the current extracted protocol bundle, generated EverParse wrapper, shell ingress boundary, minimal worker error-response boundary, C-shaped scheduler helpers, response send handoff/completion boundary, and fixed-capacity C shell scaffold. It does not link the rich `DNS.ShellScheduler.dispatch_shell_event` union or any MsQuic shell code yet.
 
-The remaining warning-15 debt is concentrated in stream accumulation and the
-protocol model:
-- DoQ stream accumulation helpers still use mathematical-integer arithmetic;
+The remaining warning-15 debt is concentrated in byte-width conversion helpers
+and the protocol model:
+- DoQ stream accumulation still uses byte-to-UInt16 and UInt16-to-UInt32
+  conversion helpers, but state transitions, body-length accounting, bounded
+  copy lengths, and stored-prefix state no longer appear as separate warning-15
+  entries;
 - GC-backed list representations in `DNS.Name` and `DNS.Protocol`;
 - `dns_packet`, `question`, and `resource_record` records that still carry list-backed fields;
 - trusted-adapter boundaries that should stay visible until the generated EverParse or Low* replacement exists.
 
-Response-handoff, scheduler send-completion, and minimal worker error-response
-construction, shell/scheduler minimal-worker dispatch, and stream lookup/close
-now use machine-integer-friendly code and no longer appear as separate
-warning-15 entries.
+Response-handoff, scheduler send-completion, minimal worker error-response
+construction, shell/scheduler minimal-worker dispatch, stream lookup/close, and
+most stream accumulation state/copy helpers now use machine-integer-friendly
+code and no longer appear as separate warning-15 entries.
 
 ### F* Release Policy
 

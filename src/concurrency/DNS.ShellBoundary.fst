@@ -13,7 +13,8 @@ module WORKER = DNS.Worker
 val shell_phase_code : phase:STREAM.stream_phase -> Tot FStar.UInt8.t
 let shell_phase_code phase =
   match phase with
-  | STREAM.ReadingLength _ -> 0uy
+  | STREAM.ReadingLength -> 0uy
+  | STREAM.ReadingLengthHigh _ -> 0uy
   | STREAM.ReadingMessage _ -> 1uy
   | STREAM.Processing _ -> 2uy
   | STREAM.Done -> 3uy
