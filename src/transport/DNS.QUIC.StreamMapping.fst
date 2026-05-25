@@ -8,6 +8,7 @@ open Steel.ST.Util
 open FStar.UInt16
 open FStar.UInt32
 open FStar.UInt64
+module CAST = FStar.Int.Cast
 
 (* The state machine for a single QUIC stream *)
 type stream_phase =
@@ -34,8 +35,8 @@ val u32_from_be_u16_bytes :
   lo:FStar.UInt8.t ->
   Tot (n:FStar.UInt32.t{FStar.UInt32.v n <= 65535})
 let u32_from_be_u16_bytes hi lo =
-  let hi32 = FStar.UInt32.uint_to_t (FStar.UInt8.v hi) in
-  let lo32 = FStar.UInt32.uint_to_t (FStar.UInt8.v lo) in
+  let hi32 = CAST.uint8_to_uint32 hi in
+  let lo32 = CAST.uint8_to_uint32 lo in
   assert (FStar.UInt32.v hi32 < 256);
   assert (FStar.UInt32.v lo32 < 256);
   let shifted = FStar.UInt32.shift_left hi32 8ul in

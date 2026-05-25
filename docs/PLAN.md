@@ -108,20 +108,20 @@ The C compile smoke gate syntax-checks the current KaRaMeL bundle and the genera
 
 The C link smoke gate links and runs a tiny harness against the current extracted protocol bundle, generated EverParse wrapper, shell ingress boundary, minimal worker error-response boundary, C-shaped scheduler helpers, response send handoff/completion boundary, fixed-capacity C shell scaffold, and MsQuic-shaped adapter scaffold over fake callback data. It does not link the rich `DNS.ShellScheduler.dispatch_shell_event` union or real MsQuic shell code yet.
 
-The remaining warning-15 debt is concentrated in the stream length-prefix
-decoder and the protocol model:
-- DoQ stream accumulation still uses one byte-to-`UInt32` helper for the
-  two-octet length prefix, but state transitions, body-length accounting,
-  bounded copy lengths, stored-prefix state, and worker processing-length
-  handoff no longer appear as separate warning-15 entries;
+The remaining warning-15 debt is concentrated in the protocol model:
+- DoQ stream accumulation, including the two-octet length-prefix byte widening,
+  state transitions, body-length accounting, bounded copy lengths,
+  stored-prefix state, and worker processing-length handoff, no longer appears
+  as separate warning-15 entries;
 - GC-backed list representations in `DNS.Name` and `DNS.Protocol`;
 - `dns_packet`, `question`, and `resource_record` records that still carry list-backed fields;
 - trusted-adapter boundaries that should stay visible until the generated EverParse or Low* replacement exists.
 
 Response-handoff, scheduler send-completion, minimal worker error-response
-construction, shell/scheduler minimal-worker dispatch, stream lookup/close, and
-stream accumulation state/copy helpers now use machine-integer-friendly code
-and no longer appear as separate warning-15 entries.
+construction, shell/scheduler minimal-worker dispatch, stream lookup/close,
+stream accumulation state/copy helpers, and DoQ length-prefix byte widening now
+use machine-integer-friendly code and no longer appear as separate warning-15
+entries.
 
 ### F* Release Policy
 
