@@ -5,6 +5,7 @@ bool ism_smoke_protocol_qtype(void);
 bool ism_smoke_shell_boundary(void);
 bool ism_smoke_shell_response_boundary(void);
 bool ism_smoke_shell_scaffold(void);
+bool ism_smoke_msquic_adapter(void);
 
 int main(void)
 {
@@ -12,7 +13,8 @@ int main(void)
       !ism_smoke_protocol_qtype() ||
       !ism_smoke_shell_boundary() ||
       !ism_smoke_shell_response_boundary() ||
-      !ism_smoke_shell_scaffold())
+      !ism_smoke_shell_scaffold() ||
+      !ism_smoke_msquic_adapter())
   {
     return 1;
   }

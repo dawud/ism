@@ -36,9 +36,10 @@ The preferred C-facing MsQuic ingress call is:
 
 - `DNS.ShellBoundary.dispatch_authenticated_stream_data`
 
-The current C shell scaffold is:
+The current C shell scaffold and MsQuic-shaped adapter are:
 
 - `shell/ism_shell.c`
+- `shell/msquic_adapter.c`
 
 The preferred verified model-level dispatcher remains:
 
@@ -64,14 +65,18 @@ authenticated ingress, minimal worker error-response construction, and
 send-completion/drop cleanup without exposing the rich F* `shell_event` union.
 `DNS.ShellResponseBoundary` covers generated C response send
 handoff/completion. `shell/ism_shell.c` owns a fixed-capacity connection/stream
-table over those generated ABIs for local scaffold testing. It does not own
-sockets, MsQuic callbacks, polling, timers, dynamic allocation, or production
-event queues. The rich `DNS.ShellScheduler.dispatch_shell_event` model remains
-in the `make extract` smoke gate but is not part of the linked shell ABI yet,
-because the full worker branch still reaches non-Low* response-construction
-state. Direct lower-level calls remain available as verified boundaries, but
-new C shell integration should target the `DNS.ShellBoundary` scheduler helper
-wrappers first.
+table over those generated ABIs for local scaffold testing.
+`shell/msquic_adapter.c` is a MsQuic-shaped callback adapter over that scaffold:
+it bridges fake callback-shaped authenticated stream bytes through the
+scheduler helper wrappers, prepares ready responses into a caller-owned buffer,
+and leaves send-completion cleanup as a separate callback. It does not include
+MsQuic headers or own sockets, real MsQuic callbacks, polling, timers, dynamic
+allocation, or production event queues. The rich
+`DNS.ShellScheduler.dispatch_shell_event` model remains in the `make extract`
+smoke gate but is not part of the linked shell ABI yet, because the full worker
+branch still reaches non-Low* response-construction state. Direct lower-level
+calls remain available as verified boundaries, but new C shell integration
+should target the `DNS.ShellBoundary` scheduler helper wrappers first.
 
 `DNS.Security.Handshake.process_crypto_frame` and
 `DNS.Security.Gateway.decrypt_and_validate` are legacy transitional adapter
@@ -155,8 +160,10 @@ when. It must maintain the logical ownership expected by the verified model:
   one scheduler-shaped ABI surface for ingress, minimal worker error-response,
   and send-completion/drop cleanup.
 - Keep `shell/ism_shell.c` as the fixed-capacity scaffold that owns generated C
-  connection/stream buffers until the MsQuic adapter replaces its local event
-  simulation.
+  connection/stream buffers.
+- Keep `shell/msquic_adapter.c` as the current MsQuic-shaped shell adapter; it
+  routes authenticated stream bytes through scheduler helper wrappers, prepares
+  ready responses, and leaves send completion as a separate callback.
 - Keep `DNS.ShellScheduler.dispatch_shell_event` as the verified model-level
   dispatch point for authenticated stream data, processing-ready streams, and
   send-completion/drop notifications.
@@ -211,8 +218,9 @@ The unverified shell must stay small and auditable.
   the current protocol/EverParse generated-wrapper strict-subset checks,
   `DNS.ShellBoundary` ingress/minimal worker error-response, scheduler helper
   wrappers, and `DNS.ShellResponseBoundary` response handoff/completion harness
-  plus the fixed-capacity C shell scaffold. This does not yet cover the rich
-  `DNS.ShellScheduler.dispatch_shell_event` union or the MsQuic shell path.
+  plus the fixed-capacity C shell scaffold and MsQuic-shaped adapter smoke
+  path. This does not yet cover the rich `DNS.ShellScheduler.dispatch_shell_event`
+  union or a real linked MsQuic shell path.
 - Run `make pulse-rust-smoke` after migration-lane Pulse/Rust boundary changes
   to compile the generated Rust, link the extern-friendly wrapper from C, and
   keep the experimental ABI shape honest.
