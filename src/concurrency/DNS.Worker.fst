@@ -163,7 +163,7 @@ val prepare_worker_minimal_error_response_send :
   ctx_ptr:buffer stream_context ->
   response_buffer:buffer FStar.UInt8.t ->
   response_capacity:FStar.UInt32.t ->
-  request_len:FStar.UInt16.t ->
+  request_len:FStar.UInt32.t ->
   ST FStar.UInt32.t
     (requires (fun h0 ->
       live h0 ctx_ptr /\
@@ -172,19 +172,19 @@ val prepare_worker_minimal_error_response_send :
       FStar.UInt32.v response_capacity <= LowStar.Buffer.length response_buffer /\
       (let ctx = FStar.Seq.index (LowStar.Buffer.as_seq h0 ctx_ptr) 0 in
        live h0 ctx.sc_buf /\
-       FStar.UInt16.v request_len <= LowStar.Buffer.length ctx.sc_buf)))
+       FStar.UInt32.v request_len <= LowStar.Buffer.length ctx.sc_buf)))
     (ensures (fun h0 _ h1 ->
       modifies (loc_buffer response_buffer) h0 h1 /\
       live h1 response_buffer))
 
 let prepare_worker_minimal_error_response_send ctx_ptr response_buffer response_capacity request_len =
   let s = LowStar.Buffer.index ctx_ptr 0ul in
-  if FStar.UInt16.lt request_len 12us ||
+  if FStar.UInt32.lt request_len 12ul ||
      FStar.UInt32.lt response_capacity 12ul then
     0ul
   else
     begin
-      assert (FStar.UInt16.v request_len <= LowStar.Buffer.length s.sc_buf);
+      assert (FStar.UInt32.v request_len <= LowStar.Buffer.length s.sc_buf);
       assert (12 <= LowStar.Buffer.length response_buffer);
       assert (1 < LowStar.Buffer.length s.sc_buf);
       assert (0 < LowStar.Buffer.length response_buffer);
@@ -247,9 +247,8 @@ let worker_loop_with_root root conn response_buffer response_capacity id =
     begin
       match s.sc_phase with
       | Processing request_len ->
-          let request_len32 = FStar.UInt32.uint_to_t (FStar.UInt16.v request_len) in
           let _send_descriptor =
-            prepare_worker_response_send root ctx_ptr response_buffer response_capacity request_len32 in
+            prepare_worker_response_send root ctx_ptr response_buffer response_capacity request_len in
           ()
       | Done -> ()
       | _ -> ()
