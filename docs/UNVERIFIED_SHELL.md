@@ -53,6 +53,7 @@ established by construction or checked before the call:
 - `DNS.ShellResponseBoundary.prepare_response_send_for_stream`
 - `DNS.ShellResponseBoundary.complete_response_send_for_stream`
 - `DNS.Worker.Minimal.prepare_worker_minimal_error_response_send`
+- `DNS.Worker.Minimal.prepare_worker_empty_noerror_response_send`
 - `DNS.QUIC.StreamMapping.handle_stream_data`
 - `DNS.QUIC.Multiplexer.find_stream`
 - `DNS.Worker.worker_loop`
@@ -61,10 +62,13 @@ established by construction or checked before the call:
 `make c-link-smoke` generated C boundary harness, and
 `DNS.ShellBoundary.process_ready_stream_for_response` covers minimal worker
 error-response construction for an already-processing stream through
-`DNS.Worker.Minimal`, keeping the linked shell ABI away from the full
-list-backed worker/parser/zone path.
+`DNS.Worker.Minimal`. `DNS.ShellBoundary.process_ready_stream_for_empty_response`
+covers the same already-processing stream shape for a header-only empty NOERROR
+response that preserves the request ID and selected request flags. Both helpers
+keep the linked shell ABI away from the full list-backed worker/parser/zone
+path.
 `DNS.ShellBoundary` also exposes C-shaped scheduler helper wrappers for
-authenticated ingress, minimal worker error-response construction, and
+authenticated ingress, minimal worker response construction, and
 send-completion/drop cleanup without exposing the rich F* `shell_event` union.
 `DNS.ShellResponseBoundary` covers generated C response send
 handoff/completion. `shell/ism_shell.c` owns a fixed-capacity connection/stream
@@ -156,14 +160,18 @@ when. It must maintain the logical ownership expected by the verified model:
   authenticated ingress.
 - Prefer `DNS.ShellBoundary.process_ready_stream_for_response` for generated C
   minimal worker error-response on streams already marked `Processing`.
-- Keep `DNS.Worker.Minimal.prepare_worker_minimal_error_response_send` as the
-  current C-linked worker response helper until the production response path is
-  rewritten into an extraction-friendly representation.
+- Prefer `DNS.ShellBoundary.process_ready_stream_for_empty_response` for
+  generated C header-only empty NOERROR responses on streams already marked
+  `Processing`.
+- Keep `DNS.Worker.Minimal.prepare_worker_minimal_error_response_send` and
+  `DNS.Worker.Minimal.prepare_worker_empty_noerror_response_send` as the
+  current C-linked worker response helpers until the production response path
+  is rewritten into an extraction-friendly representation.
 - Prefer `DNS.ShellResponseBoundary.prepare_response_send_for_stream` and
   `DNS.ShellResponseBoundary.complete_response_send_for_stream` for generated C
   response handoff and send-completion/drop cleanup.
 - Prefer the `DNS.ShellBoundary.*_via_scheduler` wrappers when the C shell wants
-  one scheduler-shaped ABI surface for ingress, minimal worker error-response,
+  one scheduler-shaped ABI surface for ingress, minimal worker responses,
   and send-completion/drop cleanup.
 - Keep `shell/ism_shell.c` as the fixed-capacity scaffold that owns generated C
   connection/stream buffers.
@@ -224,7 +232,7 @@ The unverified shell must stay small and auditable.
   syntax-check the generated C bundle and EverParse wrapper.
 - Run `make c-link-smoke` after generated C boundary changes to link and run
   the current protocol/EverParse generated-wrapper strict-subset checks,
-  `DNS.ShellBoundary` ingress/minimal worker error-response, scheduler helper
+  `DNS.ShellBoundary` ingress/minimal worker response, scheduler helper
   wrappers, and `DNS.ShellResponseBoundary` response handoff/completion harness
   plus the fixed-capacity C shell scaffold and MsQuic-shaped adapter smoke
   path. This does not yet cover the rich `DNS.ShellScheduler.dispatch_shell_event`

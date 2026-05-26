@@ -8,6 +8,8 @@ bool ism_smoke_shell_scaffold(void)
   ism_shell_connection conn;
   ism_shell_connection worker_conn;
   ism_shell_connection dispatcher_conn;
+  ism_shell_connection empty_worker_conn;
+  ism_shell_connection empty_dispatcher_conn;
   uint8_t zero_length_doq_message[] = { 0U, 0U };
   uint8_t response_buffer[1] = { 0U };
   uint8_t exact_a_query[] = {
@@ -27,11 +29,15 @@ bool ism_smoke_shell_scaffold(void)
   };
   uint8_t worker_response[128] = { 0U };
   uint8_t dispatcher_response[128] = { 0U };
+  uint8_t empty_worker_response[128] = { 0U };
+  uint8_t empty_dispatcher_response[128] = { 0U };
   const uint64_t first_stream_id = 7U;
   const uint64_t second_stream_id = 9U;
   const uint64_t third_stream_id = 11U;
   const uint64_t worker_stream_id = 13U;
   const uint64_t dispatcher_stream_id = 15U;
+  const uint64_t empty_worker_stream_id = 17U;
+  const uint64_t empty_dispatcher_stream_id = 19U;
 
   ism_shell_connection_init(&conn);
 
@@ -206,6 +212,92 @@ bool ism_smoke_shell_scaffold(void)
         false
       ) != 1U ||
       dispatcher_conn.ctx.cc_num != 0U)
+  {
+    return false;
+  }
+
+  ism_shell_connection_init(&empty_worker_conn);
+
+  if (ism_shell_on_authenticated_stream_data(
+        &empty_worker_conn,
+        empty_worker_stream_id,
+        exact_a_query,
+        (uint32_t)sizeof exact_a_query
+      ) != 2U)
+  {
+    return false;
+  }
+
+  uint32_t empty_worker_response_len =
+    ism_shell_process_ready_stream_empty_response(
+      &empty_worker_conn,
+      empty_worker_stream_id,
+      empty_worker_response,
+      (uint32_t)sizeof empty_worker_response
+    );
+
+  if (empty_worker_response_len != 12U ||
+      empty_worker_response[0] != 0x12U ||
+      empty_worker_response[1] != 0x34U ||
+      empty_worker_response[2] != 0x81U ||
+      empty_worker_response[3] != 0x00U ||
+      empty_worker_response[4] != 0x00U ||
+      empty_worker_response[5] != 0x00U ||
+      empty_worker_response[6] != 0x00U ||
+      empty_worker_response[7] != 0x00U ||
+      empty_worker_response[8] != 0x00U ||
+      empty_worker_response[9] != 0x00U ||
+      empty_worker_response[10] != 0x00U ||
+      empty_worker_response[11] != 0x00U)
+  {
+    return false;
+  }
+
+  ism_shell_connection_init(&empty_dispatcher_conn);
+
+  if (ism_shell_dispatch_authenticated_stream_data(
+        &empty_dispatcher_conn,
+        empty_dispatcher_stream_id,
+        exact_a_query,
+        (uint32_t)sizeof exact_a_query
+      ) != 2U)
+  {
+    return false;
+  }
+
+  uint32_t empty_dispatcher_response_len =
+    ism_shell_dispatch_ready_stream_empty_response(
+      &empty_dispatcher_conn,
+      empty_dispatcher_stream_id,
+      empty_dispatcher_response,
+      (uint32_t)sizeof empty_dispatcher_response
+    );
+
+  if (empty_dispatcher_response_len != 12U ||
+      empty_dispatcher_response[0] != 0x12U ||
+      empty_dispatcher_response[1] != 0x34U ||
+      empty_dispatcher_response[2] != 0x81U ||
+      empty_dispatcher_response[3] != 0x00U ||
+      empty_dispatcher_response[4] != 0x00U ||
+      empty_dispatcher_response[5] != 0x00U ||
+      empty_dispatcher_response[6] != 0x00U ||
+      empty_dispatcher_response[7] != 0x00U ||
+      empty_dispatcher_response[8] != 0x00U ||
+      empty_dispatcher_response[9] != 0x00U ||
+      empty_dispatcher_response[10] != 0x00U ||
+      empty_dispatcher_response[11] != 0x00U)
+  {
+    return false;
+  }
+
+  if (ism_shell_dispatch_response_send_finished(
+        &empty_dispatcher_conn,
+        empty_dispatcher_stream_id,
+        empty_dispatcher_response,
+        empty_dispatcher_response_len,
+        false
+      ) != 1U ||
+      empty_dispatcher_conn.ctx.cc_num != 0U)
   {
     return false;
   }

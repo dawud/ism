@@ -68,7 +68,23 @@ ism_shell_process_ready_stream(
 );
 
 uint32_t
+ism_shell_process_ready_stream_empty_response(
+  ism_shell_connection *conn,
+  uint64_t stream_id,
+  uint8_t *response_buffer,
+  uint32_t response_capacity
+);
+
+uint32_t
 ism_shell_dispatch_ready_stream(
+  ism_shell_connection *conn,
+  uint64_t stream_id,
+  uint8_t *response_buffer,
+  uint32_t response_capacity
+);
+
+uint32_t
+ism_shell_dispatch_ready_stream_empty_response(
   ism_shell_connection *conn,
   uint64_t stream_id,
   uint8_t *response_buffer,

@@ -172,6 +172,43 @@ let dispatch_minimal_worker_error_response_event conn response_buffer response_c
       end
   | None -> 0ul
 
+val dispatch_empty_noerror_response_event :
+  conn:buffer connection_context ->
+  response_buffer:buffer FStar.UInt8.t ->
+  response_capacity:FStar.UInt32.t ->
+  stream_id:FStar.UInt64.t ->
+  ST FStar.UInt32.t
+    (requires (fun h0 ->
+      live h0 conn /\
+      LowStar.Buffer.length conn >= 1 /\
+      live h0 response_buffer /\
+      FStar.UInt32.v response_capacity <= LowStar.Buffer.length response_buffer /\
+      loc_disjoint (loc_buffer conn) (loc_buffer response_buffer) /\
+      (let c = FStar.Seq.index (LowStar.Buffer.as_seq h0 conn) 0 in
+       FStar.UInt32.v c.cc_num <= FStar.UInt32.v c.cc_capacity /\
+       (if FStar.UInt32.v c.cc_num > 0 then
+          active_streams_live h0 c.cc_active c.cc_capacity /\
+          loc_disjoint (loc_buffer conn) (loc_buffer c.cc_active)
+        else True))))
+    (ensures (fun h0 _ h1 ->
+      modifies (loc_buffer response_buffer) h0 h1 /\
+      live h1 response_buffer))
+
+let dispatch_empty_noerror_response_event conn response_buffer response_capacity stream_id =
+  match find_stream conn stream_id with
+  | Some ctx_ptr ->
+      let stream = LowStar.Buffer.index ctx_ptr 0ul in
+      begin match stream.sc_phase with
+      | Processing request_len ->
+          WORKER.prepare_worker_empty_noerror_response_send
+            ctx_ptr
+            response_buffer
+            response_capacity
+            request_len
+      | _ -> 0ul
+      end
+  | None -> 0ul
+
 val dispatch_response_send_finished_for_stream_event :
   conn:buffer connection_context ->
   response_buffer:buffer FStar.UInt8.t ->
