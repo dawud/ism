@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "ism_shell.h"
 
@@ -38,6 +39,20 @@ bool ism_smoke_shell_scaffold(void)
     0x00U, 0x00U,
     0x00U, 0x00U,
     0x00U, 0x00U
+  };
+  uint8_t expected_validated_response[] = {
+    0x12U, 0x34U,
+    0x81U, 0x00U,
+    0x00U, 0x01U,
+    0x00U, 0x00U,
+    0x00U, 0x00U,
+    0x00U, 0x00U,
+    0x03U, 0x63U, 0x6fU, 0x6dU,
+    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
+    0x03U, 0x77U, 0x77U, 0x77U,
+    0x00U,
+    0x00U, 0x01U,
+    0x00U, 0x01U
   };
   uint8_t worker_response[128] = { 0U };
   uint8_t dispatcher_response[128] = { 0U };
@@ -340,19 +355,13 @@ bool ism_smoke_shell_scaffold(void)
       (uint32_t)sizeof validated_worker_response
     );
 
-  if (validated_worker_response_len != 12U ||
-      validated_worker_response[0] != 0x12U ||
-      validated_worker_response[1] != 0x34U ||
-      validated_worker_response[2] != 0x81U ||
-      validated_worker_response[3] != 0x00U ||
-      validated_worker_response[4] != 0x00U ||
-      validated_worker_response[5] != 0x00U ||
-      validated_worker_response[6] != 0x00U ||
-      validated_worker_response[7] != 0x00U ||
-      validated_worker_response[8] != 0x00U ||
-      validated_worker_response[9] != 0x00U ||
-      validated_worker_response[10] != 0x00U ||
-      validated_worker_response[11] != 0x00U)
+  if (validated_worker_response_len !=
+        (uint32_t)sizeof expected_validated_response ||
+      memcmp(
+        validated_worker_response,
+        expected_validated_response,
+        sizeof expected_validated_response
+      ) != 0)
   {
     return false;
   }
@@ -377,19 +386,13 @@ bool ism_smoke_shell_scaffold(void)
       (uint32_t)sizeof validated_dispatcher_response
     );
 
-  if (validated_dispatcher_response_len != 12U ||
-      validated_dispatcher_response[0] != 0x12U ||
-      validated_dispatcher_response[1] != 0x34U ||
-      validated_dispatcher_response[2] != 0x81U ||
-      validated_dispatcher_response[3] != 0x00U ||
-      validated_dispatcher_response[4] != 0x00U ||
-      validated_dispatcher_response[5] != 0x00U ||
-      validated_dispatcher_response[6] != 0x00U ||
-      validated_dispatcher_response[7] != 0x00U ||
-      validated_dispatcher_response[8] != 0x00U ||
-      validated_dispatcher_response[9] != 0x00U ||
-      validated_dispatcher_response[10] != 0x00U ||
-      validated_dispatcher_response[11] != 0x00U)
+  if (validated_dispatcher_response_len !=
+        (uint32_t)sizeof expected_validated_response ||
+      memcmp(
+        validated_dispatcher_response,
+        expected_validated_response,
+        sizeof expected_validated_response
+      ) != 0)
   {
     return false;
   }

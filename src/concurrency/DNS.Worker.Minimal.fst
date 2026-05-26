@@ -259,6 +259,117 @@ let prepare_worker_empty_noerror_response_send
       12ul
     end
 
+val copy_question_bytes :
+  request_buffer:buffer FStar.UInt8.t ->
+  response_buffer:buffer FStar.UInt8.t ->
+  question_len:FStar.UInt32.t ->
+  idx:FStar.UInt32.t{FStar.UInt32.v idx <= FStar.UInt32.v question_len} ->
+  ST unit
+    (requires (fun h0 ->
+      live h0 request_buffer /\
+      live h0 response_buffer /\
+      FStar.UInt32.v question_len <= 259 /\
+      FStar.UInt32.v question_len <= LowStar.Buffer.length request_buffer - 12 /\
+      FStar.UInt32.v question_len <= LowStar.Buffer.length response_buffer - 12))
+    (ensures (fun h0 _ h1 ->
+      modifies (loc_buffer response_buffer) h0 h1 /\
+      live h1 response_buffer))
+    (decreases (FStar.UInt32.v question_len - FStar.UInt32.v idx))
+
+let rec copy_question_bytes request_buffer response_buffer question_len idx =
+  if FStar.UInt32.eq idx question_len then
+    ()
+  else
+    begin
+      assert (FStar.UInt32.v idx < FStar.UInt32.v question_len);
+      assert (FStar.UInt32.v idx < 259);
+      assert (12 + FStar.UInt32.v idx < 4294967296);
+      let src_idx = FStar.UInt32.add 12ul idx in
+      let dst_idx = FStar.UInt32.add 12ul idx in
+      assert (FStar.UInt32.v src_idx < LowStar.Buffer.length request_buffer);
+      assert (FStar.UInt32.v dst_idx < LowStar.Buffer.length response_buffer);
+      let byte = LowStar.Buffer.index request_buffer src_idx in
+      LowStar.Buffer.upd response_buffer dst_idx byte;
+      assert (FStar.UInt32.v idx + 1 <= FStar.UInt32.v question_len);
+      assert (FStar.UInt32.v idx + 1 < 4294967296);
+      let next_idx = FStar.UInt32.add idx 1ul in
+      assert (FStar.UInt32.v next_idx = FStar.UInt32.v idx + 1);
+      copy_question_bytes request_buffer response_buffer question_len next_idx
+    end
+
+val prepare_worker_question_noerror_response_send :
+  ctx_ptr:buffer stream_context ->
+  response_buffer:buffer FStar.UInt8.t ->
+  response_capacity:FStar.UInt32.t ->
+  request_len:FStar.UInt32.t ->
+  ST FStar.UInt32.t
+    (requires (fun h0 ->
+      live h0 ctx_ptr /\
+      LowStar.Buffer.length ctx_ptr >= 1 /\
+      live h0 response_buffer /\
+      FStar.UInt32.v response_capacity <= LowStar.Buffer.length response_buffer /\
+      (let ctx = FStar.Seq.index (LowStar.Buffer.as_seq h0 ctx_ptr) 0 in
+       live h0 ctx.sc_buf /\
+       FStar.UInt32.v request_len <= LowStar.Buffer.length ctx.sc_buf)))
+    (ensures (fun h0 _ h1 ->
+      modifies (loc_buffer response_buffer) h0 h1 /\
+      live h1 response_buffer))
+
+let prepare_worker_question_noerror_response_send
+  ctx_ptr
+  response_buffer
+  response_capacity
+  request_len =
+  let s = LowStar.Buffer.index ctx_ptr 0ul in
+  if FStar.UInt32.lt request_len 17ul ||
+     FStar.UInt32.lt 271ul request_len ||
+     FStar.UInt32.lt response_capacity request_len then
+    0ul
+  else
+    begin
+      assert (FStar.UInt32.v request_len <= LowStar.Buffer.length s.sc_buf);
+      assert (FStar.UInt32.v request_len <= LowStar.Buffer.length response_buffer);
+      assert (FStar.UInt32.v request_len >= 12);
+      assert (FStar.UInt32.v request_len <= 271);
+      assert (FStar.UInt32.v request_len - 12 < 4294967296);
+      let question_len = FStar.UInt32.sub request_len 12ul in
+      assert (FStar.UInt32.v question_len <= 259);
+      assert (FStar.UInt32.v question_len <= LowStar.Buffer.length s.sc_buf - 12);
+      assert (FStar.UInt32.v question_len <= LowStar.Buffer.length response_buffer - 12);
+      assert (12 <= LowStar.Buffer.length response_buffer);
+      assert (3 < LowStar.Buffer.length s.sc_buf);
+      assert (0 < LowStar.Buffer.length response_buffer);
+      assert (1 < LowStar.Buffer.length response_buffer);
+      assert (2 < LowStar.Buffer.length response_buffer);
+      assert (3 < LowStar.Buffer.length response_buffer);
+      assert (4 < LowStar.Buffer.length response_buffer);
+      assert (5 < LowStar.Buffer.length response_buffer);
+      assert (6 < LowStar.Buffer.length response_buffer);
+      assert (7 < LowStar.Buffer.length response_buffer);
+      assert (8 < LowStar.Buffer.length response_buffer);
+      assert (9 < LowStar.Buffer.length response_buffer);
+      assert (10 < LowStar.Buffer.length response_buffer);
+      assert (11 < LowStar.Buffer.length response_buffer);
+      let id_hi = LowStar.Buffer.index s.sc_buf 0ul in
+      let id_lo = LowStar.Buffer.index s.sc_buf 1ul in
+      let request_flags_hi = LowStar.Buffer.index s.sc_buf 2ul in
+      let request_flags_lo = LowStar.Buffer.index s.sc_buf 3ul in
+      copy_question_bytes s.sc_buf response_buffer question_len 0ul;
+      LowStar.Buffer.upd response_buffer 0ul id_hi;
+      LowStar.Buffer.upd response_buffer 1ul id_lo;
+      LowStar.Buffer.upd response_buffer 2ul (noerror_response_flags_hi request_flags_hi);
+      LowStar.Buffer.upd response_buffer 3ul (noerror_response_flags_lo request_flags_lo);
+      LowStar.Buffer.upd response_buffer 4ul 0x00uy;
+      LowStar.Buffer.upd response_buffer 5ul 0x01uy;
+      LowStar.Buffer.upd response_buffer 6ul 0x00uy;
+      LowStar.Buffer.upd response_buffer 7ul 0x00uy;
+      LowStar.Buffer.upd response_buffer 8ul 0x00uy;
+      LowStar.Buffer.upd response_buffer 9ul 0x00uy;
+      LowStar.Buffer.upd response_buffer 10ul 0x00uy;
+      LowStar.Buffer.upd response_buffer 11ul 0x00uy;
+      request_len
+    end
+
 val prepare_worker_validated_minimal_response_send :
   ctx_ptr:buffer stream_context ->
   response_buffer:buffer FStar.UInt8.t ->
@@ -286,7 +397,7 @@ let prepare_worker_validated_minimal_response_send
   let valid =
     validate_minimal_uncompressed_question_request s.sc_buf request_len in
   if valid then
-    prepare_worker_empty_noerror_response_send
+    prepare_worker_question_noerror_response_send
       ctx_ptr
       response_buffer
       response_capacity

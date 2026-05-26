@@ -71,8 +71,8 @@ path.
 `DNS.ShellBoundary.process_ready_stream_for_validated_minimal_response` is the
 preferred narrow production-facing helper: it validates an uncompressed
 question-only request through the generated EverParse runtime boundary, returns
-the header-only empty NOERROR response when accepted, and returns the minimal
-FORMERR response when rejected.
+a zero-answer NOERROR response that echoes the validated question when
+accepted, and returns the minimal FORMERR response when rejected.
 `DNS.ShellBoundary` also exposes C-shaped scheduler helper wrappers for
 authenticated ingress, minimal worker response construction, and
 send-completion/drop cleanup without exposing the rich F* `shell_event` union.
@@ -170,8 +170,9 @@ when. It must maintain the logical ownership expected by the verified model:
   generated C header-only empty NOERROR responses on streams already marked
   `Processing`.
 - Prefer `DNS.ShellBoundary.process_ready_stream_for_validated_minimal_response`
-  for generated C minimal worker responses that should choose between empty
-  NOERROR and FORMERR based on the generated parser boundary.
+  for generated C minimal worker responses that should choose between a
+  question-echoing zero-answer NOERROR response and FORMERR based on the
+  generated parser boundary.
 - Keep `DNS.Worker.Minimal.prepare_worker_minimal_error_response_send` and
   `DNS.Worker.Minimal.prepare_worker_empty_noerror_response_send` as direct
   scaffold helpers, and keep
