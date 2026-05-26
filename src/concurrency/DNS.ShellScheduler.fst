@@ -8,7 +8,7 @@ open DNS.QUIC.Multiplexer
 module COMPLETE = DNS.QUIC.MsQuicSendCompletion
 module EGRESS = DNS.QUIC.MsQuicEgress
 module INGRESS = DNS.QUIC.MsQuicIngress
-module WORKER = DNS.Worker
+module WORKER = DNS.Worker.Minimal
 
 (* Scheduler-facing event shape for the unverified shell. The shell still owns
    polling, allocation, MsQuic callbacks, and queueing; this type only records
@@ -90,7 +90,21 @@ let dispatch_shell_event auth stream_borrow completion_borrow event =
           fragment in
       ()
   | ProcessingReady conn response_buffer response_capacity stream_id ->
-      WORKER.worker_loop conn response_buffer response_capacity stream_id
+      let _ =
+        match find_stream conn stream_id with
+        | Some ctx_ptr ->
+            let stream = LowStar.Buffer.index ctx_ptr 0ul in
+            begin match stream.sc_phase with
+            | Processing request_len ->
+                WORKER.prepare_worker_minimal_error_response_send
+                  ctx_ptr
+                  response_buffer
+                  response_capacity
+                  request_len
+            | _ -> 0ul
+            end
+        | None -> 0ul in
+      ()
   | ResponseSendFinished conn descriptor outcome ->
       COMPLETE.complete_response_send completion_borrow conn descriptor outcome
 

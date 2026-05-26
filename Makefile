@@ -71,7 +71,7 @@ EVERPARSE_FSTAR_OPTS = --odir $(EVERPARSE_OUT_DIR) --cache_dir $(EVERPARSE_OUT_D
 # KaRaMel configuration
 KRML_OPTS   = -drop 'FStar.Tactics.*' -drop 'FStar.Reflection.*' \
               -bundle DNS.Protocol=DNS.Protocol,DNS.Name,DNS.Constants,DNS.RCode,DNS.Protocol.* \
-              -bundle DNS.ShellBoundary=DNS.Security.*,DNS.QUIC.*,DNS.Zone.RadixTree,DNS.Worker,DNS.ShellScheduler,DNS.ShellBoundary \
+              -bundle DNS.ShellBoundary=DNS.Security.*,DNS.QUIC.*,DNS.Worker.Minimal,DNS.ShellScheduler,DNS.ShellBoundary \
               -bundle DNS.ShellResponseBoundary=DNS.ShellResponseBoundary \
               -add-include '"krml/internal/compat.h"' \
               -tmpdir $(DIST_DIR) -skip-compilation
@@ -127,13 +127,13 @@ ALL_FST_FILES = $(PROTOCOL_FST_FILES) \
 
 # Extraction is narrower than verification while most Phase 3/4 scaffolds still
 # contain specification-oriented lists and Steel placeholders. It includes the
-# shell-facing worker/dispatcher boundary so the unverified shell can target an
-# extracted API while cache and broader concurrency proofs remain verification-only.
+# shell-facing minimal worker/dispatcher boundary so the unverified shell can
+# target an extracted API while the full worker, cache, and broader concurrency
+# proofs remain verification-only.
 EXTRACT_FST_FILES = $(filter-out src/protocol/%.Tests.fst, $(PROTOCOL_FST_FILES)) \
                     $(wildcard src/security/*.fst) \
                     $(wildcard src/transport/*.fst) \
-                    src/logic/DNS.Zone.RadixTree.fst \
-                    src/concurrency/DNS.Worker.fst \
+                    src/concurrency/DNS.Worker.Minimal.fst \
                     src/concurrency/DNS.ShellScheduler.fst \
                     src/concurrency/DNS.ShellBoundary.fst \
                     src/concurrency/DNS.ShellResponseBoundary.fst \

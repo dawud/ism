@@ -6,7 +6,7 @@ open LowStar.Modifies
 module MUX = DNS.QUIC.Multiplexer
 module SCHED = DNS.ShellScheduler
 module STREAM = DNS.QUIC.StreamMapping
-module WORKER = DNS.Worker
+module WORKER = DNS.Worker.Minimal
 
 (* C-facing phase codes for the unverified shell. Keep this stable and small:
    the richer F* stream_phase type stays inside the verified core. *)

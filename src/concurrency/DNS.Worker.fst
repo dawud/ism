@@ -13,6 +13,7 @@ module EGRESS = DNS.QUIC.MsQuicEgress
 module PARSE = DNS.Protocol.Parser
 module SER = DNS.Protocol.Serializer
 module Z = DNS.Zone.RadixTree
+module MINIMAL = DNS.Worker.Minimal
 module L = FStar.List.Tot
 
 val build_worker_response_bytes :
@@ -178,43 +179,11 @@ val prepare_worker_minimal_error_response_send :
       live h1 response_buffer))
 
 let prepare_worker_minimal_error_response_send ctx_ptr response_buffer response_capacity request_len =
-  let s = LowStar.Buffer.index ctx_ptr 0ul in
-  if FStar.UInt32.lt request_len 12ul ||
-     FStar.UInt32.lt response_capacity 12ul then
-    0ul
-  else
-    begin
-      assert (FStar.UInt32.v request_len <= LowStar.Buffer.length s.sc_buf);
-      assert (12 <= LowStar.Buffer.length response_buffer);
-      assert (1 < LowStar.Buffer.length s.sc_buf);
-      assert (0 < LowStar.Buffer.length response_buffer);
-      assert (1 < LowStar.Buffer.length response_buffer);
-      assert (2 < LowStar.Buffer.length response_buffer);
-      assert (3 < LowStar.Buffer.length response_buffer);
-      assert (4 < LowStar.Buffer.length response_buffer);
-      assert (5 < LowStar.Buffer.length response_buffer);
-      assert (6 < LowStar.Buffer.length response_buffer);
-      assert (7 < LowStar.Buffer.length response_buffer);
-      assert (8 < LowStar.Buffer.length response_buffer);
-      assert (9 < LowStar.Buffer.length response_buffer);
-      assert (10 < LowStar.Buffer.length response_buffer);
-      assert (11 < LowStar.Buffer.length response_buffer);
-      let id_hi = LowStar.Buffer.index s.sc_buf 0ul in
-      let id_lo = LowStar.Buffer.index s.sc_buf 1ul in
-      LowStar.Buffer.upd response_buffer 0ul id_hi;
-      LowStar.Buffer.upd response_buffer 1ul id_lo;
-      LowStar.Buffer.upd response_buffer 2ul 0x81uy;
-      LowStar.Buffer.upd response_buffer 3ul 0x03uy;
-      LowStar.Buffer.upd response_buffer 4ul 0x00uy;
-      LowStar.Buffer.upd response_buffer 5ul 0x00uy;
-      LowStar.Buffer.upd response_buffer 6ul 0x00uy;
-      LowStar.Buffer.upd response_buffer 7ul 0x00uy;
-      LowStar.Buffer.upd response_buffer 8ul 0x00uy;
-      LowStar.Buffer.upd response_buffer 9ul 0x00uy;
-      LowStar.Buffer.upd response_buffer 10ul 0x00uy;
-      LowStar.Buffer.upd response_buffer 11ul 0x00uy;
-      12ul
-    end
+  MINIMAL.prepare_worker_minimal_error_response_send
+    ctx_ptr
+    response_buffer
+    response_capacity
+    request_len
 
 (* The Worker Harness *)
 (* This loop represents a thread processing a single QUIC connection *)

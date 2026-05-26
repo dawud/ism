@@ -52,6 +52,7 @@ established by construction or checked before the call:
 - `DNS.ShellBoundary.dispatch_authenticated_stream_data`
 - `DNS.ShellResponseBoundary.prepare_response_send_for_stream`
 - `DNS.ShellResponseBoundary.complete_response_send_for_stream`
+- `DNS.Worker.Minimal.prepare_worker_minimal_error_response_send`
 - `DNS.QUIC.StreamMapping.handle_stream_data`
 - `DNS.QUIC.Multiplexer.find_stream`
 - `DNS.Worker.worker_loop`
@@ -59,7 +60,9 @@ established by construction or checked before the call:
 `DNS.ShellBoundary.dispatch_authenticated_stream_data` is included in the
 `make c-link-smoke` generated C boundary harness, and
 `DNS.ShellBoundary.process_ready_stream_for_response` covers minimal worker
-error-response construction for an already-processing stream.
+error-response construction for an already-processing stream through
+`DNS.Worker.Minimal`, keeping the linked shell ABI away from the full
+list-backed worker/parser/zone path.
 `DNS.ShellBoundary` also exposes C-shaped scheduler helper wrappers for
 authenticated ingress, minimal worker error-response construction, and
 send-completion/drop cleanup without exposing the rich F* `shell_event` union.
@@ -153,6 +156,9 @@ when. It must maintain the logical ownership expected by the verified model:
   authenticated ingress.
 - Prefer `DNS.ShellBoundary.process_ready_stream_for_response` for generated C
   minimal worker error-response on streams already marked `Processing`.
+- Keep `DNS.Worker.Minimal.prepare_worker_minimal_error_response_send` as the
+  current C-linked worker response helper until the production response path is
+  rewritten into an extraction-friendly representation.
 - Prefer `DNS.ShellResponseBoundary.prepare_response_send_for_stream` and
   `DNS.ShellResponseBoundary.complete_response_send_for_stream` for generated C
   response handoff and send-completion/drop cleanup.
@@ -170,7 +176,8 @@ when. It must maintain the logical ownership expected by the verified model:
 - At most one worker mutates a given `stream_context` at a time until real Steel
   permissions replace the bootstrap adapter.
 - A stream marked `Processing` carries the completed DNS message length and may
-  be passed to `DNS.Worker.worker_loop`; other stream phases should be
+  be passed to the minimal C-linked worker helper or, in verification-only
+  model paths, to `DNS.Worker.worker_loop`; other stream phases should be
   accumulated through `handle_stream_data`.
 - Closed or reset streams must not be reused while any verified pointer still
   aliases their buffers.
@@ -192,7 +199,8 @@ shell calls the egress handoff and wires it to MsQuic sends:
 
 - the shell may drop a request after verified processing;
 - the shell must pass a caller-owned Low* response buffer and explicit capacity
-  to `DNS.Worker.worker_loop`;
+  to the current minimal worker helper or a future extraction-friendly
+  production worker boundary;
 - response bytes copied into that buffer and handed to `prepare_response_send`
   must be treated as immutable until encryption/write completion, or copied
   into shell-owned send storage before verified code can mutate or free the
