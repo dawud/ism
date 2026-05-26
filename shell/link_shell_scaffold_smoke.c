@@ -10,6 +10,9 @@ bool ism_smoke_shell_scaffold(void)
   ism_shell_connection dispatcher_conn;
   ism_shell_connection empty_worker_conn;
   ism_shell_connection empty_dispatcher_conn;
+  ism_shell_connection validated_worker_conn;
+  ism_shell_connection validated_dispatcher_conn;
+  ism_shell_connection invalid_validated_conn;
   uint8_t zero_length_doq_message[] = { 0U, 0U };
   uint8_t response_buffer[1] = { 0U };
   uint8_t exact_a_query[] = {
@@ -27,10 +30,22 @@ bool ism_smoke_shell_scaffold(void)
     0x00U, 0x01U,
     0x00U, 0x01U
   };
+  uint8_t invalid_header_query[] = {
+    0x00U, 0x0cU,
+    0x56U, 0x78U,
+    0x01U, 0x00U,
+    0x00U, 0x00U,
+    0x00U, 0x00U,
+    0x00U, 0x00U,
+    0x00U, 0x00U
+  };
   uint8_t worker_response[128] = { 0U };
   uint8_t dispatcher_response[128] = { 0U };
   uint8_t empty_worker_response[128] = { 0U };
   uint8_t empty_dispatcher_response[128] = { 0U };
+  uint8_t validated_worker_response[128] = { 0U };
+  uint8_t validated_dispatcher_response[128] = { 0U };
+  uint8_t invalid_validated_response[128] = { 0U };
   const uint64_t first_stream_id = 7U;
   const uint64_t second_stream_id = 9U;
   const uint64_t third_stream_id = 11U;
@@ -38,6 +53,9 @@ bool ism_smoke_shell_scaffold(void)
   const uint64_t dispatcher_stream_id = 15U;
   const uint64_t empty_worker_stream_id = 17U;
   const uint64_t empty_dispatcher_stream_id = 19U;
+  const uint64_t validated_worker_stream_id = 21U;
+  const uint64_t validated_dispatcher_stream_id = 23U;
+  const uint64_t invalid_validated_stream_id = 25U;
 
   ism_shell_connection_init(&conn);
 
@@ -298,6 +316,129 @@ bool ism_smoke_shell_scaffold(void)
         false
       ) != 1U ||
       empty_dispatcher_conn.ctx.cc_num != 0U)
+  {
+    return false;
+  }
+
+  ism_shell_connection_init(&validated_worker_conn);
+
+  if (ism_shell_on_authenticated_stream_data(
+        &validated_worker_conn,
+        validated_worker_stream_id,
+        exact_a_query,
+        (uint32_t)sizeof exact_a_query
+      ) != 2U)
+  {
+    return false;
+  }
+
+  uint32_t validated_worker_response_len =
+    ism_shell_process_ready_stream_validated_minimal_response(
+      &validated_worker_conn,
+      validated_worker_stream_id,
+      validated_worker_response,
+      (uint32_t)sizeof validated_worker_response
+    );
+
+  if (validated_worker_response_len != 12U ||
+      validated_worker_response[0] != 0x12U ||
+      validated_worker_response[1] != 0x34U ||
+      validated_worker_response[2] != 0x81U ||
+      validated_worker_response[3] != 0x00U ||
+      validated_worker_response[4] != 0x00U ||
+      validated_worker_response[5] != 0x00U ||
+      validated_worker_response[6] != 0x00U ||
+      validated_worker_response[7] != 0x00U ||
+      validated_worker_response[8] != 0x00U ||
+      validated_worker_response[9] != 0x00U ||
+      validated_worker_response[10] != 0x00U ||
+      validated_worker_response[11] != 0x00U)
+  {
+    return false;
+  }
+
+  ism_shell_connection_init(&validated_dispatcher_conn);
+
+  if (ism_shell_dispatch_authenticated_stream_data(
+        &validated_dispatcher_conn,
+        validated_dispatcher_stream_id,
+        exact_a_query,
+        (uint32_t)sizeof exact_a_query
+      ) != 2U)
+  {
+    return false;
+  }
+
+  uint32_t validated_dispatcher_response_len =
+    ism_shell_dispatch_ready_stream_validated_minimal_response(
+      &validated_dispatcher_conn,
+      validated_dispatcher_stream_id,
+      validated_dispatcher_response,
+      (uint32_t)sizeof validated_dispatcher_response
+    );
+
+  if (validated_dispatcher_response_len != 12U ||
+      validated_dispatcher_response[0] != 0x12U ||
+      validated_dispatcher_response[1] != 0x34U ||
+      validated_dispatcher_response[2] != 0x81U ||
+      validated_dispatcher_response[3] != 0x00U ||
+      validated_dispatcher_response[4] != 0x00U ||
+      validated_dispatcher_response[5] != 0x00U ||
+      validated_dispatcher_response[6] != 0x00U ||
+      validated_dispatcher_response[7] != 0x00U ||
+      validated_dispatcher_response[8] != 0x00U ||
+      validated_dispatcher_response[9] != 0x00U ||
+      validated_dispatcher_response[10] != 0x00U ||
+      validated_dispatcher_response[11] != 0x00U)
+  {
+    return false;
+  }
+
+  if (ism_shell_dispatch_response_send_finished(
+        &validated_dispatcher_conn,
+        validated_dispatcher_stream_id,
+        validated_dispatcher_response,
+        validated_dispatcher_response_len,
+        false
+      ) != 1U ||
+      validated_dispatcher_conn.ctx.cc_num != 0U)
+  {
+    return false;
+  }
+
+  ism_shell_connection_init(&invalid_validated_conn);
+
+  if (ism_shell_dispatch_authenticated_stream_data(
+        &invalid_validated_conn,
+        invalid_validated_stream_id,
+        invalid_header_query,
+        (uint32_t)sizeof invalid_header_query
+      ) != 2U)
+  {
+    return false;
+  }
+
+  uint32_t invalid_validated_response_len =
+    ism_shell_dispatch_ready_stream_validated_minimal_response(
+      &invalid_validated_conn,
+      invalid_validated_stream_id,
+      invalid_validated_response,
+      (uint32_t)sizeof invalid_validated_response
+    );
+
+  if (invalid_validated_response_len != 12U ||
+      invalid_validated_response[0] != 0x56U ||
+      invalid_validated_response[1] != 0x78U ||
+      invalid_validated_response[2] != 0x81U ||
+      invalid_validated_response[3] != 0x03U ||
+      invalid_validated_response[4] != 0x00U ||
+      invalid_validated_response[5] != 0x00U ||
+      invalid_validated_response[6] != 0x00U ||
+      invalid_validated_response[7] != 0x00U ||
+      invalid_validated_response[8] != 0x00U ||
+      invalid_validated_response[9] != 0x00U ||
+      invalid_validated_response[10] != 0x00U ||
+      invalid_validated_response[11] != 0x00U)
   {
     return false;
   }

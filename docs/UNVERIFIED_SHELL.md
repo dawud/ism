@@ -54,6 +54,7 @@ established by construction or checked before the call:
 - `DNS.ShellResponseBoundary.complete_response_send_for_stream`
 - `DNS.Worker.Minimal.prepare_worker_minimal_error_response_send`
 - `DNS.Worker.Minimal.prepare_worker_empty_noerror_response_send`
+- `DNS.Worker.Minimal.prepare_worker_validated_minimal_response_send`
 - `DNS.QUIC.StreamMapping.handle_stream_data`
 - `DNS.QUIC.Multiplexer.find_stream`
 - `DNS.Worker.worker_loop`
@@ -67,6 +68,11 @@ covers the same already-processing stream shape for a header-only empty NOERROR
 response that preserves the request ID and selected request flags. Both helpers
 keep the linked shell ABI away from the full list-backed worker/parser/zone
 path.
+`DNS.ShellBoundary.process_ready_stream_for_validated_minimal_response` is the
+preferred narrow production-facing helper: it validates an uncompressed
+question-only request through the generated EverParse runtime boundary, returns
+the header-only empty NOERROR response when accepted, and returns the minimal
+FORMERR response when rejected.
 `DNS.ShellBoundary` also exposes C-shaped scheduler helper wrappers for
 authenticated ingress, minimal worker response construction, and
 send-completion/drop cleanup without exposing the rich F* `shell_event` union.
@@ -163,10 +169,15 @@ when. It must maintain the logical ownership expected by the verified model:
 - Prefer `DNS.ShellBoundary.process_ready_stream_for_empty_response` for
   generated C header-only empty NOERROR responses on streams already marked
   `Processing`.
+- Prefer `DNS.ShellBoundary.process_ready_stream_for_validated_minimal_response`
+  for generated C minimal worker responses that should choose between empty
+  NOERROR and FORMERR based on the generated parser boundary.
 - Keep `DNS.Worker.Minimal.prepare_worker_minimal_error_response_send` and
-  `DNS.Worker.Minimal.prepare_worker_empty_noerror_response_send` as the
-  current C-linked worker response helpers until the production response path
-  is rewritten into an extraction-friendly representation.
+  `DNS.Worker.Minimal.prepare_worker_empty_noerror_response_send` as direct
+  scaffold helpers, and keep
+  `DNS.Worker.Minimal.prepare_worker_validated_minimal_response_send` as the
+  current C-linked validated worker response helper until the production
+  response path is rewritten into an extraction-friendly representation.
 - Prefer `DNS.ShellResponseBoundary.prepare_response_send_for_stream` and
   `DNS.ShellResponseBoundary.complete_response_send_for_stream` for generated C
   response handoff and send-completion/drop cleanup.

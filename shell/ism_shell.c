@@ -230,6 +230,23 @@ ism_shell_process_ready_stream_empty_response(
 }
 
 uint32_t
+ism_shell_process_ready_stream_validated_minimal_response(
+  ism_shell_connection *conn,
+  uint64_t stream_id,
+  uint8_t *response_buffer,
+  uint32_t response_capacity
+)
+{
+  return
+    DNS_ShellBoundary_process_ready_stream_for_validated_minimal_response(
+      &conn->ctx,
+      response_buffer,
+      response_capacity,
+      stream_id
+    );
+}
+
+uint32_t
 ism_shell_dispatch_ready_stream(
   ism_shell_connection *conn,
   uint64_t stream_id,
@@ -256,6 +273,23 @@ ism_shell_dispatch_ready_stream_empty_response(
 {
   return
     DNS_ShellBoundary_dispatch_ready_stream_for_empty_response_via_scheduler(
+      &conn->ctx,
+      response_buffer,
+      response_capacity,
+      stream_id
+    );
+}
+
+uint32_t
+ism_shell_dispatch_ready_stream_validated_minimal_response(
+  ism_shell_connection *conn,
+  uint64_t stream_id,
+  uint8_t *response_buffer,
+  uint32_t response_capacity
+)
+{
+  return
+    DNS_ShellBoundary_dispatch_ready_stream_for_validated_minimal_response_via_scheduler(
       &conn->ctx,
       response_buffer,
       response_capacity,
