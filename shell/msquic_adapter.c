@@ -74,7 +74,7 @@ ism_msquic_adapter_prepare_ready_response(
   }
 
   uint32_t response_len =
-    ism_shell_dispatch_ready_stream(
+    ism_shell_dispatch_ready_stream_validated_minimal_response(
       &adapter->connection,
       stream_id,
       adapter->response_buffer,

@@ -84,11 +84,12 @@ bytes through MsQuic. `shell/ism_shell.c` owns a fixed-capacity
 connection/stream table over those generated ABIs for local scaffold testing.
 `shell/msquic_adapter.c` is a MsQuic-shaped callback adapter over that scaffold:
 it bridges fake callback-shaped authenticated stream bytes through the
-scheduler helper wrappers, prepares ready responses into a caller-owned buffer,
-wraps those DNS response bytes in a caller-owned DoQ stream buffer, sends the
-framed bytes, and leaves send-completion cleanup as a separate callback. It
-does not include MsQuic headers or own sockets, real MsQuic callbacks, polling,
-timers, dynamic allocation, or production event queues. The rich
+scheduler helper wrappers, prepares generated-validator-backed ready responses
+into a caller-owned buffer, wraps those DNS response bytes in a caller-owned DoQ
+stream buffer, sends the framed bytes, and leaves send-completion cleanup as a
+separate callback. It does not include MsQuic headers or own sockets, real
+MsQuic callbacks, polling, timers, dynamic allocation, or production event
+queues. The rich
 `DNS.ShellScheduler.dispatch_shell_event` model remains in the `make extract`
 smoke gate but is not part of the linked shell ABI yet, because the full worker
 branch still reaches non-Low* response-construction state. Direct lower-level
@@ -193,7 +194,8 @@ when. It must maintain the logical ownership expected by the verified model:
   connection/stream buffers.
 - Keep `shell/msquic_adapter.c` as the current MsQuic-shaped shell adapter; it
   routes authenticated stream bytes through scheduler helper wrappers, prepares
-  ready responses, and leaves send completion as a separate callback.
+  ready responses through the generated-validator-backed selector, and leaves
+  send completion as a separate callback.
 - Keep `DNS.ShellScheduler.dispatch_shell_event` as the verified model-level
   dispatch point for authenticated stream data, processing-ready streams, and
   send-completion/drop notifications.
