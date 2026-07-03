@@ -1,5 +1,6 @@
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "msquic_adapter.h"
 
@@ -43,9 +44,9 @@ fake_send(
   {
     capture->second = data[1];
   }
-  if (len > 3U)
+  if (len > 5U)
   {
-    capture->rcode_low = data[3];
+    capture->rcode_low = data[5];
   }
 
   return true;
@@ -56,8 +57,19 @@ bool ism_smoke_msquic_adapter(void)
   ism_msquic_adapter adapter;
   ism_msquic_adapter capped_adapter;
   uint8_t response[128] = { 0U };
+  uint8_t send_buffer[128] = { 0U };
   uint8_t capped_response[1] = { 0U };
+  uint8_t capped_send[1] = { 0U };
   fake_msquic_send capture = { 0 };
+  uint8_t expected_formerr_stream[] = {
+    0x00U, 0x0cU,
+    0x12U, 0x34U,
+    0x81U, 0x03U,
+    0x00U, 0x00U,
+    0x00U, 0x00U,
+    0x00U, 0x00U,
+    0x00U, 0x00U
+  };
   uint8_t exact_a_query[] = {
     0x00U, 0x21U,
     0x12U, 0x34U,
@@ -79,6 +91,8 @@ bool ism_smoke_msquic_adapter(void)
     &adapter,
     response,
     (uint32_t)sizeof response,
+    send_buffer,
+    (uint32_t)sizeof send_buffer,
     fake_send,
     &capture
   );
@@ -94,11 +108,12 @@ bool ism_smoke_msquic_adapter(void)
   if (phase != 2U ||
       !capture.called ||
       capture.stream_id != stream_id ||
-      capture.len != 12U ||
+      capture.len != (uint32_t)sizeof expected_formerr_stream ||
       !capture.fin ||
-      capture.first != 0x12U ||
-      capture.second != 0x34U ||
-      capture.rcode_low != 0x03U)
+      capture.first != 0x00U ||
+      capture.second != 0x0cU ||
+      capture.rcode_low != 0x03U ||
+      memcmp(send_buffer, expected_formerr_stream, sizeof expected_formerr_stream) != 0)
   {
     return false;
   }
@@ -117,6 +132,8 @@ bool ism_smoke_msquic_adapter(void)
   ism_msquic_adapter_init(
     &capped_adapter,
     capped_response,
+    0U,
+    capped_send,
     0U,
     fake_send,
     &capture

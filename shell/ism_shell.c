@@ -196,6 +196,35 @@ ism_shell_prepare_response_send(
 }
 
 uint32_t
+ism_shell_prepare_doq_response_send(
+  ism_shell_connection *conn,
+  uint64_t stream_id,
+  uint8_t *response_buffer,
+  uint32_t response_len,
+  uint8_t *stream_buffer,
+  uint32_t stream_capacity,
+  bool fin
+)
+{
+  DNS_QUIC_StreamMapping_stream_context *stream =
+    ism_shell_find_stream(conn, stream_id);
+  if (stream == NULL)
+  {
+    return 0U;
+  }
+
+  return
+    DNS_ShellResponseBoundary_prepare_doq_response_send_for_stream(
+      stream,
+      response_buffer,
+      response_len,
+      stream_buffer,
+      stream_capacity,
+      fin ? 1U : 0U
+    );
+}
+
+uint32_t
 ism_shell_process_ready_stream(
   ism_shell_connection *conn,
   uint64_t stream_id,

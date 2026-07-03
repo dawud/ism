@@ -60,6 +60,17 @@ ism_shell_prepare_response_send(
 );
 
 uint32_t
+ism_shell_prepare_doq_response_send(
+  ism_shell_connection *conn,
+  uint64_t stream_id,
+  uint8_t *response_buffer,
+  uint32_t response_len,
+  uint8_t *stream_buffer,
+  uint32_t stream_capacity,
+  bool fin
+);
+
+uint32_t
 ism_shell_process_ready_stream(
   ism_shell_connection *conn,
   uint64_t stream_id,

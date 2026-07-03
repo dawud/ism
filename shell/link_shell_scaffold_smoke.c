@@ -54,6 +54,30 @@ bool ism_smoke_shell_scaffold(void)
     0x00U, 0x01U,
     0x00U, 0x01U
   };
+  uint8_t expected_validated_stream_response[] = {
+    0x00U, 0x21U,
+    0x12U, 0x34U,
+    0x81U, 0x00U,
+    0x00U, 0x01U,
+    0x00U, 0x00U,
+    0x00U, 0x00U,
+    0x00U, 0x00U,
+    0x03U, 0x63U, 0x6fU, 0x6dU,
+    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
+    0x03U, 0x77U, 0x77U, 0x77U,
+    0x00U,
+    0x00U, 0x01U,
+    0x00U, 0x01U
+  };
+  uint8_t expected_invalid_stream_response[] = {
+    0x00U, 0x0cU,
+    0x56U, 0x78U,
+    0x81U, 0x03U,
+    0x00U, 0x00U,
+    0x00U, 0x00U,
+    0x00U, 0x00U,
+    0x00U, 0x00U
+  };
   uint8_t worker_response[128] = { 0U };
   uint8_t dispatcher_response[128] = { 0U };
   uint8_t empty_worker_response[128] = { 0U };
@@ -61,6 +85,8 @@ bool ism_smoke_shell_scaffold(void)
   uint8_t validated_worker_response[128] = { 0U };
   uint8_t validated_dispatcher_response[128] = { 0U };
   uint8_t invalid_validated_response[128] = { 0U };
+  uint8_t validated_dispatcher_stream_response[128] = { 0U };
+  uint8_t invalid_validated_stream_response[128] = { 0U };
   const uint64_t first_stream_id = 7U;
   const uint64_t second_stream_id = 9U;
   const uint64_t third_stream_id = 11U;
@@ -397,11 +423,33 @@ bool ism_smoke_shell_scaffold(void)
     return false;
   }
 
+  uint32_t validated_dispatcher_stream_response_len =
+    ism_shell_prepare_doq_response_send(
+      &validated_dispatcher_conn,
+      validated_dispatcher_stream_id,
+      validated_dispatcher_response,
+      validated_dispatcher_response_len,
+      validated_dispatcher_stream_response,
+      (uint32_t)sizeof validated_dispatcher_stream_response,
+      true
+    );
+
+  if (validated_dispatcher_stream_response_len !=
+        (uint32_t)sizeof expected_validated_stream_response ||
+      memcmp(
+        validated_dispatcher_stream_response,
+        expected_validated_stream_response,
+        sizeof expected_validated_stream_response
+      ) != 0)
+  {
+    return false;
+  }
+
   if (ism_shell_dispatch_response_send_finished(
         &validated_dispatcher_conn,
         validated_dispatcher_stream_id,
-        validated_dispatcher_response,
-        validated_dispatcher_response_len,
+        validated_dispatcher_stream_response,
+        validated_dispatcher_stream_response_len,
         false
       ) != 1U ||
       validated_dispatcher_conn.ctx.cc_num != 0U)
@@ -442,6 +490,28 @@ bool ism_smoke_shell_scaffold(void)
       invalid_validated_response[9] != 0x00U ||
       invalid_validated_response[10] != 0x00U ||
       invalid_validated_response[11] != 0x00U)
+  {
+    return false;
+  }
+
+  uint32_t invalid_validated_stream_response_len =
+    ism_shell_prepare_doq_response_send(
+      &invalid_validated_conn,
+      invalid_validated_stream_id,
+      invalid_validated_response,
+      invalid_validated_response_len,
+      invalid_validated_stream_response,
+      (uint32_t)sizeof invalid_validated_stream_response,
+      true
+    );
+
+  if (invalid_validated_stream_response_len !=
+        (uint32_t)sizeof expected_invalid_stream_response ||
+      memcmp(
+        invalid_validated_stream_response,
+        expected_invalid_stream_response,
+        sizeof expected_invalid_stream_response
+      ) != 0)
   {
     return false;
   }

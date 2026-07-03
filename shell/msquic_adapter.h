@@ -19,6 +19,8 @@ typedef struct ism_msquic_adapter_s
   ism_shell_connection connection;
   uint8_t *response_buffer;
   uint32_t response_capacity;
+  uint8_t *send_buffer;
+  uint32_t send_capacity;
   ism_msquic_send_fn send;
   void *send_ctx;
 }
@@ -29,6 +31,8 @@ ism_msquic_adapter_init(
   ism_msquic_adapter *adapter,
   uint8_t *response_buffer,
   uint32_t response_capacity,
+  uint8_t *send_buffer,
+  uint32_t send_capacity,
   ism_msquic_send_fn send,
   void *send_ctx
 );

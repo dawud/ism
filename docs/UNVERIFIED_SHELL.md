@@ -51,6 +51,7 @@ established by construction or checked before the call:
 - `DNS.ShellScheduler.dispatch_shell_event`
 - `DNS.ShellBoundary.dispatch_authenticated_stream_data`
 - `DNS.ShellResponseBoundary.prepare_response_send_for_stream`
+- `DNS.ShellResponseBoundary.prepare_doq_response_send_for_stream`
 - `DNS.ShellResponseBoundary.complete_response_send_for_stream`
 - `DNS.Worker.Minimal.prepare_worker_minimal_error_response_send`
 - `DNS.Worker.Minimal.prepare_worker_empty_noerror_response_send`
@@ -77,14 +78,17 @@ accepted, and returns the minimal FORMERR response when rejected.
 authenticated ingress, minimal worker response construction, and
 send-completion/drop cleanup without exposing the rich F* `shell_event` union.
 `DNS.ShellResponseBoundary` covers generated C response send
-handoff/completion. `shell/ism_shell.c` owns a fixed-capacity connection/stream
-table over those generated ABIs for local scaffold testing.
+handoff/completion, including a DoQ egress helper that writes the two-octet DNS
+message length prefix into a caller-owned stream buffer before the shell sends
+bytes through MsQuic. `shell/ism_shell.c` owns a fixed-capacity
+connection/stream table over those generated ABIs for local scaffold testing.
 `shell/msquic_adapter.c` is a MsQuic-shaped callback adapter over that scaffold:
 it bridges fake callback-shaped authenticated stream bytes through the
 scheduler helper wrappers, prepares ready responses into a caller-owned buffer,
-and leaves send-completion cleanup as a separate callback. It does not include
-MsQuic headers or own sockets, real MsQuic callbacks, polling, timers, dynamic
-allocation, or production event queues. The rich
+wraps those DNS response bytes in a caller-owned DoQ stream buffer, sends the
+framed bytes, and leaves send-completion cleanup as a separate callback. It
+does not include MsQuic headers or own sockets, real MsQuic callbacks, polling,
+timers, dynamic allocation, or production event queues. The rich
 `DNS.ShellScheduler.dispatch_shell_event` model remains in the `make extract`
 smoke gate but is not part of the linked shell ABI yet, because the full worker
 branch still reaches non-Low* response-construction state. Direct lower-level
@@ -209,6 +213,7 @@ when. It must maintain the logical ownership expected by the verified model:
 
 The preferred MsQuic egress handoff is:
 
+- `DNS.ShellResponseBoundary.prepare_doq_response_send_for_stream`
 - `DNS.ShellResponseBoundary.prepare_response_send_for_stream`
 - `DNS.ShellResponseBoundary.complete_response_send_for_stream`
 - `DNS.QUIC.MsQuicEgress.prepare_response_send`
@@ -221,10 +226,13 @@ shell calls the egress handoff and wires it to MsQuic sends:
 - the shell must pass a caller-owned Low* response buffer and explicit capacity
   to the current minimal worker helper or a future extraction-friendly
   production worker boundary;
-- response bytes copied into that buffer and handed to `prepare_response_send`
-  must be treated as immutable until encryption/write completion, or copied
-  into shell-owned send storage before verified code can mutate or free the
-  source bytes;
+- the shell must pass a separate caller-owned stream buffer to
+  `prepare_doq_response_send_for_stream`; verified code writes the RFC 9250
+  two-octet response length prefix followed by the DNS response bytes into that
+  buffer;
+- DoQ-framed response bytes handed to `prepare_response_send` must be treated
+  as immutable until encryption/write completion, or copied into shell-owned
+  send storage before verified code can mutate or free the source bytes;
 - MsQuic response fragments passed through the handoff must name the matching
   verified `stream_context.sc_id`;
 - stream close/cleanup must be sequenced after send completion or after the

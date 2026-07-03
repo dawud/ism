@@ -8,6 +8,8 @@ ism_msquic_adapter_init(
   ism_msquic_adapter *adapter,
   uint8_t *response_buffer,
   uint32_t response_capacity,
+  uint8_t *send_buffer,
+  uint32_t send_capacity,
   ism_msquic_send_fn send,
   void *send_ctx
 )
@@ -21,6 +23,8 @@ ism_msquic_adapter_init(
   ism_shell_connection_init(&adapter->connection);
   adapter->response_buffer = response_buffer;
   adapter->response_capacity = response_capacity;
+  adapter->send_buffer = send_buffer;
+  adapter->send_capacity = send_capacity;
   adapter->send = send;
   adapter->send_ctx = send_ctx;
 }
@@ -62,7 +66,9 @@ ism_msquic_adapter_prepare_ready_response(
 {
   if (adapter == NULL ||
       adapter->response_buffer == NULL ||
-      adapter->response_capacity == 0U)
+      adapter->response_capacity == 0U ||
+      adapter->send_buffer == NULL ||
+      adapter->send_capacity == 0U)
   {
     return 0U;
   }
@@ -75,18 +81,29 @@ ism_msquic_adapter_prepare_ready_response(
       adapter->response_capacity
     );
 
-  if (response_len > 0U && adapter->send != NULL)
+  uint32_t send_len =
+    ism_shell_prepare_doq_response_send(
+      &adapter->connection,
+      stream_id,
+      adapter->response_buffer,
+      response_len,
+      adapter->send_buffer,
+      adapter->send_capacity,
+      true
+    );
+
+  if (send_len > 0U && adapter->send != NULL)
   {
     (void)adapter->send(
       adapter->send_ctx,
       stream_id,
-      adapter->response_buffer,
-      response_len,
+      adapter->send_buffer,
+      send_len,
       true
     );
   }
 
-  return response_len;
+  return send_len;
 }
 
 bool
@@ -98,9 +115,9 @@ ism_msquic_adapter_on_send_complete(
 )
 {
   if (adapter == NULL ||
-      adapter->response_buffer == NULL ||
-      adapter->response_capacity == 0U ||
-      response_len > adapter->response_capacity)
+      adapter->send_buffer == NULL ||
+      adapter->send_capacity == 0U ||
+      response_len > adapter->send_capacity)
   {
     return false;
   }
@@ -109,7 +126,7 @@ ism_msquic_adapter_on_send_complete(
     ism_shell_dispatch_response_send_finished(
       &adapter->connection,
       stream_id,
-      adapter->response_buffer,
+      adapter->send_buffer,
       response_len,
       dropped
     ) == 1U;
