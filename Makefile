@@ -101,6 +101,8 @@ C_LINK_SMOKE_SOURCES = shell/link_smoke.c \
                        shell/link_shell_response_boundary_smoke.c \
                        shell/link_shell_scaffold_smoke.c \
                        shell/link_msquic_adapter_smoke.c \
+                       shell/link_event_queue_smoke.c \
+                       shell/ism_event_queue.c \
                        shell/msquic_adapter.c \
                        shell/ism_shell.c \
                        shell/link_krml_compat_stubs.c \

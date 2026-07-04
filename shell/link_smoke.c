@@ -6,6 +6,7 @@ bool ism_smoke_shell_boundary(void);
 bool ism_smoke_shell_response_boundary(void);
 bool ism_smoke_shell_scaffold(void);
 bool ism_smoke_msquic_adapter(void);
+bool ism_smoke_event_queue(void);
 
 int main(void)
 {
@@ -14,7 +15,8 @@ int main(void)
       !ism_smoke_shell_boundary() ||
       !ism_smoke_shell_response_boundary() ||
       !ism_smoke_shell_scaffold() ||
-      !ism_smoke_msquic_adapter())
+      !ism_smoke_msquic_adapter() ||
+      !ism_smoke_event_queue())
   {
     return 1;
   }

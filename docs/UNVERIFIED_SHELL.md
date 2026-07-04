@@ -40,6 +40,7 @@ The current C shell scaffold and MsQuic-shaped adapter are:
 
 - `shell/ism_shell.c`
 - `shell/msquic_adapter.c`
+- `shell/ism_event_queue.c`
 
 The preferred verified model-level dispatcher remains:
 
@@ -88,8 +89,11 @@ scheduler helper wrappers, prepares generated-validator-backed ready responses
 into a caller-owned buffer, wraps those DNS response bytes in a caller-owned DoQ
 stream buffer, sends the framed bytes, and leaves send-completion cleanup as a
 separate callback. It does not include MsQuic headers or own sockets, real
-MsQuic callbacks, polling, timers, dynamic allocation, or production event
-queues. The rich
+MsQuic callbacks, polling, timers, dynamic allocation, or production event-loop
+integration. `shell/ism_event_queue.c` adds a fixed-capacity ring for
+shell-selected authenticated-ingress, ready-response, and send-completion
+events; it is still unverified shell code and currently dispatches to the
+scaffold/adapter entry points under smoke coverage. The rich
 `DNS.ShellScheduler.dispatch_shell_event` model remains in the `make extract`
 smoke gate but is not part of the linked shell ABI yet, because the full worker
 branch still reaches non-Low* response-construction state. Direct lower-level
@@ -196,6 +200,9 @@ when. It must maintain the logical ownership expected by the verified model:
   routes authenticated stream bytes through scheduler helper wrappers, prepares
   ready responses through the generated-validator-backed selector, and leaves
   send completion as a separate callback.
+- Keep `shell/ism_event_queue.c` as the current fixed-capacity shell event
+  queue for staging authenticated-ingress, ready-response, and send-completion
+  events before dispatching them to the adapter/scaffold.
 - Keep `DNS.ShellScheduler.dispatch_shell_event` as the verified model-level
   dispatch point for authenticated stream data, processing-ready streams, and
   send-completion/drop notifications.
