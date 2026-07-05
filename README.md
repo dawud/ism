@@ -131,6 +131,17 @@ podman run --rm \
   bash -lc 'make c-link-smoke'
 ```
 
+To syntax-check the optional wrapper that consumes real MsQuic stream callback
+types, install/provide the MsQuic headers and pass any needed include flags:
+
+```bash
+podman run --rm \
+  --userns=keep-id \
+  -v "$(pwd):/workspace:Z" \
+  localhost/verified-dns-server:latest \
+  bash -lc 'make MSQUIC_CFLAGS="-I/path/to/msquic/include" msquic-runtime-compile-smoke'
+```
+
 The image also includes EverParse/3D tooling. To regenerate the current
 EverParse parser scaffold and verify/extract the generated subset, run:
 

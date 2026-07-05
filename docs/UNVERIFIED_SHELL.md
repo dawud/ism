@@ -208,6 +208,14 @@ when. It must maintain the logical ownership expected by the verified model:
   events before dispatching them to the adapter/scaffold. Derived ready
   responses from completed ingress are serviced synchronously by the dispatcher
   rather than re-enqueued.
+- Keep `shell/msquic_runtime.c` as the optional real-MsQuic callback seam. The
+  default build covers dependency-free receive/send-completion translation
+  helpers; defining `ISM_ENABLE_MSQUIC=1` compiles the wrapper that consumes
+  upstream `QUIC_STREAM_EVENT` receive and send-completion shapes.
+- MsQuic receive buffers may be passed to verified ingress only while the
+  callback-owned bytes remain live. The current runtime seam enqueues and
+  dispatches receive buffers synchronously; delayed queueing requires copying
+  into shell-owned storage first.
 - Keep `DNS.ShellScheduler.dispatch_shell_event` as the verified model-level
   dispatch point for authenticated stream data, processing-ready streams, and
   send-completion/drop notifications.
@@ -269,8 +277,12 @@ The unverified shell must stay small and auditable.
   `DNS.ShellBoundary` ingress/minimal worker response, scheduler helper
   wrappers, and `DNS.ShellResponseBoundary` response handoff/completion harness
   plus the fixed-capacity C shell scaffold and MsQuic-shaped adapter smoke
-  path. This does not yet cover the rich `DNS.ShellScheduler.dispatch_shell_event`
-  union or a real linked MsQuic shell path.
+  path plus the dependency-free MsQuic runtime seam. This does not yet cover the
+  rich `DNS.ShellScheduler.dispatch_shell_event` union or a real linked MsQuic
+  shell path.
+- Run `make MSQUIC_CFLAGS=... msquic-runtime-compile-smoke` when real MsQuic
+  headers are available to syntax-check the optional `QUIC_STREAM_EVENT`
+  callback wrapper.
 - Run `make pulse-rust-smoke` after migration-lane Pulse/Rust boundary changes
   to compile the generated Rust, link the extern-friendly wrapper from C, and
   keep the experimental ABI shape honest.

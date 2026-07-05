@@ -101,12 +101,15 @@ C_LINK_SMOKE_SOURCES = shell/link_smoke.c \
                        shell/link_shell_response_boundary_smoke.c \
                        shell/link_shell_scaffold_smoke.c \
                        shell/link_msquic_adapter_smoke.c \
+                       shell/link_msquic_runtime_smoke.c \
                        shell/link_event_queue_smoke.c \
                        shell/ism_event_queue.c \
                        shell/msquic_adapter.c \
+                       shell/msquic_runtime.c \
                        shell/ism_shell.c \
                        shell/link_krml_compat_stubs.c \
                        $(C_COMPILE_SMOKE_SOURCES)
+MSQUIC_CFLAGS ?=
 
 # 1. Collect all F* source files
 PROTOCOL_FST_FILES = src/protocol/DNS.Name.fst \
@@ -143,7 +146,7 @@ EXTRACT_FST_FILES = $(filter-out src/protocol/%.Tests.fst, $(PROTOCOL_FST_FILES)
 
 EVERPARSE_3D_FILES = $(wildcard $(EVERPARSE_SRC_DIR)/*.3d)
 
-.PHONY: all verify verify-pulse-pilot assess-pulse-pilot-rust pulse-rust-smoke extract c-compile-smoke c-link-smoke everparse-generate everparse-verify clean
+.PHONY: all verify verify-pulse-pilot assess-pulse-pilot-rust pulse-rust-smoke extract c-compile-smoke c-link-smoke msquic-runtime-compile-smoke everparse-generate everparse-verify clean
 
 all: extract
 
@@ -266,6 +269,16 @@ c-link-smoke: extract
 	  $(C_LINK_SMOKE_SOURCES) \
 	  -o $(C_LINK_SMOKE); \
 	$(C_LINK_SMOKE)
+
+msquic-runtime-compile-smoke: extract
+	@echo "Syntax-checking optional real MsQuic runtime callback wrapper..."
+	KRML_INCLUDEDIR="$$($(KRML_HOME)/krml -locate-include)"; \
+	KRML_LIBDIR="$$($(KRML_HOME)/krml -locate-krmllib)"; \
+	$(CC) $(C_COMPILE_SMOKE_CFLAGS) $(MSQUIC_CFLAGS) \
+	  -DISM_ENABLE_MSQUIC=1 \
+	  -I "$$KRML_INCLUDEDIR" \
+	  -I "$$KRML_LIBDIR/dist/minimal" \
+	  shell/msquic_runtime.c
 
 # 4. EverParse generation scaffold
 everparse-generate:
