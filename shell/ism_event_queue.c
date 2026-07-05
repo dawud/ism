@@ -165,11 +165,10 @@ ism_shell_event_queue_dispatch_one(
 
       if (phase == 2U)
       {
-        return
-          ism_shell_event_queue_enqueue_ready_response(
-            queue,
-            event.stream_id
-          );
+        return ism_msquic_adapter_prepare_ready_response(
+          adapter,
+          event.stream_id
+        ) > 0U;
       }
 
       return true;

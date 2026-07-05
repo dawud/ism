@@ -108,7 +108,7 @@ bool ism_smoke_event_queue(void)
     return false;
   }
 
-  ism_shell_event_queue_init(&queue, storage, (uint32_t)(sizeof storage / sizeof storage[0]));
+  ism_shell_event_queue_init(&queue, storage, 1U);
   ism_msquic_adapter_init(
     &adapter,
     response,
@@ -126,17 +126,11 @@ bool ism_smoke_event_queue(void)
         (uint32_t)sizeof exact_a_query
       ) ||
       !ism_shell_event_queue_dispatch_one(&queue, &adapter) ||
-      capture.called ||
-      ism_shell_event_queue_len(&queue) != 1U)
-  {
-    return false;
-  }
-
-  if (!ism_shell_event_queue_dispatch_one(&queue, &adapter) ||
       !capture.called ||
       capture.stream_id != stream_id ||
       capture.len != (uint32_t)sizeof expected_validated_stream_response ||
       !capture.fin ||
+      ism_shell_event_queue_len(&queue) != 0U ||
       memcmp(
         send_buffer,
         expected_validated_stream_response,

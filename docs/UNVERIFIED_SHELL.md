@@ -92,8 +92,11 @@ separate callback. It does not include MsQuic headers or own sockets, real
 MsQuic callbacks, polling, timers, dynamic allocation, or production event-loop
 integration. `shell/ism_event_queue.c` adds a fixed-capacity ring for
 shell-selected authenticated-ingress, ready-response, and send-completion
-events; it is still unverified shell code and currently dispatches to the
-scaffold/adapter entry points under smoke coverage. The rich
+events; when authenticated ingress reaches `Processing`, the queue dispatcher
+services the ready response immediately instead of enqueueing a derived
+ready-response event that could be lost on overflow. It is still unverified
+shell code and currently dispatches to the scaffold/adapter entry points under
+smoke coverage. The rich
 `DNS.ShellScheduler.dispatch_shell_event` model remains in the `make extract`
 smoke gate but is not part of the linked shell ABI yet, because the full worker
 branch still reaches non-Low* response-construction state. Direct lower-level
@@ -202,7 +205,9 @@ when. It must maintain the logical ownership expected by the verified model:
   send completion as a separate callback.
 - Keep `shell/ism_event_queue.c` as the current fixed-capacity shell event
   queue for staging authenticated-ingress, ready-response, and send-completion
-  events before dispatching them to the adapter/scaffold.
+  events before dispatching them to the adapter/scaffold. Derived ready
+  responses from completed ingress are serviced synchronously by the dispatcher
+  rather than re-enqueued.
 - Keep `DNS.ShellScheduler.dispatch_shell_event` as the verified model-level
   dispatch point for authenticated stream data, processing-ready streams, and
   send-completion/drop notifications.
