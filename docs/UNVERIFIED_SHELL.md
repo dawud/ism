@@ -87,8 +87,9 @@ connection/stream table over those generated ABIs for local scaffold testing.
 it bridges fake callback-shaped authenticated stream bytes through the
 scheduler helper wrappers, prepares generated-validator-backed ready responses
 into a caller-owned buffer, wraps those DNS response bytes in a caller-owned DoQ
-stream buffer, sends the framed bytes, and leaves send-completion cleanup as a
-separate callback. It does not include MsQuic headers or own sockets, real
+stream buffer, sends the framed bytes, tracks one in-flight send descriptor for
+that buffer, and only clears the stream after a matching send-completion
+callback. It does not include MsQuic headers or own sockets, real
 MsQuic callbacks, polling, timers, dynamic allocation, or production event-loop
 integration. `shell/ism_event_queue.c` adds a fixed-capacity ring for
 shell-selected authenticated-ingress, ready-response, and send-completion
@@ -201,8 +202,9 @@ when. It must maintain the logical ownership expected by the verified model:
   connection/stream buffers.
 - Keep `shell/msquic_adapter.c` as the current MsQuic-shaped shell adapter; it
   routes authenticated stream bytes through scheduler helper wrappers, prepares
-  ready responses through the generated-validator-backed selector, and leaves
-  send completion as a separate callback.
+  ready responses through the generated-validator-backed selector, refuses to
+  reuse the single send buffer while a send is in flight, and accepts only the
+  matching send-completion callback.
 - Keep `shell/ism_event_queue.c` as the current fixed-capacity shell event
   queue for staging authenticated-ingress, ready-response, and send-completion
   events before dispatching them to the adapter/scaffold. Derived ready
@@ -256,8 +258,12 @@ shell calls the egress handoff and wires it to MsQuic sends:
 - DoQ-framed response bytes handed to `prepare_response_send` must be treated
   as immutable until encryption/write completion, or copied into shell-owned
   send storage before verified code can mutate or free the source bytes;
+- the current `shell/msquic_adapter.c` scaffold has one shell-owned send buffer
+  and refuses another ready response while that buffer is in flight;
 - MsQuic response fragments passed through the handoff must name the matching
   verified `stream_context.sc_id`;
+- send-completion callbacks must match the in-flight stream ID and response
+  length before the shell clears the send slot or closes the verified stream;
 - stream close/cleanup must be sequenced after send completion or after the
   shell decides to drop the response by calling `complete_response_send`;
 - AEAD encryption, QUIC packetization, congestion control, retransmission, and

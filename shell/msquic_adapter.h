@@ -23,6 +23,9 @@ typedef struct ism_msquic_adapter_s
   uint32_t send_capacity;
   ism_msquic_send_fn send;
   void *send_ctx;
+  bool send_in_flight;
+  uint64_t send_stream_id;
+  uint32_t send_len;
 }
 ism_msquic_adapter;
 

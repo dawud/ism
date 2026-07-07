@@ -68,7 +68,9 @@ ism_msquic_adapter_prepare_ready_response(
       adapter->response_buffer == NULL ||
       adapter->response_capacity == 0U ||
       adapter->send_buffer == NULL ||
-      adapter->send_capacity == 0U)
+      adapter->send_capacity == 0U ||
+      adapter->send == NULL ||
+      adapter->send_in_flight)
   {
     return 0U;
   }
@@ -92,15 +94,26 @@ ism_msquic_adapter_prepare_ready_response(
       true
     );
 
-  if (send_len > 0U && adapter->send != NULL)
+  if (send_len > 0U)
   {
-    (void)adapter->send(
+    bool sent = adapter->send(
       adapter->send_ctx,
       stream_id,
       adapter->send_buffer,
       send_len,
       true
     );
+    if (!sent)
+    {
+      return 0U;
+    }
+  }
+
+  if (send_len > 0U)
+  {
+    adapter->send_in_flight = true;
+    adapter->send_stream_id = stream_id;
+    adapter->send_len = send_len;
   }
 
   return send_len;
@@ -117,12 +130,15 @@ ism_msquic_adapter_on_send_complete(
   if (adapter == NULL ||
       adapter->send_buffer == NULL ||
       adapter->send_capacity == 0U ||
-      response_len > adapter->send_capacity)
+      response_len > adapter->send_capacity ||
+      !adapter->send_in_flight ||
+      adapter->send_stream_id != stream_id ||
+      adapter->send_len != response_len)
   {
     return false;
   }
 
-  return
+  bool completed =
     ism_shell_dispatch_response_send_finished(
       &adapter->connection,
       stream_id,
@@ -130,4 +146,13 @@ ism_msquic_adapter_on_send_complete(
       response_len,
       dropped
     ) == 1U;
+
+  if (completed)
+  {
+    adapter->send_in_flight = false;
+    adapter->send_stream_id = 0U;
+    adapter->send_len = 0U;
+  }
+
+  return completed;
 }

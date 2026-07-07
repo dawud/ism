@@ -7,6 +7,7 @@
 typedef struct fake_msquic_send_s
 {
   bool called;
+  uint32_t calls;
   uint64_t stream_id;
   uint32_t len;
   bool fin;
@@ -32,6 +33,7 @@ fake_send(
   }
 
   capture->called = true;
+  capture->calls++;
   capture->stream_id = stream_id;
   capture->len = len;
   capture->fin = fin;
@@ -137,8 +139,12 @@ bool ism_smoke_msquic_adapter(void)
   if (phase != 2U ||
       !capture.called ||
       capture.stream_id != stream_id ||
+      capture.calls != 1U ||
       capture.len != (uint32_t)sizeof expected_validated_stream_response ||
       !capture.fin ||
+      !adapter.send_in_flight ||
+      adapter.send_stream_id != stream_id ||
+      adapter.send_len != capture.len ||
       capture.first != 0x00U ||
       capture.second != 0x21U ||
       capture.rcode_low != 0x00U ||
@@ -151,12 +157,46 @@ bool ism_smoke_msquic_adapter(void)
     return false;
   }
 
+  if (ism_msquic_adapter_prepare_ready_response(
+        &adapter,
+        stream_id
+      ) != 0U ||
+      capture.calls != 1U ||
+      !adapter.send_in_flight)
+  {
+    return false;
+  }
+
+  if (ism_msquic_adapter_on_send_complete(
+        &adapter,
+        stream_id + 1U,
+        capture.len,
+        false
+      ) ||
+      !adapter.send_in_flight)
+  {
+    return false;
+  }
+
+  if (ism_msquic_adapter_on_send_complete(
+        &adapter,
+        stream_id,
+        capture.len + 1U,
+        false
+      ) ||
+      !adapter.send_in_flight)
+  {
+    return false;
+  }
+
   if (!ism_msquic_adapter_on_send_complete(
         &adapter,
         stream_id,
         capture.len,
         false
       ) ||
+      adapter.send_in_flight ||
+      adapter.send_len != 0U ||
       adapter.connection.ctx.cc_num != 0U)
   {
     return false;
@@ -183,8 +223,12 @@ bool ism_smoke_msquic_adapter(void)
   if (invalid_phase != 2U ||
       !invalid_capture.called ||
       invalid_capture.stream_id != invalid_stream_id ||
+      invalid_capture.calls != 1U ||
       invalid_capture.len != (uint32_t)sizeof expected_formerr_stream ||
       !invalid_capture.fin ||
+      !invalid_adapter.send_in_flight ||
+      invalid_adapter.send_stream_id != invalid_stream_id ||
+      invalid_adapter.send_len != invalid_capture.len ||
       invalid_capture.first != 0x00U ||
       invalid_capture.second != 0x0cU ||
       invalid_capture.rcode_low != 0x03U ||
@@ -203,6 +247,8 @@ bool ism_smoke_msquic_adapter(void)
         invalid_capture.len,
         false
       ) ||
+      invalid_adapter.send_in_flight ||
+      invalid_adapter.send_len != 0U ||
       invalid_adapter.connection.ctx.cc_num != 0U)
   {
     return false;
