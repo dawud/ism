@@ -51,6 +51,15 @@ jobs:
             localhost/verified-dns-server:latest \
             bash -lc 'cd /workspace && make extract'
 
+      - name: Syntax-check real MsQuic callback wrapper
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -v "${PWD}:/workspace" \
+            localhost/verified-dns-server:latest \
+            bash -lc 'cd /workspace && make msquic-runtime-compile-smoke'
+
   latest-fstar-migration:
     name: Latest F* migration lane
     runs-on: ubuntu-latest

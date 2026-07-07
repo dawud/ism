@@ -218,10 +218,12 @@ when. It must maintain the logical ownership expected by the verified model:
   or reset events before dispatching them to the adapter/scaffold. Derived ready
   responses from completed ingress are serviced synchronously by the dispatcher
   rather than re-enqueued.
-- Keep `shell/msquic_runtime.c` as the optional real-MsQuic callback seam. The
+- Keep `shell/msquic_runtime.c` as the real-MsQuic callback seam. The
   default build covers dependency-free receive/send-completion translation
   helpers; defining `ISM_ENABLE_MSQUIC=1` compiles the wrapper that consumes
-  upstream `QUIC_STREAM_EVENT` receive and send-completion shapes.
+  upstream `QUIC_STREAM_EVENT` receive, send-completion, and reset/shutdown
+  shapes. The stable container installs a pinned upstream `msquic.h` header and
+  the CI `msquic-runtime-compile-smoke` gate syntax-checks that API shape.
 - MsQuic receive bytes must be copied into shell-owned ingress storage before
   verified ingress sees them. The current runtime seam rejects receive fragments
   larger than that fixed-capacity storage and only queues the copied bytes.
@@ -300,9 +302,10 @@ The unverified shell must stay small and auditable.
   ordering. This does not yet cover the
   rich `DNS.ShellScheduler.dispatch_shell_event` union or a real linked MsQuic
   shell path.
-- Run `make MSQUIC_CFLAGS=... msquic-runtime-compile-smoke` when real MsQuic
-  headers are available to syntax-check the optional `QUIC_STREAM_EVENT`
-  callback wrapper.
+- Run `make msquic-runtime-compile-smoke` after MsQuic runtime callback changes
+  to syntax-check the `QUIC_STREAM_EVENT` wrapper against the pinned upstream
+  `msquic.h` header installed in the stable container. Override
+  `MSQUIC_CFLAGS` only for non-container MsQuic header locations.
 - Run `make pulse-rust-smoke` after migration-lane Pulse/Rust boundary changes
   to compile the generated Rust, link the extern-friendly wrapper from C, and
   keep the experimental ABI shape honest.

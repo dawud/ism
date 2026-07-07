@@ -14,6 +14,7 @@ RUN dnf install -y \
 ENV FSTAR_HOME=/opt/fstar/fstar
 ENV KRML_HOME=/opt/karamel
 ENV EVERPARSE_HOME=/opt/everparse
+ENV MSQUIC_HOME=/opt/msquic
 ENV PATH="${FSTAR_HOME}/bin:${KRML_HOME}:${EVERPARSE_HOME}:${PATH}"
 
 # 3. Install F* (Specific stable version for Low*)
@@ -31,8 +32,8 @@ RUN FSTAR_VERSION=v2026.03.24 \
 # 4. Create the unprivileged development user and writable tool directories.
 RUN groupadd --gid ${GROUP_ID} ${USER_NAME} \
     && useradd --uid ${USER_ID} --gid ${GROUP_ID} --create-home --shell /bin/bash ${USER_NAME} \
-    && mkdir -p ${KRML_HOME} ${EVERPARSE_HOME} /workspace \
-    && chown -R ${USER_NAME}:${USER_NAME} ${KRML_HOME} ${EVERPARSE_HOME} /workspace
+    && mkdir -p ${KRML_HOME} ${EVERPARSE_HOME} ${MSQUIC_HOME} /workspace \
+    && chown -R ${USER_NAME}:${USER_NAME} ${KRML_HOME} ${EVERPARSE_HOME} ${MSQUIC_HOME} /workspace
 
 USER ${USER_NAME}
 ENV HOME=/home/${USER_NAME}
@@ -61,7 +62,22 @@ RUN EVERPARSE_VERSION=v2026.03.21 \
     && rm /tmp/everparse.tar.gz \
     && test -x ${EVERPARSE_HOME}/everparse.sh
 
-# 7. Set up the Project Workspace
+# 7. Install pinned upstream MsQuic headers for real callback API checks.
+RUN MSQUIC_VERSION=v2.5.9 \
+    && MSQUIC_HEADER_SHA256=c9abfdd02c45910649dd335d6bd82718e4ddd2fdb35fe550567c78f032551e0c \
+    && MSQUIC_POSIX_HEADER_SHA256=b285fa66b9c9bdc886c30ef92910da472692b25f5c6192416fb40f08f64e22ec \
+    && MSQUIC_SAL_STUB_HEADER_SHA256=9b13328d9aec8807a754b2bc391b31b5d09b1c5f6cec064012051683ed169055 \
+    && MSQUIC_BASE_URL=https://raw.githubusercontent.com/microsoft/msquic/${MSQUIC_VERSION}/src/inc \
+    && mkdir -p ${MSQUIC_HOME}/include \
+    && echo "Downloading MsQuic headers ${MSQUIC_VERSION} from ${MSQUIC_BASE_URL}" \
+    && wget "${MSQUIC_BASE_URL}/msquic.h" -O ${MSQUIC_HOME}/include/msquic.h \
+    && wget "${MSQUIC_BASE_URL}/msquic_posix.h" -O ${MSQUIC_HOME}/include/msquic_posix.h \
+    && wget "${MSQUIC_BASE_URL}/quic_sal_stub.h" -O ${MSQUIC_HOME}/include/quic_sal_stub.h \
+    && echo "${MSQUIC_HEADER_SHA256}  ${MSQUIC_HOME}/include/msquic.h" | sha256sum -c - \
+    && echo "${MSQUIC_POSIX_HEADER_SHA256}  ${MSQUIC_HOME}/include/msquic_posix.h" | sha256sum -c - \
+    && echo "${MSQUIC_SAL_STUB_HEADER_SHA256}  ${MSQUIC_HOME}/include/quic_sal_stub.h" | sha256sum -c -
+
+# 8. Set up the Project Workspace
 WORKDIR /workspace
 COPY --chown=${USER_NAME}:${USER_NAME} . /workspace
 

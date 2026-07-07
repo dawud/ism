@@ -13,6 +13,7 @@ EVERPARSE_SRC_DIR = everparse
 EVERPARSE_OUT_DIR = $(GENERATED_DIR)/everparse
 EVERPARSE_CMD ?= everparse.sh
 EVERPARSE_HOME ?= /opt/everparse
+MSQUIC_HOME ?= /opt/msquic
 PULSE_HOME ?= $(FSTAR_HOME)/lib/fstar/pulse
 PULSE_KRML ?= $(FSTAR_HOME)/bin/krml
 EVERPARSE_INCLUDE_DIRS = $(EVERPARSE_OUT_DIR) \
@@ -109,7 +110,7 @@ C_LINK_SMOKE_SOURCES = shell/link_smoke.c \
                        shell/ism_shell.c \
                        shell/link_krml_compat_stubs.c \
                        $(C_COMPILE_SMOKE_SOURCES)
-MSQUIC_CFLAGS ?=
+MSQUIC_CFLAGS ?= -I $(MSQUIC_HOME)/include
 
 # 1. Collect all F* source files
 PROTOCOL_FST_FILES = src/protocol/DNS.Name.fst \
@@ -271,7 +272,7 @@ c-link-smoke: extract
 	$(C_LINK_SMOKE)
 
 msquic-runtime-compile-smoke: extract
-	@echo "Syntax-checking optional real MsQuic runtime callback wrapper..."
+	@echo "Syntax-checking real MsQuic runtime callback wrapper..."
 	KRML_INCLUDEDIR="$$($(KRML_HOME)/krml -locate-include)"; \
 	KRML_LIBDIR="$$($(KRML_HOME)/krml -locate-krmllib)"; \
 	$(CC) $(C_COMPILE_SMOKE_CFLAGS) $(MSQUIC_CFLAGS) \
