@@ -156,3 +156,36 @@ ism_msquic_adapter_on_send_complete(
 
   return completed;
 }
+
+bool
+ism_msquic_adapter_on_stream_reset(
+  ism_msquic_adapter *adapter,
+  uint64_t stream_id
+)
+{
+  if (adapter == NULL)
+  {
+    return false;
+  }
+
+  if (adapter->send_in_flight)
+  {
+    if (adapter->send_stream_id != stream_id)
+    {
+      return false;
+    }
+
+    return ism_msquic_adapter_on_send_complete(
+      adapter,
+      stream_id,
+      adapter->send_len,
+      true
+    );
+  }
+
+  return
+    ism_shell_dispatch_stream_reset(
+      &adapter->connection,
+      stream_id
+    ) == 1U;
+}

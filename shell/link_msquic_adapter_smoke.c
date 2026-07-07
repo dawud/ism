@@ -59,14 +59,18 @@ bool ism_smoke_msquic_adapter(void)
   ism_msquic_adapter adapter;
   ism_msquic_adapter invalid_adapter;
   ism_msquic_adapter capped_adapter;
+  ism_msquic_adapter reset_adapter;
   uint8_t response[128] = { 0U };
   uint8_t send_buffer[128] = { 0U };
   uint8_t invalid_response[128] = { 0U };
   uint8_t invalid_send_buffer[128] = { 0U };
   uint8_t capped_response[1] = { 0U };
   uint8_t capped_send[1] = { 0U };
+  uint8_t reset_response[128] = { 0U };
+  uint8_t reset_send_buffer[128] = { 0U };
   fake_msquic_send capture = { 0 };
   fake_msquic_send invalid_capture = { 0 };
+  fake_msquic_send reset_capture = { 0 };
   uint8_t expected_formerr_stream[] = {
     0x00U, 0x0cU,
     0x56U, 0x78U,
@@ -115,8 +119,12 @@ bool ism_smoke_msquic_adapter(void)
     0x00U, 0x00U,
     0x00U, 0x00U
   };
+  uint8_t partial_length_prefix[] = {
+    0x00U
+  };
   const uint64_t stream_id = 17U;
   const uint64_t invalid_stream_id = 19U;
+  const uint64_t reset_stream_id = 23U;
 
   ism_msquic_adapter_init(
     &adapter,
@@ -178,6 +186,15 @@ bool ism_smoke_msquic_adapter(void)
     return false;
   }
 
+  if (ism_msquic_adapter_on_stream_reset(
+        &adapter,
+        stream_id + 1U
+      ) ||
+      !adapter.send_in_flight)
+  {
+    return false;
+  }
+
   if (ism_msquic_adapter_on_send_complete(
         &adapter,
         stream_id,
@@ -189,14 +206,21 @@ bool ism_smoke_msquic_adapter(void)
     return false;
   }
 
-  if (!ism_msquic_adapter_on_send_complete(
+  if (!ism_msquic_adapter_on_stream_reset(
         &adapter,
-        stream_id,
-        capture.len,
-        false
+        stream_id
       ) ||
       adapter.send_in_flight ||
       adapter.send_len != 0U ||
+      adapter.connection.ctx.cc_num != 0U)
+  {
+    return false;
+  }
+
+  if (!ism_msquic_adapter_on_stream_reset(
+        &adapter,
+        stream_id
+      ) ||
       adapter.connection.ctx.cc_num != 0U)
   {
     return false;
@@ -274,6 +298,50 @@ bool ism_smoke_msquic_adapter(void)
         0U,
         false
       ))
+  {
+    return false;
+  }
+
+  ism_msquic_adapter_init(
+    &reset_adapter,
+    reset_response,
+    (uint32_t)sizeof reset_response,
+    reset_send_buffer,
+    (uint32_t)sizeof reset_send_buffer,
+    fake_send,
+    &reset_capture
+  );
+
+  uint8_t reset_phase =
+    ism_msquic_adapter_on_authenticated_stream_bytes(
+      &reset_adapter,
+      reset_stream_id,
+      partial_length_prefix,
+      (uint32_t)sizeof partial_length_prefix
+    );
+
+  if (reset_phase != 0U ||
+      reset_capture.calls != 0U ||
+      reset_adapter.connection.ctx.cc_num != 1U)
+  {
+    return false;
+  }
+
+  if (!ism_msquic_adapter_on_stream_reset(
+        &reset_adapter,
+        reset_stream_id
+      ) ||
+      reset_adapter.connection.ctx.cc_num != 0U ||
+      reset_adapter.send_in_flight)
+  {
+    return false;
+  }
+
+  if (!ism_msquic_adapter_on_stream_reset(
+        &reset_adapter,
+        reset_stream_id
+      ) ||
+      reset_adapter.connection.ctx.cc_num != 0U)
   {
     return false;
   }

@@ -152,5 +152,23 @@ bool ism_smoke_event_queue(void)
     return false;
   }
 
+  if (!ism_shell_event_queue_enqueue_authenticated_stream_bytes(
+        &queue,
+        stream_id,
+        exact_a_query,
+        1U
+      ) ||
+      !ism_shell_event_queue_dispatch_one(&queue, &adapter) ||
+      adapter.connection.ctx.cc_num != 1U ||
+      !ism_shell_event_queue_enqueue_stream_reset(
+        &queue,
+        stream_id
+      ) ||
+      !ism_shell_event_queue_dispatch_one(&queue, &adapter) ||
+      adapter.connection.ctx.cc_num != 0U)
+  {
+    return false;
+  }
+
   return true;
 }

@@ -115,6 +115,21 @@ ism_shell_event_queue_enqueue_send_complete(
 }
 
 bool
+ism_shell_event_queue_enqueue_stream_reset(
+  ism_shell_event_queue *queue,
+  uint64_t stream_id
+)
+{
+  return ism_shell_event_queue_enqueue(queue, (ism_shell_event){
+    .kind = ISM_SHELL_EVENT_STREAM_RESET,
+    .stream_id = stream_id,
+    .data = NULL,
+    .len = 0U,
+    .dropped = true
+  });
+}
+
+bool
 ism_shell_event_queue_dequeue(
   ism_shell_event_queue *queue,
   ism_shell_event *event
@@ -187,6 +202,12 @@ ism_shell_event_queue_dispatch_one(
         event.stream_id,
         event.len,
         event.dropped
+      );
+
+    case ISM_SHELL_EVENT_STREAM_RESET:
+      return ism_msquic_adapter_on_stream_reset(
+        adapter,
+        event.stream_id
       );
 
     default:

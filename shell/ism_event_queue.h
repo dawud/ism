@@ -10,7 +10,8 @@ typedef enum ism_shell_event_kind_e
 {
   ISM_SHELL_EVENT_AUTHENTICATED_STREAM_BYTES = 1,
   ISM_SHELL_EVENT_READY_RESPONSE = 2,
-  ISM_SHELL_EVENT_SEND_COMPLETE = 3
+  ISM_SHELL_EVENT_SEND_COMPLETE = 3,
+  ISM_SHELL_EVENT_STREAM_RESET = 4
 }
 ism_shell_event_kind;
 
@@ -63,6 +64,12 @@ ism_shell_event_queue_enqueue_send_complete(
   uint64_t stream_id,
   uint32_t response_len,
   bool dropped
+);
+
+bool
+ism_shell_event_queue_enqueue_stream_reset(
+  ism_shell_event_queue *queue,
+  uint64_t stream_id
 );
 
 bool

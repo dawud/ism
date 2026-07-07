@@ -78,6 +78,8 @@ accepted, and returns the minimal FORMERR response when rejected.
 `DNS.ShellBoundary` also exposes C-shaped scheduler helper wrappers for
 authenticated ingress, minimal worker response construction, and
 send-completion/drop cleanup without exposing the rich F* `shell_event` union.
+It also exposes a narrow stream-reset wrapper for shell-observed resets when no
+response buffer handoff is active.
 `DNS.ShellResponseBoundary` covers generated C response send
 handoff/completion, including a DoQ egress helper that writes the two-octet DNS
 message length prefix into a caller-owned stream buffer before the shell sends
@@ -89,10 +91,12 @@ scheduler helper wrappers, prepares generated-validator-backed ready responses
 into a caller-owned buffer, wraps those DNS response bytes in a caller-owned DoQ
 stream buffer, sends the framed bytes, tracks one in-flight send descriptor for
 that buffer, and only clears the stream after a matching send-completion
-callback. It does not include MsQuic headers or own sockets, real
+callback. Stream reset/drop handling reuses that matching completion path when
+a send is in flight and otherwise closes the stream through the reset wrapper.
+It does not include MsQuic headers or own sockets, real
 MsQuic callbacks, polling, timers, dynamic allocation, or production event-loop
 integration. `shell/ism_event_queue.c` adds a fixed-capacity ring for
-shell-selected authenticated-ingress, ready-response, and send-completion
+shell-selected authenticated-ingress, ready-response, send-completion, and reset
 events; when authenticated ingress reaches `Processing`, the queue dispatcher
 services the ready response immediately instead of enqueueing a derived
 ready-response event that could be lost on overflow. It is still unverified
@@ -198,16 +202,20 @@ when. It must maintain the logical ownership expected by the verified model:
 - Prefer the `DNS.ShellBoundary.*_via_scheduler` wrappers when the C shell wants
   one scheduler-shaped ABI surface for ingress, minimal worker responses,
   and send-completion/drop cleanup.
+- Use `DNS.ShellBoundary.dispatch_stream_reset_via_scheduler` for stream resets
+  when no response send is in flight. If a send is in flight, the shell must
+  first route the reset/drop through the matching send-completion/drop cleanup
+  path so the send slot and stream close together.
 - Keep `shell/ism_shell.c` as the fixed-capacity scaffold that owns generated C
   connection/stream buffers.
 - Keep `shell/msquic_adapter.c` as the current MsQuic-shaped shell adapter; it
   routes authenticated stream bytes through scheduler helper wrappers, prepares
   ready responses through the generated-validator-backed selector, refuses to
   reuse the single send buffer while a send is in flight, and accepts only the
-  matching send-completion callback.
+  matching send-completion or reset/drop callback.
 - Keep `shell/ism_event_queue.c` as the current fixed-capacity shell event
   queue for staging authenticated-ingress, ready-response, and send-completion
-  events before dispatching them to the adapter/scaffold. Derived ready
+  or reset events before dispatching them to the adapter/scaffold. Derived ready
   responses from completed ingress are serviced synchronously by the dispatcher
   rather than re-enqueued.
 - Keep `shell/msquic_runtime.c` as the optional real-MsQuic callback seam. The
@@ -264,6 +272,10 @@ shell calls the egress handoff and wires it to MsQuic sends:
   verified `stream_context.sc_id`;
 - send-completion callbacks must match the in-flight stream ID and response
   length before the shell clears the send slot or closes the verified stream;
+- stream reset/drop events for an in-flight send must be handled as dropped
+  send completions for the matching stream before the send buffer is reused;
+- stream reset/drop events with no in-flight send must close the stream through
+  the reset wrapper and may be repeated after close without reopening state;
 - stream close/cleanup must be sequenced after send completion or after the
   shell decides to drop the response by calling `complete_response_send`;
 - AEAD encryption, QUIC packetization, congestion control, retransmission, and
@@ -284,7 +296,8 @@ The unverified shell must stay small and auditable.
   `DNS.ShellBoundary` ingress/minimal worker response, scheduler helper
   wrappers, and `DNS.ShellResponseBoundary` response handoff/completion harness
   plus the fixed-capacity C shell scaffold and MsQuic-shaped adapter smoke
-  path plus the dependency-free MsQuic runtime seam. This does not yet cover the
+  path plus the dependency-free MsQuic runtime seam, including reset/drop
+  ordering. This does not yet cover the
   rich `DNS.ShellScheduler.dispatch_shell_event` union or a real linked MsQuic
   shell path.
 - Run `make MSQUIC_CFLAGS=... msquic-runtime-compile-smoke` when real MsQuic

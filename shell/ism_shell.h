@@ -136,4 +136,10 @@ ism_shell_dispatch_response_send_finished(
   bool dropped
 );
 
+uint8_t
+ism_shell_dispatch_stream_reset(
+  ism_shell_connection *conn,
+  uint64_t stream_id
+);
+
 #endif /* ISM_SHELL_H */

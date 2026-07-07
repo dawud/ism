@@ -57,6 +57,11 @@ ism_msquic_runtime_on_send_complete(
   bool dropped
 );
 
+bool
+ism_msquic_runtime_on_stream_reset(
+  ism_msquic_runtime_stream *runtime
+);
+
 #if ISM_ENABLE_MSQUIC
 QUIC_STATUS QUIC_API
 ism_msquic_runtime_stream_callback(

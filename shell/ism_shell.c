@@ -385,3 +385,23 @@ ism_shell_dispatch_response_send_finished(
 
   return result;
 }
+
+uint8_t
+ism_shell_dispatch_stream_reset(
+  ism_shell_connection *conn,
+  uint64_t stream_id
+)
+{
+  uint8_t result =
+    DNS_ShellBoundary_dispatch_stream_reset_via_scheduler(
+      &conn->ctx,
+      stream_id
+    );
+
+  if (result == 1U)
+  {
+    ism_shell_sync_stream_slots(conn);
+  }
+
+  return result;
+}

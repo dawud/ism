@@ -325,3 +325,21 @@ let dispatch_response_send_finished_via_scheduler
     response_len
     stream_id
     outcome_code
+
+val dispatch_stream_reset_via_scheduler :
+  conn:buffer MUX.connection_context ->
+  stream_id:FStar.UInt64.t ->
+  ST FStar.UInt8.t
+    (requires (fun h0 ->
+      live h0 conn /\
+      LowStar.Buffer.length conn >= 1 /\
+      (let c = FStar.Seq.index (LowStar.Buffer.as_seq h0 conn) 0 in
+       FStar.UInt32.v c.MUX.cc_num <= FStar.UInt32.v c.MUX.cc_capacity /\
+       (FStar.UInt32.v c.MUX.cc_num > 0 ==>
+        MUX.active_streams_live h0 c.MUX.cc_active c.MUX.cc_capacity /\
+        loc_disjoint (loc_buffer conn) (loc_buffer c.MUX.cc_active)))))
+    (ensures (fun _h0 _ _h1 -> True))
+
+let dispatch_stream_reset_via_scheduler conn stream_id =
+  MUX.close_stream conn stream_id;
+  1uy

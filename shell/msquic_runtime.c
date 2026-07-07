@@ -118,6 +118,29 @@ ism_msquic_runtime_on_send_complete(
     );
 }
 
+bool
+ism_msquic_runtime_on_stream_reset(
+  ism_msquic_runtime_stream *runtime
+)
+{
+  if (runtime == NULL ||
+      runtime->adapter == NULL ||
+      runtime->queue == NULL)
+  {
+    return false;
+  }
+
+  return
+    ism_shell_event_queue_enqueue_stream_reset(
+      runtime->queue,
+      runtime->stream_id
+    ) &&
+    ism_shell_event_queue_dispatch_one(
+      runtime->queue,
+      runtime->adapter
+    );
+}
+
 #if ISM_ENABLE_MSQUIC
 static bool
 ism_msquic_runtime_on_msquic_receive(
@@ -201,6 +224,13 @@ ism_msquic_runtime_stream_callback(
         ? QUIC_STATUS_SUCCESS
         : QUIC_STATUS_INVALID_STATE;
     }
+
+    case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
+    case QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED:
+    case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
+      return ism_msquic_runtime_on_stream_reset(runtime)
+        ? QUIC_STATUS_SUCCESS
+        : QUIC_STATUS_INVALID_STATE;
 
     default:
       return QUIC_STATUS_SUCCESS;

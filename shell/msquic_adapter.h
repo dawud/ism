@@ -62,4 +62,10 @@ ism_msquic_adapter_on_send_complete(
   bool dropped
 );
 
+bool
+ism_msquic_adapter_on_stream_reset(
+  ism_msquic_adapter *adapter,
+  uint64_t stream_id
+);
+
 #endif /* ISM_MSQUIC_ADAPTER_H */

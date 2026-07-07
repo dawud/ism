@@ -46,6 +46,9 @@ bool ism_smoke_msquic_runtime(void)
   uint8_t send_buffer[128] = { 0U };
   uint8_t ingress_buffer[64] = { 0U };
   uint8_t undersized_ingress_buffer[1] = { 0U };
+  uint8_t reset_response[128] = { 0U };
+  uint8_t reset_send_buffer[128] = { 0U };
+  uint8_t reset_ingress_buffer[4] = { 0U };
   uint8_t exact_a_query[] = {
     0x00U, 0x21U,
     0x12U, 0x34U,
@@ -82,7 +85,17 @@ bool ism_smoke_msquic_runtime(void)
       .len = (uint32_t)sizeof exact_a_query
     }
   };
+  uint8_t partial_length_prefix[] = {
+    0x00U
+  };
+  ism_msquic_runtime_buffer reset_buffers[] = {
+    {
+      .data = partial_length_prefix,
+      .len = (uint32_t)sizeof partial_length_prefix
+    }
+  };
   const uint64_t stream_id = 31U;
+  const uint64_t reset_stream_id = 37U;
 
   ism_msquic_adapter_init(
     &adapter,
@@ -135,6 +148,41 @@ bool ism_smoke_msquic_runtime(void)
         false
       ) ||
       adapter.connection.ctx.cc_num != 0U ||
+      ism_shell_event_queue_len(&queue) != 0U)
+  {
+    return false;
+  }
+
+  capture = (runtime_send_capture){ 0 };
+  ism_msquic_adapter_init(
+    &adapter,
+    reset_response,
+    (uint32_t)sizeof reset_response,
+    reset_send_buffer,
+    (uint32_t)sizeof reset_send_buffer,
+    runtime_fake_send,
+    &capture
+  );
+  ism_shell_event_queue_init(&queue, events, 1U);
+  ism_msquic_runtime_stream_init(
+    &runtime,
+    &adapter,
+    &queue,
+    reset_stream_id,
+    reset_ingress_buffer,
+    (uint32_t)sizeof reset_ingress_buffer
+  );
+
+  if (!ism_msquic_runtime_on_receive(
+        &runtime,
+        reset_buffers,
+        (uint32_t)(sizeof reset_buffers / sizeof reset_buffers[0])
+      ) ||
+      capture.called ||
+      adapter.connection.ctx.cc_num != 1U ||
+      !ism_msquic_runtime_on_stream_reset(&runtime) ||
+      adapter.connection.ctx.cc_num != 0U ||
+      !ism_msquic_runtime_on_stream_reset(&runtime) ||
       ism_shell_event_queue_len(&queue) != 0U)
   {
     return false;
