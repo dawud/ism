@@ -212,10 +212,11 @@ when. It must maintain the logical ownership expected by the verified model:
   default build covers dependency-free receive/send-completion translation
   helpers; defining `ISM_ENABLE_MSQUIC=1` compiles the wrapper that consumes
   upstream `QUIC_STREAM_EVENT` receive and send-completion shapes.
-- MsQuic receive buffers may be passed to verified ingress only while the
-  callback-owned bytes remain live. The current runtime seam enqueues and
-  dispatches receive buffers synchronously; delayed queueing requires copying
-  into shell-owned storage first.
+- MsQuic receive bytes must be copied into shell-owned ingress storage before
+  verified ingress sees them. The current runtime seam rejects receive fragments
+  larger than that fixed-capacity storage and only queues the copied bytes.
+- Delayed queueing of receive bytes must keep using shell-owned storage; the
+  shell must never retain pointers into callback-owned MsQuic buffers.
 - Keep `DNS.ShellScheduler.dispatch_shell_event` as the verified model-level
   dispatch point for authenticated stream data, processing-ready streams, and
   send-completion/drop notifications.

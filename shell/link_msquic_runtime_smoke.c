@@ -44,6 +44,8 @@ bool ism_smoke_msquic_runtime(void)
   runtime_send_capture capture = { 0 };
   uint8_t response[128] = { 0U };
   uint8_t send_buffer[128] = { 0U };
+  uint8_t ingress_buffer[64] = { 0U };
+  uint8_t undersized_ingress_buffer[1] = { 0U };
   uint8_t exact_a_query[] = {
     0x00U, 0x21U,
     0x12U, 0x34U,
@@ -92,7 +94,14 @@ bool ism_smoke_msquic_runtime(void)
     &capture
   );
   ism_shell_event_queue_init(&queue, events, 1U);
-  ism_msquic_runtime_stream_init(&runtime, &adapter, &queue, stream_id);
+  ism_msquic_runtime_stream_init(
+    &runtime,
+    &adapter,
+    &queue,
+    stream_id,
+    ingress_buffer,
+    (uint32_t)sizeof ingress_buffer
+  );
 
   if (!ism_msquic_runtime_on_receive(
         &runtime,
@@ -104,6 +113,11 @@ bool ism_smoke_msquic_runtime(void)
       capture.len != (uint32_t)sizeof expected_validated_stream_response ||
       !capture.fin ||
       memcmp(
+        ingress_buffer,
+        exact_a_query,
+        sizeof exact_a_query
+      ) != 0 ||
+      memcmp(
         send_buffer,
         expected_validated_stream_response,
         sizeof expected_validated_stream_response
@@ -113,12 +127,34 @@ bool ism_smoke_msquic_runtime(void)
     return false;
   }
 
+  memset(exact_a_query, 0, sizeof exact_a_query);
+
   if (!ism_msquic_runtime_on_send_complete(
         &runtime,
         capture.len,
         false
       ) ||
       adapter.connection.ctx.cc_num != 0U ||
+      ism_shell_event_queue_len(&queue) != 0U)
+  {
+    return false;
+  }
+
+  ism_shell_event_queue_init(&queue, events, 1U);
+  ism_msquic_runtime_stream_init(
+    &runtime,
+    &adapter,
+    &queue,
+    stream_id,
+    undersized_ingress_buffer,
+    (uint32_t)sizeof undersized_ingress_buffer
+  );
+
+  if (ism_msquic_runtime_on_receive(
+        &runtime,
+        buffers,
+        (uint32_t)(sizeof buffers / sizeof buffers[0])
+      ) ||
       ism_shell_event_queue_len(&queue) != 0U)
   {
     return false;

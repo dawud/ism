@@ -1,13 +1,16 @@
 #include "msquic_runtime.h"
 
 #include <stddef.h>
+#include <string.h>
 
 void
 ism_msquic_runtime_stream_init(
   ism_msquic_runtime_stream *runtime,
   ism_msquic_adapter *adapter,
   ism_shell_event_queue *queue,
-  uint64_t stream_id
+  uint64_t stream_id,
+  uint8_t *ingress_buffer,
+  uint32_t ingress_capacity
 )
 {
   if (runtime == NULL)
@@ -18,20 +21,32 @@ ism_msquic_runtime_stream_init(
   runtime->adapter = adapter;
   runtime->queue = queue;
   runtime->stream_id = stream_id;
+  runtime->ingress_buffer = ingress_buffer;
+  runtime->ingress_capacity = ingress_capacity;
 }
 
 static bool
-ism_msquic_runtime_enqueue_and_dispatch(
+ism_msquic_runtime_copy_enqueue_and_dispatch(
   ism_msquic_runtime_stream *runtime,
   uint8_t *data,
   uint32_t len
 )
 {
+  if (runtime == NULL ||
+      runtime->ingress_buffer == NULL ||
+      data == NULL ||
+      len > runtime->ingress_capacity)
+  {
+    return false;
+  }
+
+  memcpy(runtime->ingress_buffer, data, len);
+
   return
     ism_shell_event_queue_enqueue_authenticated_stream_bytes(
       runtime->queue,
       runtime->stream_id,
-      data,
+      runtime->ingress_buffer,
       len
     ) &&
     ism_shell_event_queue_dispatch_one(
@@ -63,7 +78,7 @@ ism_msquic_runtime_on_receive(
     }
 
     if (buffers[i].data == NULL ||
-        !ism_msquic_runtime_enqueue_and_dispatch(
+        !ism_msquic_runtime_copy_enqueue_and_dispatch(
           runtime,
           buffers[i].data,
           buffers[i].len
@@ -126,7 +141,7 @@ ism_msquic_runtime_on_msquic_receive(
     }
 
     if (buffer->Buffer == NULL ||
-        !ism_msquic_runtime_enqueue_and_dispatch(
+        !ism_msquic_runtime_copy_enqueue_and_dispatch(
           runtime,
           buffer->Buffer,
           buffer->Length

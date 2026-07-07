@@ -28,6 +28,8 @@ typedef struct ism_msquic_runtime_stream_s
   ism_msquic_adapter *adapter;
   ism_shell_event_queue *queue;
   uint64_t stream_id;
+  uint8_t *ingress_buffer;
+  uint32_t ingress_capacity;
 }
 ism_msquic_runtime_stream;
 
@@ -36,7 +38,9 @@ ism_msquic_runtime_stream_init(
   ism_msquic_runtime_stream *runtime,
   ism_msquic_adapter *adapter,
   ism_shell_event_queue *queue,
-  uint64_t stream_id
+  uint64_t stream_id,
+  uint8_t *ingress_buffer,
+  uint32_t ingress_capacity
 );
 
 bool
