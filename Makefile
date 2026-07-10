@@ -113,6 +113,7 @@ C_LINK_SMOKE_SOURCES = shell/link_smoke.c \
 MSQUIC_CFLAGS ?= -I $(MSQUIC_HOME)/include
 MSQUIC_LDFLAGS ?= -L $(MSQUIC_HOME)/lib -Wl,-rpath,$(MSQUIC_HOME)/lib -lmsquic
 MSQUIC_LINK_SMOKE = $(DIST_DIR)/msquic-runtime-link-smoke
+MSQUIC_LIFECYCLE_SMOKE = $(DIST_DIR)/msquic-runtime-lifecycle-smoke
 
 # 1. Collect all F* source files
 PROTOCOL_FST_FILES = src/protocol/DNS.Name.fst \
@@ -149,7 +150,7 @@ EXTRACT_FST_FILES = $(filter-out src/protocol/%.Tests.fst, $(PROTOCOL_FST_FILES)
 
 EVERPARSE_3D_FILES = $(wildcard $(EVERPARSE_SRC_DIR)/*.3d)
 
-.PHONY: all verify verify-pulse-pilot assess-pulse-pilot-rust pulse-rust-smoke extract c-compile-smoke c-link-smoke msquic-runtime-compile-smoke msquic-runtime-link-smoke everparse-generate everparse-verify clean
+.PHONY: all verify verify-pulse-pilot assess-pulse-pilot-rust pulse-rust-smoke extract c-compile-smoke c-link-smoke msquic-runtime-compile-smoke msquic-runtime-link-smoke msquic-runtime-lifecycle-smoke everparse-generate everparse-verify clean
 
 all: extract
 
@@ -290,6 +291,14 @@ msquic-runtime-link-smoke: extract
 	  $(MSQUIC_LDFLAGS) \
 	  -o $(MSQUIC_LINK_SMOKE)
 	$(MSQUIC_LINK_SMOKE)
+
+msquic-runtime-lifecycle-smoke: extract
+	@echo "Linking real MsQuic object lifecycle smoke binary..."
+	$(CC) -std=c11 $(MSQUIC_CFLAGS) \
+	  shell/msquic_lifecycle_smoke.c \
+	  $(MSQUIC_LDFLAGS) \
+	  -o $(MSQUIC_LIFECYCLE_SMOKE)
+	$(MSQUIC_LIFECYCLE_SMOKE)
 
 # 4. EverParse generation scaffold
 everparse-generate:

@@ -224,8 +224,10 @@ when. It must maintain the logical ownership expected by the verified model:
   upstream `QUIC_STREAM_EVENT` receive, send-completion, and reset/shutdown
   shapes. The stable container installs a pinned upstream `msquic.h` header and
   MsQuic shared library; the CI `msquic-runtime-compile-smoke` gate
-  syntax-checks that API shape and `msquic-runtime-link-smoke` links/runs a
-  no-network MsQuic API-table open/close check.
+  syntax-checks that API shape, `msquic-runtime-link-smoke` links/runs a
+  no-network MsQuic API-table open/close check, and
+  `msquic-runtime-lifecycle-smoke` opens/closes no-network registration,
+  configuration, and listener handles.
 - MsQuic receive bytes must be copied into shell-owned ingress storage before
   verified ingress sees them. The current runtime seam rejects receive fragments
   larger than that fixed-capacity storage and only queues the copied bytes.
@@ -312,6 +314,10 @@ The unverified shell must stay small and auditable.
   container dependency changes to link and run the no-network
   `MsQuicOpen2`/`MsQuicClose` smoke against the pinned shared library. Override
   `MSQUIC_LDFLAGS` only for non-container MsQuic library locations.
+- Run `make msquic-runtime-lifecycle-smoke` after MsQuic object-lifecycle or
+  handle-ownership changes to open and close no-network API-table,
+  registration, configuration, and listener handles. This gate must not call
+  `ListenerStart` or bind sockets.
 - Run `make pulse-rust-smoke` after migration-lane Pulse/Rust boundary changes
   to compile the generated Rust, link the extern-friendly wrapper from C, and
   keep the experimental ABI shape honest.

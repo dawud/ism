@@ -69,6 +69,15 @@ jobs:
             localhost/verified-dns-server:latest \
             bash -lc 'cd /workspace && make msquic-runtime-link-smoke'
 
+      - name: Check real MsQuic object lifecycle
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -v "${PWD}:/workspace" \
+            localhost/verified-dns-server:latest \
+            bash -lc 'cd /workspace && make msquic-runtime-lifecycle-smoke'
+
   latest-fstar-migration:
     name: Latest F* migration lane
     runs-on: ubuntu-latest

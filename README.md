@@ -153,6 +153,17 @@ podman run --rm \
   bash -lc 'make msquic-runtime-link-smoke'
 ```
 
+To check the no-network MsQuic object lifecycle boundary, including API table,
+registration, configuration, and listener handle ownership, run:
+
+```bash
+podman run --rm \
+  --userns=keep-id \
+  -v "$(pwd):/workspace:Z" \
+  localhost/verified-dns-server:latest \
+  bash -lc 'make msquic-runtime-lifecycle-smoke'
+```
+
 For a non-container MsQuic installation, override `MSQUIC_CFLAGS` and
 `MSQUIC_LDFLAGS` with the needed include and link flags.
 
