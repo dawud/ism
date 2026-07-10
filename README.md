@@ -142,8 +142,19 @@ podman run --rm \
   bash -lc 'make msquic-runtime-compile-smoke'
 ```
 
-For a non-container MsQuic installation, override `MSQUIC_CFLAGS` with the
-needed include flags.
+To link and run the no-network MsQuic runtime smoke check, use the pinned
+MsQuic headers and shared library installed in the container:
+
+```bash
+podman run --rm \
+  --userns=keep-id \
+  -v "$(pwd):/workspace:Z" \
+  localhost/verified-dns-server:latest \
+  bash -lc 'make msquic-runtime-link-smoke'
+```
+
+For a non-container MsQuic installation, override `MSQUIC_CFLAGS` and
+`MSQUIC_LDFLAGS` with the needed include and link flags.
 
 The image also includes EverParse/3D tooling. To regenerate the current
 EverParse parser scaffold and verify/extract the generated subset, run:

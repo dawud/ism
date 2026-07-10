@@ -221,12 +221,14 @@ important than integration simplicity.
 **Consequences:** Shell integration work should target MsQuic first and shape
 the shell/core boundary around MsQuic stream callbacks: authenticated bytes from
 MsQuic into verified DoQ handling, and serialized response bytes from verified
-code back to MsQuic. The stable container pins the upstream `msquic.h` header
-and the `make msquic-runtime-compile-smoke` CI gate checks the callback wrapper
-against that real API shape. Pin the chosen MsQuic library version or commit
-before production use, document build/link dependencies, and revisit this
-decision if MsQuic's API, maintenance, platform support, or security process no
-longer fits the project.
+code back to MsQuic. The stable container pins upstream MsQuic `v2.5.9` headers
+and shared library artifacts, checks the source commit before building, uses
+`make msquic-runtime-compile-smoke` to check the callback wrapper against the
+real API shape, and uses `make msquic-runtime-link-smoke` to link and run a
+no-network `MsQuicOpen2`/`MsQuicClose` load check. Real listener, connection,
+stream, polling, timer, and send-path integration remain future shell work.
+Revisit this decision if MsQuic's API, maintenance, platform support, or
+security process no longer fits the project.
 
 ## DR-0013: Evaluate Pulse Before Any Low* Migration
 

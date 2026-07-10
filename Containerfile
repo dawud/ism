@@ -62,22 +62,49 @@ RUN EVERPARSE_VERSION=v2026.03.21 \
     && rm /tmp/everparse.tar.gz \
     && test -x ${EVERPARSE_HOME}/everparse.sh
 
-# 7. Install pinned upstream MsQuic headers for real callback API checks.
+USER root
+
+# 7. Install MsQuic-specific build dependencies.
+RUN dnf install -y openssl-devel perl-FindBin perl-File-Compare perl-File-Copy perl-IPC-Cmd \
+    && dnf clean all \
+    && chown -R ${USER_NAME}:${USER_NAME} ${MSQUIC_HOME}
+
+USER ${USER_NAME}
+
+# 8. Install pinned upstream MsQuic headers and shared library for real
+# callback API and runtime linkage checks.
 RUN MSQUIC_VERSION=v2.5.9 \
+    && MSQUIC_COMMIT=87b53085d76bd7920d490a6f226c9999b6614d14 \
     && MSQUIC_HEADER_SHA256=c9abfdd02c45910649dd335d6bd82718e4ddd2fdb35fe550567c78f032551e0c \
     && MSQUIC_POSIX_HEADER_SHA256=b285fa66b9c9bdc886c30ef92910da472692b25f5c6192416fb40f08f64e22ec \
     && MSQUIC_SAL_STUB_HEADER_SHA256=9b13328d9aec8807a754b2bc391b31b5d09b1c5f6cec064012051683ed169055 \
     && MSQUIC_BASE_URL=https://raw.githubusercontent.com/microsoft/msquic/${MSQUIC_VERSION}/src/inc \
-    && mkdir -p ${MSQUIC_HOME}/include \
+    && mkdir -p ${MSQUIC_HOME}/include ${MSQUIC_HOME}/lib \
     && echo "Downloading MsQuic headers ${MSQUIC_VERSION} from ${MSQUIC_BASE_URL}" \
     && wget "${MSQUIC_BASE_URL}/msquic.h" -O ${MSQUIC_HOME}/include/msquic.h \
     && wget "${MSQUIC_BASE_URL}/msquic_posix.h" -O ${MSQUIC_HOME}/include/msquic_posix.h \
     && wget "${MSQUIC_BASE_URL}/quic_sal_stub.h" -O ${MSQUIC_HOME}/include/quic_sal_stub.h \
     && echo "${MSQUIC_HEADER_SHA256}  ${MSQUIC_HOME}/include/msquic.h" | sha256sum -c - \
     && echo "${MSQUIC_POSIX_HEADER_SHA256}  ${MSQUIC_HOME}/include/msquic_posix.h" | sha256sum -c - \
-    && echo "${MSQUIC_SAL_STUB_HEADER_SHA256}  ${MSQUIC_HOME}/include/quic_sal_stub.h" | sha256sum -c -
+    && echo "${MSQUIC_SAL_STUB_HEADER_SHA256}  ${MSQUIC_HOME}/include/quic_sal_stub.h" | sha256sum -c - \
+    && git clone --depth 1 --branch ${MSQUIC_VERSION} https://github.com/microsoft/msquic.git /tmp/msquic \
+    && cd /tmp/msquic \
+    && test "$(git rev-parse HEAD)" = "${MSQUIC_COMMIT}" \
+    && git submodule update --init --depth 1 submodules/quictls \
+    && cmake -S . -B build \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DQUIC_BUILD_TOOLS=OFF \
+        -DQUIC_BUILD_TEST=OFF \
+        -DQUIC_BUILD_PERF=OFF \
+        -DQUIC_ENABLE_LOGGING=OFF \
+        -DQUIC_TLS_LIB=quictls \
+        -DQUIC_USE_SYSTEM_LIBCRYPTO=ON \
+    && cmake --build build --target msquic -j2 \
+    && cp "$(find build -name 'libmsquic.so*' -type f | sort | head -n 1)" ${MSQUIC_HOME}/lib/libmsquic.so \
+    && ln -sf libmsquic.so ${MSQUIC_HOME}/lib/libmsquic.so.2 \
+    && rm -rf /tmp/msquic
 
-# 8. Set up the Project Workspace
+# 9. Set up the Project Workspace
 WORKDIR /workspace
 COPY --chown=${USER_NAME}:${USER_NAME} . /workspace
 
