@@ -131,8 +131,9 @@ podman run --rm \
   bash -lc 'make c-link-smoke'
 ```
 
-To syntax-check the wrapper that consumes real MsQuic stream callback types, use
-the pinned MsQuic header installed in the container:
+To syntax-check the wrappers that consume real MsQuic stream, connection, and
+listener callback types, use the pinned MsQuic header installed in the
+container:
 
 ```bash
 podman run --rm \

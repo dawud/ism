@@ -223,16 +223,20 @@ the shell/core boundary around MsQuic stream callbacks: authenticated bytes from
 MsQuic into verified DoQ handling, and serialized response bytes from verified
 code back to MsQuic. The stable container pins upstream MsQuic `v2.5.9` headers
 and shared library artifacts, checks the source commit before building, uses
-`make msquic-runtime-compile-smoke` to check the callback wrapper against the
-real API shape, `make msquic-runtime-link-smoke` to link and run a no-network
+`make msquic-runtime-compile-smoke` to check the stream, listener, and
+connection callback wrappers against the real API shape,
+`make msquic-runtime-link-smoke` to link and run a no-network
 `MsQuicOpen2`/`MsQuicClose` load check, and
 `make msquic-runtime-lifecycle-smoke` to open and close a registration,
 configuration, and listener without starting socket I/O.
 `make msquic-runtime-listener-smoke` starts a loopback listener on an ephemeral
 local port and then stops it without accepting connections or sending traffic.
-Real connection, stream, polling, timer, and send-path integration remain
-future shell work. Revisit this decision if MsQuic's API, maintenance, platform
-support, or security process no longer fits the project.
+The current connection wrapper accepts listener `NEW_CONNECTION` events, applies
+configuration, maps peer-started streams into fixed shell-owned slots, and
+installs the existing stream callback. End-to-end real stream traffic, polling,
+timer, and send-path integration remain future shell work. Revisit this decision
+if MsQuic's API, maintenance, platform support, or security process no longer
+fits the project.
 
 ## DR-0013: Evaluate Pulse Before Any Low* Migration
 

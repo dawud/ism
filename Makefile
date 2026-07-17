@@ -276,14 +276,15 @@ c-link-smoke: extract
 	$(C_LINK_SMOKE)
 
 msquic-runtime-compile-smoke: extract
-	@echo "Syntax-checking real MsQuic runtime callback wrapper..."
+	@echo "Syntax-checking real MsQuic runtime callback wrappers..."
 	KRML_INCLUDEDIR="$$($(KRML_HOME)/krml -locate-include)"; \
 	KRML_LIBDIR="$$($(KRML_HOME)/krml -locate-krmllib)"; \
 	$(CC) $(C_COMPILE_SMOKE_CFLAGS) $(MSQUIC_CFLAGS) \
 	  -DISM_ENABLE_MSQUIC=1 \
 	  -I "$$KRML_INCLUDEDIR" \
 	  -I "$$KRML_LIBDIR/dist/minimal" \
-	  shell/msquic_runtime.c
+	  shell/msquic_runtime.c \
+	  shell/msquic_connection_runtime.c
 
 msquic-runtime-link-smoke: extract
 	@echo "Linking real MsQuic runtime library smoke binary..."

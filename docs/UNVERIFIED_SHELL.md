@@ -218,18 +218,26 @@ when. It must maintain the logical ownership expected by the verified model:
   or reset events before dispatching them to the adapter/scaffold. Derived ready
   responses from completed ingress are serviced synchronously by the dispatcher
   rather than re-enqueued.
-- Keep `shell/msquic_runtime.c` as the real-MsQuic callback seam. The
+- Keep `shell/msquic_runtime.c` as the real-MsQuic stream callback seam. The
   default build covers dependency-free receive/send-completion translation
   helpers; defining `ISM_ENABLE_MSQUIC=1` compiles the wrapper that consumes
   upstream `QUIC_STREAM_EVENT` receive, send-completion, and reset/shutdown
-  shapes. The stable container installs a pinned upstream `msquic.h` header and
-  MsQuic shared library; the CI `msquic-runtime-compile-smoke` gate
-  syntax-checks that API shape, `msquic-runtime-link-smoke` links/runs a
-  no-network MsQuic API-table open/close check, and
+  shapes.
+- Keep `shell/msquic_connection_runtime.c` as the real-MsQuic connection
+  callback seam. It accepts listener `NEW_CONNECTION` events, installs the
+  connection callback, applies the selected configuration, maps
+  `PEER_STREAM_STARTED` events into fixed shell-owned stream slots, reads the
+  MsQuic stream ID, and installs the stream callback over the existing
+  receive/send-completion/reset path. It closes the MsQuic stream handle when
+  the stream shutdown callback completes.
+- The stable container installs a pinned upstream `msquic.h` header and MsQuic
+  shared library; the CI `msquic-runtime-compile-smoke` gate syntax-checks
+  the stream and connection callback API shapes, `msquic-runtime-link-smoke`
+  links/runs a no-network MsQuic API-table open/close check, and
   `msquic-runtime-lifecycle-smoke` opens/closes no-network registration,
-  configuration, and listener handles. `msquic-runtime-listener-smoke`
-  starts and stops a loopback listener on an ephemeral local port without
-  accepting connections or sending traffic.
+  configuration, and listener handles. `msquic-runtime-listener-smoke` starts
+  and stops a loopback listener on an ephemeral local port without accepting
+  connections or sending traffic.
 - MsQuic receive bytes must be copied into shell-owned ingress storage before
   verified ingress sees them. The current runtime seam rejects receive fragments
   larger than that fixed-capacity storage and only queues the copied bytes.
@@ -309,8 +317,9 @@ The unverified shell must stay small and auditable.
   rich `DNS.ShellScheduler.dispatch_shell_event` union or a real linked MsQuic
   shell path.
 - Run `make msquic-runtime-compile-smoke` after MsQuic runtime callback changes
-  to syntax-check the `QUIC_STREAM_EVENT` wrapper against the pinned upstream
-  `msquic.h` header installed in the stable container. Override
+  to syntax-check the `QUIC_STREAM_EVENT`, `QUIC_CONNECTION_EVENT`, and
+  `QUIC_LISTENER_EVENT` wrappers against the pinned upstream `msquic.h` header
+  installed in the stable container. Override
   `MSQUIC_CFLAGS` only for non-container MsQuic header locations.
 - Run `make msquic-runtime-link-smoke` after MsQuic library, link flag, or
   container dependency changes to link and run the no-network

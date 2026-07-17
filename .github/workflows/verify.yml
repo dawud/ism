@@ -51,7 +51,7 @@ jobs:
             localhost/verified-dns-server:latest \
             bash -lc 'cd /workspace && make extract'
 
-      - name: Syntax-check real MsQuic callback wrapper
+      - name: Syntax-check real MsQuic callback wrappers
         run: |
           docker run --rm \
             --user "$(id -u):$(id -g)" \
