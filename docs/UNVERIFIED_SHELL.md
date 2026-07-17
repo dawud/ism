@@ -227,7 +227,9 @@ when. It must maintain the logical ownership expected by the verified model:
   syntax-checks that API shape, `msquic-runtime-link-smoke` links/runs a
   no-network MsQuic API-table open/close check, and
   `msquic-runtime-lifecycle-smoke` opens/closes no-network registration,
-  configuration, and listener handles.
+  configuration, and listener handles. `msquic-runtime-listener-smoke`
+  starts and stops a loopback listener on an ephemeral local port without
+  accepting connections or sending traffic.
 - MsQuic receive bytes must be copied into shell-owned ingress storage before
   verified ingress sees them. The current runtime seam rejects receive fragments
   larger than that fixed-capacity storage and only queues the copied bytes.
@@ -318,6 +320,9 @@ The unverified shell must stay small and auditable.
   handle-ownership changes to open and close no-network API-table,
   registration, configuration, and listener handles. This gate must not call
   `ListenerStart` or bind sockets.
+- Run `make msquic-runtime-listener-smoke` after MsQuic listener-start or
+  socket-binding changes to start and stop a loopback listener on an ephemeral
+  local port. This gate must not accept connections or send traffic.
 - Run `make pulse-rust-smoke` after migration-lane Pulse/Rust boundary changes
   to compile the generated Rust, link the extern-friendly wrapper from C, and
   keep the experimental ABI shape honest.

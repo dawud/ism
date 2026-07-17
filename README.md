@@ -164,6 +164,17 @@ podman run --rm \
   bash -lc 'make msquic-runtime-lifecycle-smoke'
 ```
 
+To start and stop a real loopback MsQuic listener on an ephemeral local port,
+without accepting connections or sending traffic, run:
+
+```bash
+podman run --rm \
+  --userns=keep-id \
+  -v "$(pwd):/workspace:Z" \
+  localhost/verified-dns-server:latest \
+  bash -lc 'make msquic-runtime-listener-smoke'
+```
+
 For a non-container MsQuic installation, override `MSQUIC_CFLAGS` and
 `MSQUIC_LDFLAGS` with the needed include and link flags.
 
