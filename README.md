@@ -143,6 +143,17 @@ podman run --rm \
   bash -lc 'make msquic-runtime-compile-smoke'
 ```
 
+To link and run the no-network MsQuic connection callback behavior smoke check,
+using a fake MsQuic API table and the pinned upstream callback types, run:
+
+```bash
+podman run --rm \
+  --userns=keep-id \
+  -v "$(pwd):/workspace:Z" \
+  localhost/verified-dns-server:latest \
+  bash -lc 'make msquic-runtime-connection-smoke'
+```
+
 To link and run the no-network MsQuic runtime smoke check, use the pinned
 MsQuic headers and shared library installed in the container:
 

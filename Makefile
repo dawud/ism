@@ -115,6 +115,7 @@ MSQUIC_LDFLAGS ?= -L $(MSQUIC_HOME)/lib -Wl,-rpath,$(MSQUIC_HOME)/lib -lmsquic
 MSQUIC_LINK_SMOKE = $(DIST_DIR)/msquic-runtime-link-smoke
 MSQUIC_LIFECYCLE_SMOKE = $(DIST_DIR)/msquic-runtime-lifecycle-smoke
 MSQUIC_LISTENER_SMOKE = $(DIST_DIR)/msquic-runtime-listener-smoke
+MSQUIC_CONNECTION_SMOKE = $(DIST_DIR)/msquic-runtime-connection-smoke
 
 # 1. Collect all F* source files
 PROTOCOL_FST_FILES = src/protocol/DNS.Name.fst \
@@ -151,7 +152,7 @@ EXTRACT_FST_FILES = $(filter-out src/protocol/%.Tests.fst, $(PROTOCOL_FST_FILES)
 
 EVERPARSE_3D_FILES = $(wildcard $(EVERPARSE_SRC_DIR)/*.3d)
 
-.PHONY: all verify verify-pulse-pilot assess-pulse-pilot-rust pulse-rust-smoke extract c-compile-smoke c-link-smoke msquic-runtime-compile-smoke msquic-runtime-link-smoke msquic-runtime-lifecycle-smoke msquic-runtime-listener-smoke everparse-generate everparse-verify clean
+.PHONY: all verify verify-pulse-pilot assess-pulse-pilot-rust pulse-rust-smoke extract c-compile-smoke c-link-smoke msquic-runtime-compile-smoke msquic-runtime-link-smoke msquic-runtime-lifecycle-smoke msquic-runtime-listener-smoke msquic-runtime-connection-smoke everparse-generate everparse-verify clean
 
 all: extract
 
@@ -309,6 +310,25 @@ msquic-runtime-listener-smoke: extract
 	  $(MSQUIC_LDFLAGS) \
 	  -o $(MSQUIC_LISTENER_SMOKE)
 	$(MSQUIC_LISTENER_SMOKE)
+
+msquic-runtime-connection-smoke: extract
+	@echo "Linking real MsQuic connection callback smoke binary..."
+	KRML_INCLUDEDIR="$$($(KRML_HOME)/krml -locate-include)"; \
+	KRML_LIBDIR="$$($(KRML_HOME)/krml -locate-krmllib)"; \
+	$(CC) $(C_SMOKE_CFLAGS) $(MSQUIC_CFLAGS) \
+	  -DISM_ENABLE_MSQUIC=1 \
+	  -I "$$KRML_INCLUDEDIR" \
+	  -I "$$KRML_LIBDIR/dist/minimal" \
+	  shell/msquic_connection_smoke.c \
+	  shell/msquic_connection_runtime.c \
+	  shell/msquic_runtime.c \
+	  shell/ism_event_queue.c \
+	  shell/msquic_adapter.c \
+	  shell/ism_shell.c \
+	  shell/link_krml_compat_stubs.c \
+	  $(C_COMPILE_SMOKE_SOURCES) \
+	  -o $(MSQUIC_CONNECTION_SMOKE); \
+	$(MSQUIC_CONNECTION_SMOKE)
 
 # 4. EverParse generation scaffold
 everparse-generate:

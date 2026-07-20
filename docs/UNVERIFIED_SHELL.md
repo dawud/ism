@@ -232,8 +232,12 @@ when. It must maintain the logical ownership expected by the verified model:
   the stream shutdown callback completes.
 - The stable container installs a pinned upstream `msquic.h` header and MsQuic
   shared library; the CI `msquic-runtime-compile-smoke` gate syntax-checks
-  the stream and connection callback API shapes, `msquic-runtime-link-smoke`
-  links/runs a no-network MsQuic API-table open/close check, and
+  the stream and connection callback API shapes,
+  `msquic-runtime-connection-smoke` links/runs a fake-API behavior check for
+  listener new-connection handling, peer-started stream slot mapping, stream
+  callback installation, shutdown cleanup, and rejected-stream closure,
+  `msquic-runtime-link-smoke` links/runs a no-network MsQuic API-table
+  open/close check, and
   `msquic-runtime-lifecycle-smoke` opens/closes no-network registration,
   configuration, and listener handles. `msquic-runtime-listener-smoke` starts
   and stops a loopback listener on an ephemeral local port without accepting
@@ -321,6 +325,9 @@ The unverified shell must stay small and auditable.
   `QUIC_LISTENER_EVENT` wrappers against the pinned upstream `msquic.h` header
   installed in the stable container. Override
   `MSQUIC_CFLAGS` only for non-container MsQuic header locations.
+- Run `make msquic-runtime-connection-smoke` after listener, connection, or
+  peer-stream callback behavior changes to link and run the fake-API behavior
+  harness. This gate must not use a live MsQuic connection or network I/O.
 - Run `make msquic-runtime-link-smoke` after MsQuic library, link flag, or
   container dependency changes to link and run the no-network
   `MsQuicOpen2`/`MsQuicClose` smoke against the pinned shared library. Override

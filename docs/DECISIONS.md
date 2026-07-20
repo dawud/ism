@@ -225,6 +225,9 @@ code back to MsQuic. The stable container pins upstream MsQuic `v2.5.9` headers
 and shared library artifacts, checks the source commit before building, uses
 `make msquic-runtime-compile-smoke` to check the stream, listener, and
 connection callback wrappers against the real API shape,
+`make msquic-runtime-connection-smoke` to link and run a fake-API behavioral
+check for listener new-connection handling, peer-started stream slot mapping,
+stream callback installation, shutdown cleanup, and rejected-stream closure,
 `make msquic-runtime-link-smoke` to link and run a no-network
 `MsQuicOpen2`/`MsQuicClose` load check, and
 `make msquic-runtime-lifecycle-smoke` to open and close a registration,
