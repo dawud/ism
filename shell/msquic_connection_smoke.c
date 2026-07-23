@@ -10,7 +10,9 @@ typedef struct ism_msquic_connection_smoke_state_s
   HQUIC connection;
   HQUIC configuration;
   HQUIC stream;
+  HQUIC closed_connections[2];
   HQUIC closed_streams[4];
+  uint32_t closed_connection_count;
   uint32_t closed_stream_count;
   uint32_t set_callback_count;
   uint32_t get_param_count;
@@ -113,6 +115,23 @@ smoke_connection_set_configuration(
 }
 
 static void QUIC_API
+smoke_connection_close(HQUIC connection)
+{
+  if (g_smoke_state == NULL ||
+      g_smoke_state->closed_connection_count >=
+        (uint32_t)(sizeof g_smoke_state->closed_connections /
+                   sizeof g_smoke_state->closed_connections[0]))
+  {
+    return;
+  }
+
+  g_smoke_state->closed_connections[
+    g_smoke_state->closed_connection_count
+  ] = connection;
+  g_smoke_state->closed_connection_count++;
+}
+
+static void QUIC_API
 smoke_stream_close(HQUIC stream)
 {
   if (g_smoke_state == NULL ||
@@ -152,6 +171,7 @@ main(void)
     .SetCallbackHandler = smoke_set_callback_handler,
     .GetParam = smoke_get_param,
     .ConnectionSetConfiguration = smoke_connection_set_configuration,
+    .ConnectionClose = smoke_connection_close,
     .StreamClose = smoke_stream_close
   };
   ism_msquic_connection_smoke_state state = {
@@ -192,6 +212,14 @@ main(void)
       .ConnectionClosedRemotely = 1,
       .ConnectionErrorCode = 0U,
       .ConnectionCloseStatus = QUIC_STATUS_SUCCESS
+    }
+  };
+  QUIC_CONNECTION_EVENT connection_shutdown_event = {
+    .Type = QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE,
+    .SHUTDOWN_COMPLETE = {
+      .HandshakeCompleted = 1,
+      .PeerAcknowledgedShutdown = 1,
+      .AppCloseInProgress = 0
     }
   };
 
@@ -272,6 +300,17 @@ main(void)
       slots[0].api != NULL ||
       state.closed_stream_count != 1U ||
       state.closed_streams[0] != state.stream)
+  {
+    return 1;
+  }
+
+  if (QUIC_FAILED(ism_msquic_connection_runtime_connection_callback(
+        state.connection,
+        &runtime,
+        &connection_shutdown_event
+      )) ||
+      state.closed_connection_count != 1U ||
+      state.closed_connections[0] != state.connection)
   {
     return 1;
   }

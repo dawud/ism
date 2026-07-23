@@ -256,6 +256,13 @@ ism_msquic_connection_runtime_connection_callback(
       return QUIC_STATUS_SUCCESS;
     }
 
+    case QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE:
+      if (connection != 0 && runtime->api->ConnectionClose != NULL)
+      {
+        runtime->api->ConnectionClose(connection);
+      }
+      return QUIC_STATUS_SUCCESS;
+
     default:
       return QUIC_STATUS_SUCCESS;
   }

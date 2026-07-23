@@ -187,6 +187,17 @@ podman run --rm \
   bash -lc 'make msquic-runtime-listener-smoke'
 ```
 
+To run a live loopback MsQuic stream exchange through the current stream
+callback boundary, using test-only loopback credentials under `shell/`, run:
+
+```bash
+podman run --rm \
+  --userns=keep-id \
+  -v "$(pwd):/workspace:Z" \
+  localhost/verified-dns-server:latest \
+  bash -lc 'make msquic-runtime-stream-smoke'
+```
+
 For a non-container MsQuic installation, override `MSQUIC_CFLAGS` and
 `MSQUIC_LDFLAGS` with the needed include and link flags.
 

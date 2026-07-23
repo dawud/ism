@@ -95,7 +95,11 @@ callback. Stream reset/drop handling reuses that matching completion path when
 a send is in flight and otherwise closes the stream through the reset wrapper.
 It does not include MsQuic headers or own sockets, real
 MsQuic callbacks, polling, timers, dynamic allocation, or production event-loop
-integration. `shell/ism_event_queue.c` adds a fixed-capacity ring for
+integration. The separate `make msquic-runtime-stream-smoke` gate starts a live
+loopback MsQuic client/server exchange with test-only credentials and asserts
+that a valid DoQ query reaches the real receive callback boundary and prepares
+the expected response bytes, but it still bypasses production polling and
+MsQuic send-path wiring. `shell/ism_event_queue.c` adds a fixed-capacity ring for
 shell-selected authenticated-ingress, ready-response, send-completion, and reset
 events; when authenticated ingress reaches `Processing`, the queue dispatcher
 services the ready response immediately instead of enqueueing a derived
@@ -241,7 +245,11 @@ when. It must maintain the logical ownership expected by the verified model:
   `msquic-runtime-lifecycle-smoke` opens/closes no-network registration,
   configuration, and listener handles. `msquic-runtime-listener-smoke` starts
   and stops a loopback listener on an ephemeral local port without accepting
-  connections or sending traffic.
+  connections or sending traffic. `msquic-runtime-stream-smoke` starts a live
+  loopback client/server stream exchange with test-only credentials, permits one
+  incoming bidirectional stream, sends a valid DoQ query, and checks that the
+  server callback boundary copies real receive bytes into shell-owned ingress
+  storage before preparing expected response bytes.
 - MsQuic receive bytes must be copied into shell-owned ingress storage before
   verified ingress sees them. The current runtime seam rejects receive fragments
   larger than that fixed-capacity storage and only queues the copied bytes.
@@ -339,6 +347,11 @@ The unverified shell must stay small and auditable.
 - Run `make msquic-runtime-listener-smoke` after MsQuic listener-start or
   socket-binding changes to start and stop a loopback listener on an ephemeral
   local port. This gate must not accept connections or send traffic.
+- Run `make msquic-runtime-stream-smoke` after live stream receive-path, MsQuic
+  credential/configuration, stream-limit, or callback ownership changes. This
+  gate uses test-only loopback credentials and live local UDP, and it checks
+  receive-to-response preparation without proving production polling, timer, or
+  send-path behavior.
 - Run `make pulse-rust-smoke` after migration-lane Pulse/Rust boundary changes
   to compile the generated Rust, link the extern-friendly wrapper from C, and
   keep the experimental ABI shape honest.

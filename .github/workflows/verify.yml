@@ -96,6 +96,15 @@ jobs:
             localhost/verified-dns-server:latest \
             bash -lc 'cd /workspace && make msquic-runtime-listener-smoke'
 
+      - name: Exchange real MsQuic stream data
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -v "${PWD}:/workspace" \
+            localhost/verified-dns-server:latest \
+            bash -lc 'cd /workspace && make msquic-runtime-stream-smoke'
+
   latest-fstar-migration:
     name: Latest F* migration lane
     runs-on: ubuntu-latest

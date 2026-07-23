@@ -234,12 +234,17 @@ stream callback installation, shutdown cleanup, and rejected-stream closure,
 configuration, and listener without starting socket I/O.
 `make msquic-runtime-listener-smoke` starts a loopback listener on an ephemeral
 local port and then stops it without accepting connections or sending traffic.
+`make msquic-runtime-stream-smoke` runs a live loopback client/server stream
+exchange with test-only credentials, permits one incoming bidirectional stream,
+sends a valid DoQ query, and asserts that the server receive callback boundary
+copies real MsQuic stream bytes into shell-owned storage before preparing the
+expected generated-validator-backed DoQ response bytes.
 The current connection wrapper accepts listener `NEW_CONNECTION` events, applies
 configuration, maps peer-started streams into fixed shell-owned slots, and
-installs the existing stream callback. End-to-end real stream traffic, polling,
-timer, and send-path integration remain future shell work. Revisit this decision
-if MsQuic's API, maintenance, platform support, or security process no longer
-fits the project.
+installs the existing stream callback. Production polling, timer, event-loop,
+and send-path integration remain future shell work. Revisit this decision if
+MsQuic's API, maintenance, platform support, or security process no longer fits
+the project.
 
 ## DR-0013: Evaluate Pulse Before Any Low* Migration
 
