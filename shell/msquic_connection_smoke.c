@@ -23,6 +23,11 @@ typedef struct ism_msquic_connection_smoke_state_s
   void *connection_context;
   void *stream_handler;
   void *stream_context;
+  const QUIC_BUFFER *send_buffers;
+  void *send_client_context;
+  uint32_t send_buffer_count;
+  QUIC_SEND_FLAGS send_flags;
+  uint32_t stream_send_count;
   bool get_param_should_fail;
 }
 ism_msquic_connection_smoke_state;
@@ -146,22 +151,32 @@ smoke_stream_close(HQUIC stream)
   g_smoke_state->closed_stream_count++;
 }
 
-static bool
-smoke_send(
-  void *ctx,
-  uint64_t stream_id,
-  uint8_t *data,
-  uint32_t len,
-  bool fin
+static QUIC_STATUS QUIC_API
+smoke_stream_send(
+  HQUIC stream,
+  const QUIC_BUFFER *const buffers,
+  uint32_t buffer_count,
+  QUIC_SEND_FLAGS flags,
+  void *client_send_context
 )
 {
-  (void)ctx;
-  (void)stream_id;
-  (void)data;
-  (void)len;
-  (void)fin;
+  if (g_smoke_state == NULL ||
+      stream != g_smoke_state->stream ||
+      buffers == NULL ||
+      buffer_count != 1U ||
+      buffers[0].Buffer == NULL ||
+      buffers[0].Length == 0U ||
+      client_send_context == NULL)
+  {
+    return QUIC_STATUS_INVALID_PARAMETER;
+  }
 
-  return false;
+  g_smoke_state->send_buffers = buffers;
+  g_smoke_state->send_client_context = client_send_context;
+  g_smoke_state->send_buffer_count = buffer_count;
+  g_smoke_state->send_flags = flags;
+  g_smoke_state->stream_send_count++;
+  return QUIC_STATUS_SUCCESS;
 }
 
 int
@@ -172,7 +187,8 @@ main(void)
     .GetParam = smoke_get_param,
     .ConnectionSetConfiguration = smoke_connection_set_configuration,
     .ConnectionClose = smoke_connection_close,
-    .StreamClose = smoke_stream_close
+    .StreamClose = smoke_stream_close,
+    .StreamSend = smoke_stream_send
   };
   ism_msquic_connection_smoke_state state = {
     .connection = smoke_handle(1U),
@@ -189,6 +205,50 @@ main(void)
   uint8_t ingress_buffer[64] = { 0U };
   uint8_t response_buffer[128] = { 0U };
   uint8_t send_buffer[128] = { 0U };
+  uint8_t exact_a_query[] = {
+    0x00U, 0x21U,
+    0x12U, 0x34U,
+    0x01U, 0x00U,
+    0x00U, 0x01U,
+    0x00U, 0x00U,
+    0x00U, 0x00U,
+    0x00U, 0x00U,
+    0x03U, 0x63U, 0x6fU, 0x6dU,
+    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
+    0x03U, 0x77U, 0x77U, 0x77U,
+    0x00U,
+    0x00U, 0x01U,
+    0x00U, 0x01U
+  };
+  const uint8_t expected_response[] = {
+    0x00U, 0x21U,
+    0x12U, 0x34U,
+    0x81U, 0x00U,
+    0x00U, 0x01U,
+    0x00U, 0x00U,
+    0x00U, 0x00U,
+    0x00U, 0x00U,
+    0x03U, 0x63U, 0x6fU, 0x6dU,
+    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
+    0x03U, 0x77U, 0x77U, 0x77U,
+    0x00U,
+    0x00U, 0x01U,
+    0x00U, 0x01U
+  };
+  const QUIC_BUFFER receive_buffer = {
+    .Length = (uint32_t)sizeof exact_a_query,
+    .Buffer = exact_a_query
+  };
+  QUIC_STREAM_EVENT receive_event = {
+    .Type = QUIC_STREAM_EVENT_RECEIVE,
+    .RECEIVE = {
+      .AbsoluteOffset = 0U,
+      .TotalBufferLength = sizeof exact_a_query,
+      .Buffers = &receive_buffer,
+      .BufferCount = 1U,
+      .Flags = QUIC_RECEIVE_FLAG_FIN
+    }
+  };
   QUIC_LISTENER_EVENT listener_event = {
     .Type = QUIC_LISTENER_EVENT_NEW_CONNECTION,
     .NEW_CONNECTION = {
@@ -214,6 +274,12 @@ main(void)
       .ConnectionCloseStatus = QUIC_STATUS_SUCCESS
     }
   };
+  QUIC_STREAM_EVENT peer_receive_aborted_event = {
+    .Type = QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED,
+    .PEER_RECEIVE_ABORTED = {
+      .ErrorCode = 1U
+    }
+  };
   QUIC_CONNECTION_EVENT connection_shutdown_event = {
     .Type = QUIC_CONNECTION_EVENT_SHUTDOWN_COMPLETE,
     .SHUTDOWN_COMPLETE = {
@@ -230,8 +296,8 @@ main(void)
     (uint32_t)sizeof response_buffer,
     send_buffer,
     (uint32_t)sizeof send_buffer,
-    smoke_send,
-    NULL
+    ism_msquic_connection_runtime_send,
+    &runtime
   );
   ism_shell_event_queue_init(
     &queue,
@@ -293,6 +359,44 @@ main(void)
   if (QUIC_FAILED(stream_handler(
         state.stream,
         state.stream_context,
+        &receive_event
+      )) ||
+      state.stream_send_count != 1U ||
+      state.send_buffers == NULL ||
+      state.send_buffer_count != 1U ||
+      state.send_buffers[0].Length != (uint32_t)sizeof expected_response ||
+      state.send_buffers[0].Buffer != send_buffer ||
+      state.send_flags != QUIC_SEND_FLAG_FIN ||
+      state.send_client_context != &slots[0].runtime.send_context ||
+      !slots[0].runtime.send_in_flight ||
+      !adapter.send_in_flight ||
+      memcmp(send_buffer, expected_response, sizeof expected_response) != 0)
+  {
+    return 1;
+  }
+
+  QUIC_STREAM_EVENT send_complete_event = {
+    .Type = QUIC_STREAM_EVENT_SEND_COMPLETE,
+    .SEND_COMPLETE = {
+      .Canceled = 0,
+      .ClientContext = state.send_client_context
+    }
+  };
+  if (QUIC_FAILED(stream_handler(
+        state.stream,
+        state.stream_context,
+        &send_complete_event
+      )) ||
+      slots[0].runtime.send_in_flight ||
+      adapter.send_in_flight ||
+      adapter.connection.ctx.cc_num != 0U)
+  {
+    return 1;
+  }
+
+  if (QUIC_FAILED(stream_handler(
+        state.stream,
+        state.stream_context,
         &shutdown_event
       )) ||
       slots[0].in_use ||
@@ -300,6 +404,72 @@ main(void)
       slots[0].api != NULL ||
       state.closed_stream_count != 1U ||
       state.closed_streams[0] != state.stream)
+  {
+    return 1;
+  }
+
+  state.stream = smoke_handle(7U);
+  state.stream_id = 43U;
+  stream_event.PEER_STREAM_STARTED.Stream = state.stream;
+  if (QUIC_FAILED(ism_msquic_connection_runtime_connection_callback(
+        state.connection,
+        &runtime,
+        &stream_event
+      )))
+  {
+    return 1;
+  }
+
+  stream_handler = (QUIC_STREAM_CALLBACK_HANDLER)state.stream_handler;
+  if (QUIC_FAILED(stream_handler(
+        state.stream,
+        state.stream_context,
+        &receive_event
+      )) ||
+      state.stream_send_count != 2U ||
+      !slots[0].runtime.send_in_flight ||
+      !adapter.send_in_flight ||
+      adapter.connection.ctx.cc_num != 1U)
+  {
+    return 1;
+  }
+
+  if (QUIC_FAILED(stream_handler(
+        state.stream,
+        state.stream_context,
+        &peer_receive_aborted_event
+      )) ||
+      !slots[0].runtime.send_in_flight ||
+      !slots[0].runtime.reset_pending ||
+      !adapter.send_in_flight ||
+      adapter.connection.ctx.cc_num != 1U)
+  {
+    return 1;
+  }
+
+  send_complete_event.SEND_COMPLETE.Canceled = 1;
+  send_complete_event.SEND_COMPLETE.ClientContext = state.send_client_context;
+  if (QUIC_FAILED(stream_handler(
+        state.stream,
+        state.stream_context,
+        &send_complete_event
+      )) ||
+      slots[0].runtime.send_in_flight ||
+      slots[0].runtime.reset_pending ||
+      adapter.send_in_flight ||
+      adapter.connection.ctx.cc_num != 0U)
+  {
+    return 1;
+  }
+
+  if (QUIC_FAILED(stream_handler(
+        state.stream,
+        state.stream_context,
+        &shutdown_event
+      )) ||
+      slots[0].in_use ||
+      state.closed_stream_count != 2U ||
+      state.closed_streams[1] != state.stream)
   {
     return 1;
   }
@@ -323,8 +493,8 @@ main(void)
         &runtime,
         &stream_event
       ) != QUIC_STATUS_INVALID_STATE ||
-      state.closed_stream_count != 2U ||
-      state.closed_streams[1] != state.stream)
+      state.closed_stream_count != 3U ||
+      state.closed_streams[2] != state.stream)
   {
     return 1;
   }
@@ -338,8 +508,8 @@ main(void)
         &runtime,
         &stream_event
       ) != QUIC_STATUS_INVALID_STATE ||
-      state.closed_stream_count != 3U ||
-      state.closed_streams[2] != state.stream)
+      state.closed_stream_count != 4U ||
+      state.closed_streams[3] != state.stream)
   {
     return 1;
   }

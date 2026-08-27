@@ -47,6 +47,15 @@ ism_msquic_connection_stream_slot_init(
   uint32_t ingress_capacity
 );
 
+bool
+ism_msquic_connection_runtime_send(
+  void *ctx,
+  uint64_t stream_id,
+  uint8_t *data,
+  uint32_t len,
+  bool fin
+);
+
 QUIC_STATUS QUIC_API
 ism_msquic_connection_runtime_listener_callback(
   HQUIC listener,

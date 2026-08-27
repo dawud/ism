@@ -17,14 +17,12 @@ typedef struct ism_msquic_stream_smoke_state_s
   bool server_new_connection;
   bool server_peer_stream_started;
   bool server_receive_seen;
-  bool server_response_prepared;
+  bool server_send_complete;
+  bool client_response_finished;
   uint32_t server_receive_buffer_count;
   uint64_t server_stream_id;
-  uint32_t response_len;
-  bool response_fin;
-  uint8_t response_prefix_high;
-  uint8_t response_prefix_low;
-  uint8_t response_rcode_low;
+  uint32_t client_response_len;
+  uint8_t client_response[128];
 }
 ism_msquic_stream_smoke_state;
 
@@ -71,14 +69,17 @@ ism_msquic_stream_smoke_report_state(
   fprintf(
     stderr,
     "msquic stream smoke state: connected=%u started=%u new_connection=%u "
-    "peer_stream=%u receive=%u receive_buffers=%u response=%u\n",
+    "peer_stream=%u receive=%u receive_buffers=%u send_complete=%u "
+    "client_response_finished=%u client_response_len=%u\n",
     state->client_connected ? 1U : 0U,
     state->client_stream_started ? 1U : 0U,
     state->server_new_connection ? 1U : 0U,
     state->server_peer_stream_started ? 1U : 0U,
     state->server_receive_seen ? 1U : 0U,
     state->server_receive_buffer_count,
-    state->server_response_prepared ? 1U : 0U
+    state->server_send_complete ? 1U : 0U,
+    state->client_response_finished ? 1U : 0U,
+    state->client_response_len
   );
 }
 
@@ -103,7 +104,8 @@ ism_msquic_stream_smoke_condition_met(
     case ISM_STREAM_SMOKE_WAIT_CLIENT_STREAM_STARTED:
       return state->client_stream_started;
     case ISM_STREAM_SMOKE_WAIT_SERVER_RESPONSE:
-      return state->server_response_prepared;
+      return state->server_send_complete &&
+             state->client_response_finished;
     default:
       return false;
   }
@@ -145,36 +147,6 @@ ism_msquic_stream_smoke_wait_for(
   return false;
 }
 
-static bool
-ism_msquic_stream_smoke_capture_send(
-  void *ctx,
-  uint64_t stream_id,
-  uint8_t *data,
-  uint32_t len,
-  bool fin
-)
-{
-  ism_msquic_stream_smoke_state *state =
-    (ism_msquic_stream_smoke_state *)ctx;
-
-  if (state == NULL || data == NULL || len < 6U)
-  {
-    return false;
-  }
-
-  pthread_mutex_lock(&state->lock);
-  state->server_response_prepared = true;
-  state->server_stream_id = stream_id;
-  state->response_len = len;
-  state->response_fin = fin;
-  state->response_prefix_high = data[0];
-  state->response_prefix_low = data[1];
-  state->response_rcode_low = data[5];
-  pthread_mutex_unlock(&state->lock);
-
-  return true;
-}
-
 static QUIC_STATUS QUIC_API
 ism_msquic_stream_smoke_client_connection_callback(
   HQUIC connection,
@@ -202,11 +174,11 @@ ism_msquic_stream_smoke_client_connection_callback(
 
     case QUIC_CONNECTION_EVENT_SHUTDOWN_INITIATED_BY_TRANSPORT:
     {
-      bool server_response_prepared = false;
+      bool server_send_complete = false;
       pthread_mutex_lock(&state->lock);
-      server_response_prepared = state->server_response_prepared;
+      server_send_complete = state->server_send_complete;
       pthread_mutex_unlock(&state->lock);
-      if (!server_response_prepared)
+      if (!server_send_complete)
       {
         ism_msquic_stream_smoke_set_failed(state);
       }
@@ -257,6 +229,43 @@ ism_msquic_stream_smoke_client_stream_callback(
       }
       return QUIC_STATUS_SUCCESS;
 
+    case QUIC_STREAM_EVENT_RECEIVE:
+      if (event->RECEIVE.Buffers == NULL &&
+          event->RECEIVE.BufferCount > 0U)
+      {
+        ism_msquic_stream_smoke_set_failed(state);
+        return QUIC_STATUS_INVALID_PARAMETER;
+      }
+
+      pthread_mutex_lock(&state->lock);
+      for (uint32_t i = 0U; i < event->RECEIVE.BufferCount; i++)
+      {
+        const QUIC_BUFFER *buffer = &event->RECEIVE.Buffers[i];
+        if (buffer->Buffer == NULL ||
+            buffer->Length >
+              (uint32_t)sizeof state->client_response -
+                state->client_response_len)
+        {
+          state->failed = true;
+          break;
+        }
+
+        memcpy(
+          state->client_response + state->client_response_len,
+          buffer->Buffer,
+          buffer->Length
+        );
+        state->client_response_len += buffer->Length;
+      }
+      pthread_mutex_unlock(&state->lock);
+      return QUIC_STATUS_SUCCESS;
+
+    case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
+      pthread_mutex_lock(&state->lock);
+      state->client_response_finished = true;
+      pthread_mutex_unlock(&state->lock);
+      return QUIC_STATUS_SUCCESS;
+
     default:
       return QUIC_STATUS_SUCCESS;
   }
@@ -294,6 +303,20 @@ ism_msquic_stream_smoke_server_stream_callback(
     server_context->stream_runtime,
     event
   );
+
+  if (event->Type == QUIC_STREAM_EVENT_SEND_COMPLETE)
+  {
+    pthread_mutex_lock(&server_context->state->lock);
+    if (QUIC_FAILED(status) || event->SEND_COMPLETE.Canceled != 0)
+    {
+      server_context->state->failed = true;
+    }
+    else
+    {
+      server_context->state->server_send_complete = true;
+    }
+    pthread_mutex_unlock(&server_context->state->lock);
+  }
 
   if (QUIC_SUCCEEDED(status) &&
       event->Type == QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE)
@@ -347,6 +370,14 @@ ism_msquic_stream_smoke_server_connection_callback(
       }
 
       server_context->stream_runtime->stream_id = (uint64_t)stream_id;
+      pthread_mutex_lock(&server_context->state->lock);
+      server_context->state->server_stream_id = (uint64_t)stream_id;
+      pthread_mutex_unlock(&server_context->state->lock);
+      ism_msquic_runtime_bind_msquic_stream(
+        server_context->stream_runtime,
+        server_context->api,
+        stream
+      );
       server_context->api->SetCallbackHandler(
         stream,
         (void *)ism_msquic_stream_smoke_server_stream_callback,
@@ -527,6 +558,21 @@ main(int argc, char **argv)
     0x00U, 0x01U,
     0x00U, 0x01U
   };
+  const uint8_t expected_response[] = {
+    0x00U, 0x21U,
+    0x12U, 0x34U,
+    0x81U, 0x00U,
+    0x00U, 0x01U,
+    0x00U, 0x00U,
+    0x00U, 0x00U,
+    0x00U, 0x00U,
+    0x03U, 0x63U, 0x6fU, 0x6dU,
+    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
+    0x03U, 0x77U, 0x77U, 0x77U,
+    0x00U,
+    0x00U, 0x01U,
+    0x00U, 0x01U
+  };
   const QUIC_BUFFER query_buffer = {
     sizeof exact_a_query,
     exact_a_query
@@ -607,8 +653,8 @@ main(int argc, char **argv)
     (uint32_t)sizeof response_buffer,
     send_buffer,
     (uint32_t)sizeof send_buffer,
-    ism_msquic_stream_smoke_capture_send,
-    &state
+    ism_msquic_runtime_send,
+    &server_stream_runtime
   );
   ism_shell_event_queue_init(
     &queue,
@@ -744,16 +790,21 @@ main(int argc, char **argv)
   bool ok =
     !state.failed &&
     state.server_stream_id == 0U &&
-    state.response_len == 35U &&
-    state.response_fin &&
-    state.response_prefix_high == 0x00U &&
-    state.response_prefix_low == 0x21U &&
-    state.response_rcode_low == 0x00U;
+    state.server_send_complete &&
+    state.client_response_finished &&
+    state.client_response_len == (uint32_t)sizeof expected_response &&
+    memcmp(
+      state.client_response,
+      expected_response,
+      sizeof expected_response
+    ) == 0;
   pthread_mutex_unlock(&state.lock);
 
   if (!ok)
   {
-    ism_msquic_stream_smoke_fail("server response did not match expected DoQ shape");
+    ism_msquic_stream_smoke_fail(
+      "client did not receive the expected DoQ response"
+    );
     goto cleanup;
   }
 

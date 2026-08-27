@@ -96,7 +96,7 @@ jobs:
             localhost/verified-dns-server:latest \
             bash -lc 'cd /workspace && make msquic-runtime-listener-smoke'
 
-      - name: Exchange real MsQuic stream data
+      - name: Exchange real MsQuic query and response
         run: |
           docker run --rm \
             --user "$(id -u):$(id -g)" \

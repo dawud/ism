@@ -14,6 +14,7 @@ typedef struct fake_msquic_send_s
   uint8_t first;
   uint8_t second;
   uint8_t rcode_low;
+  bool fail;
 }
 fake_msquic_send;
 
@@ -51,7 +52,7 @@ fake_send(
     capture->rcode_low = data[5];
   }
 
-  return true;
+  return !capture->fail;
 }
 
 bool ism_smoke_msquic_adapter(void)
@@ -60,6 +61,7 @@ bool ism_smoke_msquic_adapter(void)
   ism_msquic_adapter invalid_adapter;
   ism_msquic_adapter capped_adapter;
   ism_msquic_adapter reset_adapter;
+  ism_msquic_adapter failed_send_adapter;
   uint8_t response[128] = { 0U };
   uint8_t send_buffer[128] = { 0U };
   uint8_t invalid_response[128] = { 0U };
@@ -68,9 +70,12 @@ bool ism_smoke_msquic_adapter(void)
   uint8_t capped_send[1] = { 0U };
   uint8_t reset_response[128] = { 0U };
   uint8_t reset_send_buffer[128] = { 0U };
+  uint8_t failed_send_response[128] = { 0U };
+  uint8_t failed_send_buffer[128] = { 0U };
   fake_msquic_send capture = { 0 };
   fake_msquic_send invalid_capture = { 0 };
   fake_msquic_send reset_capture = { 0 };
+  fake_msquic_send failed_send_capture = { .fail = true };
   uint8_t expected_formerr_stream[] = {
     0x00U, 0x0cU,
     0x56U, 0x78U,
@@ -342,6 +347,31 @@ bool ism_smoke_msquic_adapter(void)
         reset_stream_id
       ) ||
       reset_adapter.connection.ctx.cc_num != 0U)
+  {
+    return false;
+  }
+
+  ism_msquic_adapter_init(
+    &failed_send_adapter,
+    failed_send_response,
+    (uint32_t)sizeof failed_send_response,
+    failed_send_buffer,
+    (uint32_t)sizeof failed_send_buffer,
+    fake_send,
+    &failed_send_capture
+  );
+
+  if (ism_msquic_adapter_on_authenticated_stream_bytes(
+        &failed_send_adapter,
+        stream_id,
+        exact_a_query,
+        (uint32_t)sizeof exact_a_query
+      ) != 2U ||
+      failed_send_capture.calls != 1U ||
+      failed_send_adapter.send_in_flight ||
+      failed_send_adapter.send_stream_id != 0U ||
+      failed_send_adapter.send_len != 0U ||
+      failed_send_adapter.connection.ctx.cc_num != 0U)
   {
     return false;
   }

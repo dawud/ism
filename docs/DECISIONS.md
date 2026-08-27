@@ -236,13 +236,17 @@ configuration, and listener without starting socket I/O.
 local port and then stops it without accepting connections or sending traffic.
 `make msquic-runtime-stream-smoke` runs a live loopback client/server stream
 exchange with test-only credentials, permits one incoming bidirectional stream,
-sends a valid DoQ query, and asserts that the server receive callback boundary
-copies real MsQuic stream bytes into shell-owned storage before preparing the
-expected generated-validator-backed DoQ response bytes.
+sends a valid DoQ query, asserts that the server receive callback boundary copies
+real MsQuic stream bytes into shell-owned storage, submits the generated response
+through `StreamSend`, checks the exact bytes received by the client, and observes
+server-side send completion.
 The current connection wrapper accepts listener `NEW_CONNECTION` events, applies
 configuration, maps peer-started streams into fixed shell-owned slots, and
-installs the existing stream callback. Production polling, timer, event-loop,
-and send-path integration remain future shell work. Revisit this decision if
+installs the existing stream callback. The stream runtime retains its MsQuic
+buffer descriptor and completion context until `SEND_COMPLETE`, and the adapter
+rolls verified send ownership back on submission failure. Production polling,
+timer, event-loop, allocation, and multi-send integration remain future shell
+work. Revisit this decision if
 MsQuic's API, maintenance, platform support, or security process no longer fits
 the project.
 

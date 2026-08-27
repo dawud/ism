@@ -188,7 +188,8 @@ podman run --rm \
 ```
 
 To run a live loopback MsQuic stream exchange through the current stream
-callback boundary, using test-only loopback credentials under `shell/`, run:
+receive and send callback boundaries, using test-only loopback credentials
+under `shell/`, run:
 
 ```bash
 podman run --rm \
@@ -197,6 +198,10 @@ podman run --rm \
   localhost/verified-dns-server:latest \
   bash -lc 'make msquic-runtime-stream-smoke'
 ```
+
+The gate sends a valid DoQ query from the client, submits the generated response
+through the real MsQuic `StreamSend` API, and checks the exact response bytes at
+the client before accepting server-side send completion.
 
 For a non-container MsQuic installation, override `MSQUIC_CFLAGS` and
 `MSQUIC_LDFLAGS` with the needed include and link flags.

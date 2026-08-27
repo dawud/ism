@@ -23,6 +23,14 @@ ism_msquic_runtime_stream_init(
   runtime->stream_id = stream_id;
   runtime->ingress_buffer = ingress_buffer;
   runtime->ingress_capacity = ingress_capacity;
+#if ISM_ENABLE_MSQUIC
+  runtime->api = NULL;
+  runtime->stream = 0;
+  runtime->send_buffer = (QUIC_BUFFER){ 0 };
+  runtime->send_context = (ism_msquic_runtime_send_context){ 0 };
+  runtime->send_in_flight = false;
+  runtime->reset_pending = false;
+#endif
 }
 
 static bool
@@ -142,6 +150,74 @@ ism_msquic_runtime_on_stream_reset(
 }
 
 #if ISM_ENABLE_MSQUIC
+void
+ism_msquic_runtime_bind_msquic_stream(
+  ism_msquic_runtime_stream *runtime,
+  const QUIC_API_TABLE *api,
+  HQUIC stream
+)
+{
+  if (runtime == NULL)
+  {
+    return;
+  }
+
+  runtime->api = api;
+  runtime->stream = stream;
+}
+
+bool
+ism_msquic_runtime_send(
+  void *ctx,
+  uint64_t stream_id,
+  uint8_t *data,
+  uint32_t len,
+  bool fin
+)
+{
+  ism_msquic_runtime_stream *runtime =
+    (ism_msquic_runtime_stream *)ctx;
+
+  if (runtime == NULL ||
+      runtime->api == NULL ||
+      runtime->api->StreamSend == NULL ||
+      runtime->stream == 0 ||
+      runtime->stream_id != stream_id ||
+      data == NULL ||
+      len == 0U ||
+      runtime->send_in_flight)
+  {
+    return false;
+  }
+
+  runtime->send_buffer = (QUIC_BUFFER){
+    .Length = len,
+    .Buffer = data
+  };
+  runtime->send_context.response_len = len;
+  runtime->send_in_flight = true;
+  runtime->reset_pending = false;
+
+  QUIC_STATUS status = runtime->api->StreamSend(
+    runtime->stream,
+    &runtime->send_buffer,
+    1U,
+    fin ? QUIC_SEND_FLAG_FIN : QUIC_SEND_FLAG_NONE,
+    &runtime->send_context
+  );
+
+  if (QUIC_FAILED(status))
+  {
+    runtime->send_buffer = (QUIC_BUFFER){ 0 };
+    runtime->send_context.response_len = 0U;
+    runtime->send_in_flight = false;
+    runtime->reset_pending = false;
+    return false;
+  }
+
+  return true;
+}
+
 static bool
 ism_msquic_runtime_on_msquic_receive(
   ism_msquic_runtime_stream *runtime,
@@ -211,23 +287,45 @@ ism_msquic_runtime_stream_callback(
         (const ism_msquic_runtime_send_context *)
           event->SEND_COMPLETE.ClientContext;
 
-      if (send_context == NULL)
+      if (send_context == NULL ||
+          send_context != &runtime->send_context ||
+          !runtime->send_in_flight)
       {
         return QUIC_STATUS_INVALID_PARAMETER;
       }
 
-      return ism_msquic_runtime_on_send_complete(
-        runtime,
-        send_context->response_len,
-        event->SEND_COMPLETE.Canceled != 0
-      )
-        ? QUIC_STATUS_SUCCESS
-        : QUIC_STATUS_INVALID_STATE;
+      uint32_t response_len = send_context->response_len;
+      bool dropped = event->SEND_COMPLETE.Canceled != 0 ||
+                     runtime->reset_pending;
+      runtime->send_buffer = (QUIC_BUFFER){ 0 };
+      runtime->send_context.response_len = 0U;
+      runtime->send_in_flight = false;
+      runtime->reset_pending = false;
+
+      if (!runtime->adapter->send_in_flight)
+      {
+        return QUIC_STATUS_SUCCESS;
+      }
+
+      return
+        ism_msquic_runtime_on_send_complete(
+          runtime,
+          response_len,
+          dropped
+        )
+          ? QUIC_STATUS_SUCCESS
+          : QUIC_STATUS_INVALID_STATE;
     }
 
     case QUIC_STREAM_EVENT_PEER_SEND_ABORTED:
     case QUIC_STREAM_EVENT_PEER_RECEIVE_ABORTED:
     case QUIC_STREAM_EVENT_SHUTDOWN_COMPLETE:
+      if (runtime->send_in_flight)
+      {
+        runtime->reset_pending = true;
+        return QUIC_STATUS_SUCCESS;
+      }
+
       return ism_msquic_runtime_on_stream_reset(runtime)
         ? QUIC_STATUS_SUCCESS
         : QUIC_STATUS_INVALID_STATE;

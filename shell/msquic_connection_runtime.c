@@ -45,6 +45,41 @@ ism_msquic_connection_runtime_init(
   runtime->stream_slot_count = stream_slot_count;
 }
 
+bool
+ism_msquic_connection_runtime_send(
+  void *ctx,
+  uint64_t stream_id,
+  uint8_t *data,
+  uint32_t len,
+  bool fin
+)
+{
+  ism_msquic_connection_runtime *runtime =
+    (ism_msquic_connection_runtime *)ctx;
+
+  if (runtime == NULL || runtime->stream_slots == NULL)
+  {
+    return false;
+  }
+
+  for (uint32_t i = 0U; i < runtime->stream_slot_count; i++)
+  {
+    ism_msquic_connection_stream_slot *slot = &runtime->stream_slots[i];
+    if (slot->in_use && slot->runtime.stream_id == stream_id)
+    {
+      return ism_msquic_runtime_send(
+        &slot->runtime,
+        stream_id,
+        data,
+        len,
+        fin
+      );
+    }
+  }
+
+  return false;
+}
+
 static void
 ism_msquic_connection_runtime_release_slot(
   ism_msquic_connection_stream_slot *slot
@@ -144,6 +179,11 @@ ism_msquic_connection_runtime_allocate_slot(
         (uint64_t)msquic_stream_id,
         slot->ingress_buffer,
         slot->ingress_capacity
+      );
+      ism_msquic_runtime_bind_msquic_stream(
+        &slot->runtime,
+        runtime->api,
+        stream
       );
       slot->api = runtime->api;
       slot->stream = stream;

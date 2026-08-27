@@ -30,6 +30,14 @@ typedef struct ism_msquic_runtime_stream_s
   uint64_t stream_id;
   uint8_t *ingress_buffer;
   uint32_t ingress_capacity;
+#if ISM_ENABLE_MSQUIC
+  const QUIC_API_TABLE *api;
+  HQUIC stream;
+  QUIC_BUFFER send_buffer;
+  ism_msquic_runtime_send_context send_context;
+  bool send_in_flight;
+  bool reset_pending;
+#endif
 }
 ism_msquic_runtime_stream;
 
@@ -63,6 +71,22 @@ ism_msquic_runtime_on_stream_reset(
 );
 
 #if ISM_ENABLE_MSQUIC
+void
+ism_msquic_runtime_bind_msquic_stream(
+  ism_msquic_runtime_stream *runtime,
+  const QUIC_API_TABLE *api,
+  HQUIC stream
+);
+
+bool
+ism_msquic_runtime_send(
+  void *ctx,
+  uint64_t stream_id,
+  uint8_t *data,
+  uint32_t len,
+  bool fin
+);
+
 QUIC_STATUS QUIC_API
 ism_msquic_runtime_stream_callback(
   HQUIC stream,
