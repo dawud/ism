@@ -363,3 +363,39 @@ Rust shell adapter or Pulse/Rust wrapper introduces enough handwritten safe Rust
 to justify additional proof effort, evaluate Aeneas in the migration lane first
 and keep the trusted-boundary inventory current if the evaluation adds any new
 adapter assumptions.
+
+## DR-0016: Scope proofs explicitly and reject unsupported audit cases
+
+**Status:** Accepted (2026-09-12)
+
+**Context:** The September proof audit found functional defects that satisfied
+weak contracts and documentation that overstated component guarantees.
+
+**Decision:** Keep names in wire order with original spelling, use shared ASCII
+case-folded equality, and convert explicitly to a distinct TLD-first tree key.
+Resolve compression only through structural name-field suffix offsets and
+decreasing targets. Reject relocating compressed name-bearing RDATA until it has
+a typed semantic representation. General serialization is checked construction:
+success must round-trip through the reference parser, even at the cost of an
+additional parse. Compare abstract byte values by their contents.
+
+Require exact DoQ framing, a zero message ID, and peer FIN before processing.
+Preserve active/available stream slots by swapping, and state sequential mutation
+and value contracts. Cache insertion must check its declared authority-zone
+suffix and record shape; lookup returns an aged TTL under trusted time.
+
+**Proof boundary:** Buffer parsing must relate accepted packets to actual input
+snapshots. Pure model equivalence is not external EverParse equivalence. Do not
+invent validator semantics, cryptographic authenticity, or ownership axioms.
+Use explicit serialized/exclusive caller access until real concurrent invariants
+exist. Full DNS semantics, generated-validator completeness, production worker
+extraction/integration, and real concurrency remain separate promotion gates.
+
+**Toolchain:** Pin stable KaRaMeL to
+`11bb8e1ac2f720fb7144b9b768c7251526caa149`, the audited working image revision.
+This does not lock the entire base image or transitive package supply chain.
+
+**Consequences:** Update the README, architecture, parser contract, roadmap and
+trusted inventory together; retain the audit's counterexamples as regressions
+with corrected expected outcomes; rerun verification, extraction, generated
+parser checks and C/runtime gates. No admissions are introduced by this decision.

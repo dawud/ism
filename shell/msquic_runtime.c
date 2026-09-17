@@ -23,9 +23,11 @@ ism_msquic_runtime_stream_init(
   runtime->stream_id = stream_id;
   runtime->ingress_buffer = ingress_buffer;
   runtime->ingress_capacity = ingress_capacity;
+  runtime->received_fin = false;
 #if ISM_ENABLE_MSQUIC
   runtime->api = NULL;
   runtime->stream = 0;
+  runtime->connection = 0;
   runtime->send_buffer = (QUIC_BUFFER){ 0 };
   runtime->send_context = (ism_msquic_runtime_send_context){ 0 };
   runtime->send_in_flight = false;
@@ -43,7 +45,9 @@ ism_msquic_runtime_copy_enqueue_and_dispatch(
   if (runtime == NULL ||
       runtime->ingress_buffer == NULL ||
       data == NULL ||
-      len > runtime->ingress_capacity)
+      len > runtime->ingress_capacity ||
+      ism_shell_event_queue_len(runtime->queue) != 0U ||
+      (runtime->received_fin && len > 0U))
   {
     return false;
   }
@@ -97,6 +101,28 @@ ism_msquic_runtime_on_receive(
   }
 
   return true;
+}
+
+bool
+ism_msquic_runtime_on_fin(ism_msquic_runtime_stream *runtime)
+{
+  if (runtime == NULL || runtime->adapter == NULL || runtime->queue == NULL)
+  {
+    return false;
+  }
+  if (runtime->received_fin)
+  {
+    return true; /* MsQuic may report both RECEIVE/FIN and PEER_SEND_SHUTDOWN. */
+  }
+  if (ism_shell_event_queue_len(runtime->queue) != 0U)
+  {
+    return false;
+  }
+  bool accepted = ism_shell_event_queue_enqueue_authenticated_stream_fin(
+    runtime->queue, runtime->stream_id) &&
+    ism_shell_event_queue_dispatch_one(runtime->queue, runtime->adapter);
+  runtime->received_fin = accepted;
+  return accepted;
 }
 
 bool
@@ -250,7 +276,20 @@ ism_msquic_runtime_on_msquic_receive(
     }
   }
 
-  return true;
+  return (event->RECEIVE.Flags & QUIC_RECEIVE_FLAG_FIN) == 0 ||
+    ism_msquic_runtime_on_fin(runtime);
+}
+
+static QUIC_STATUS
+ism_msquic_runtime_protocol_error(ism_msquic_runtime_stream *runtime)
+{
+  if (runtime->api != NULL && runtime->api->ConnectionShutdown != NULL &&
+      runtime->connection != 0)
+  {
+    runtime->api->ConnectionShutdown(runtime->connection,
+      QUIC_CONNECTION_SHUTDOWN_FLAG_NONE, 2U /* DOQ_PROTOCOL_ERROR */);
+  }
+  return QUIC_STATUS_INVALID_STATE;
 }
 
 QUIC_STATUS QUIC_API
@@ -279,7 +318,12 @@ ism_msquic_runtime_stream_callback(
     case QUIC_STREAM_EVENT_RECEIVE:
       return ism_msquic_runtime_on_msquic_receive(runtime, event)
         ? QUIC_STATUS_SUCCESS
-        : QUIC_STATUS_INVALID_STATE;
+        : ism_msquic_runtime_protocol_error(runtime);
+
+    case QUIC_STREAM_EVENT_PEER_SEND_SHUTDOWN:
+      return ism_msquic_runtime_on_fin(runtime)
+        ? QUIC_STATUS_SUCCESS
+        : ism_msquic_runtime_protocol_error(runtime);
 
     case QUIC_STREAM_EVENT_SEND_COMPLETE:
     {

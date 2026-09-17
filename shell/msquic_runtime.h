@@ -30,9 +30,11 @@ typedef struct ism_msquic_runtime_stream_s
   uint64_t stream_id;
   uint8_t *ingress_buffer;
   uint32_t ingress_capacity;
+  bool received_fin;
 #if ISM_ENABLE_MSQUIC
   const QUIC_API_TABLE *api;
   HQUIC stream;
+  HQUIC connection; /* optional owner, needed for fatal DoQ protocol errors */
   QUIC_BUFFER send_buffer;
   ism_msquic_runtime_send_context send_context;
   bool send_in_flight;
@@ -57,6 +59,9 @@ ism_msquic_runtime_on_receive(
   const ism_msquic_runtime_buffer *buffers,
   uint32_t buffer_count
 );
+
+bool
+ism_msquic_runtime_on_fin(ism_msquic_runtime_stream *runtime);
 
 bool
 ism_msquic_runtime_on_send_complete(

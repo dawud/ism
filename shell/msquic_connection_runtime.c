@@ -287,6 +287,7 @@ ism_msquic_connection_runtime_connection_callback(
         return QUIC_STATUS_INVALID_STATE;
       }
 
+      slot->runtime.connection = connection;
       runtime->api->SetCallbackHandler(
         event->PEER_STREAM_STARTED.Stream,
         (void *)ism_msquic_connection_runtime_stream_callback,

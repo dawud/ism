@@ -8,6 +8,17 @@ open Steel.ST.Util
 open FStar.UInt32
 open FStar.UInt64
 open DNS.QUIC.StreamMapping
+module S = FStar.Seq
+module SP = FStar.Seq.Properties
+
+let distinct_slots (slots:S.seq (buffer stream_context)) : Type0 =
+  forall (i:nat) (j:nat). i < S.length slots /\ j < S.length slots /\ i <> j ==>
+    S.index slots i =!= S.index slots j
+
+let lemma_swap_preserves_distinct_slots
+  (slots:S.seq (buffer stream_context))
+  (i:nat{i < S.length slots}) (j:nat{j < S.length slots})
+  : Lemma (distinct_slots slots ==> distinct_slots (SP.swap slots i j)) = ()
 
 (* A Connection Context manages multiple streams *)
 noeq
@@ -36,6 +47,18 @@ let active_streams_live h active count =
       live h stream.sc_buf /\
       LowStar.Buffer.length stream.sc_buf >= 65535)))
 
+(* Sequential ownership: the active prefix and available suffix are one
+   permutation of disjoint context slots. This is not a concurrency token. *)
+let slots_owned (h:FStar.Monotonic.HyperStack.mem)
+  (active:buffer (buffer stream_context)) : Type0 =
+  distinct_slots (as_seq h active) /\
+  (forall (i:nat). i < LowStar.Buffer.length active ==>
+    loc_disjoint (loc_buffer active) (loc_buffer (S.index (as_seq h active) i))) /\
+  (forall (i:nat) (j:nat).
+    i < LowStar.Buffer.length active /\ j < LowStar.Buffer.length active /\ i <> j ==>
+    loc_disjoint (loc_buffer (S.index (as_seq h active) i))
+                 (loc_buffer (S.index (as_seq h active) j)))
+
 val stream_option_live :
   h:FStar.Monotonic.HyperStack.mem ->
   result:option (buffer stream_context) ->
@@ -63,7 +86,11 @@ val find_stream_from :
       FStar.UInt32.v count <= FStar.UInt32.v capacity))
     (ensures (fun h0 result h1 ->
       modifies_none h0 h1 /\
-      stream_option_live h1 result))
+      stream_option_live h1 result /\
+      (match result with
+       | Some ptr -> (S.index (as_seq h0 ptr) 0).sc_id == id
+       | None -> forall (i:nat). FStar.UInt32.v idx <= i /\ i < FStar.UInt32.v count ==>
+           (S.index (as_seq h0 (S.index (as_seq h0 active) i)) 0).sc_id <> id)))
     (decreases (FStar.UInt32.v count - FStar.UInt32.v idx))
 
 let rec find_stream_from active capacity count id idx =
@@ -96,9 +123,16 @@ val close_stream_from :
     (requires (fun h0 ->
       active_streams_live h0 active capacity /\
       FStar.UInt32.v count <= FStar.UInt32.v capacity))
-    (ensures (fun h0 _ h1 ->
+    (ensures (fun h0 closed h1 ->
       modifies (loc_buffer active) h0 h1 /\
-      live h1 active))
+      live h1 active /\
+      (distinct_slots (as_seq h0 active) ==> distinct_slots (as_seq h1 active)) /\
+      (if closed then
+        (exists (removed:nat). FStar.UInt32.v idx <= removed /\
+          removed < FStar.UInt32.v count /\
+          (S.index (as_seq h0 (S.index (as_seq h0 active) removed)) 0).sc_id == id /\
+          as_seq h1 active == SP.swap (as_seq h0 active) removed (FStar.UInt32.v count - 1))
+       else modifies_none h0 h1)))
     (decreases (FStar.UInt32.v count - FStar.UInt32.v idx))
 
 let rec close_stream_from active capacity count id idx =
@@ -110,11 +144,19 @@ let rec close_stream_from active capacity count id idx =
       let stream = LowStar.Buffer.index stream_ptr 0ul in
       if stream.sc_id = id then
         begin
+          let h0 = FStar.HyperStack.ST.get () in
           assert (FStar.UInt32.v count > 0);
           let last_idx = FStar.UInt32.sub count 1ul in
           assert (FStar.UInt32.v last_idx = FStar.UInt32.v count - 1);
           let last_ptr = LowStar.Buffer.index active last_idx in
+          LowStar.Buffer.upd active last_idx stream_ptr;
           LowStar.Buffer.upd active idx last_ptr;
+          let h1 = FStar.HyperStack.ST.get () in
+          assert (as_seq h1 active == SP.swap (as_seq h0 active) (FStar.UInt32.v idx) (FStar.UInt32.v last_idx));
+          lemma_swap_preserves_distinct_slots (as_seq h0 active) (FStar.UInt32.v idx) (FStar.UInt32.v last_idx);
+          assert (exists (removed:nat). FStar.UInt32.v idx <= removed /\
+            removed < FStar.UInt32.v count /\
+            as_seq h1 active == SP.swap (as_seq h0 active) removed (FStar.UInt32.v count - 1));
           true
         end
       else
@@ -139,9 +181,14 @@ val find_stream :
          FStar.UInt32.v c.cc_num <= FStar.UInt32.v c.cc_capacity /\
          (FStar.UInt32.v c.cc_num > 0 ==>
           active_streams_live h0 c.cc_active c.cc_capacity))))
-      (ensures (fun h0 result h1 ->
+    (ensures (fun h0 result h1 ->
         modifies_none h0 h1 /\
-        stream_option_live h1 result))
+        stream_option_live h1 result /\
+        (match result with
+         | Some ptr -> (S.index (as_seq h0 ptr) 0).sc_id == id
+         | None -> let c = S.index (as_seq h0 conn) 0 in
+             forall (i:nat). i < FStar.UInt32.v c.cc_num ==>
+               (S.index (as_seq h0 (S.index (as_seq h0 c.cc_active) i)) 0).sc_id <> id)))
 
 let find_stream conn_ptr id =
   let conn = LowStar.Buffer.index conn_ptr 0ul in
@@ -160,12 +207,35 @@ val allocate_stream :
         LowStar.Buffer.length conn >= 1 /\
         (let c = FStar.Seq.index (LowStar.Buffer.as_seq h0 conn) 0 in
          active_streams_live h0 c.cc_active c.cc_capacity /\
+         slots_owned h0 c.cc_active /\
+         loc_disjoint (loc_buffer conn) (loc_buffer c.cc_active) /\
+         (forall (i:nat). i < LowStar.Buffer.length c.cc_active ==>
+           loc_disjoint (loc_buffer conn) (loc_buffer (S.index (as_seq h0 c.cc_active) i))) /\
          FStar.UInt32.v c.cc_num <= FStar.UInt32.v c.cc_capacity)))
-      (ensures (fun h0 _ h1 -> True))
+      (ensures (fun h0 result h1 ->
+        let c = S.index (as_seq h0 conn) 0 in
+        live h1 conn /\ live h1 c.cc_active /\
+        as_seq h1 c.cc_active == as_seq h0 c.cc_active /\
+        distinct_slots (as_seq h1 c.cc_active) /\
+        (match result with
+         | None -> modifies_none h0 h1
+         | Some ptr ->
+             FStar.UInt32.v c.cc_num < FStar.UInt32.v c.cc_capacity /\
+             FStar.UInt32.v c.cc_num + 1 < 4294967296 /\
+             ptr == S.index (as_seq h0 c.cc_active) (FStar.UInt32.v c.cc_num) /\
+             modifies (loc_union (loc_buffer conn) (loc_buffer ptr)) h0 h1 /\
+             (S.index (as_seq h1 conn) 0).cc_num == FStar.UInt32.add c.cc_num 1ul /\
+             (S.index (as_seq h1 ptr) 0) ==
+               { (S.index (as_seq h0 ptr) 0) with sc_id = id; sc_phase = ReadingLength } /\
+             (forall (i:nat). i < FStar.UInt32.v c.cc_num ==>
+               as_seq h1 (S.index (as_seq h0 c.cc_active) i) ==
+               as_seq h0 (S.index (as_seq h0 c.cc_active) i)))))
 
 let allocate_stream conn_ptr id =
   let conn = LowStar.Buffer.index conn_ptr 0ul in
-  if FStar.UInt32.lt conn.cc_num conn.cc_capacity &&
+  let existing = find_stream conn_ptr id in
+  if Some? existing then None
+  else if FStar.UInt32.lt conn.cc_num conn.cc_capacity &&
      FStar.UInt32.lt conn.cc_num 0xfffffffful then
     let stream_ptr = LowStar.Buffer.index conn.cc_active conn.cc_num in
     let stream = LowStar.Buffer.index stream_ptr 0ul in
@@ -192,7 +262,16 @@ val close_stream :
          (FStar.UInt32.v c.cc_num > 0 ==>
           active_streams_live h0 c.cc_active c.cc_capacity /\
           loc_disjoint (loc_buffer conn) (loc_buffer c.cc_active)))))
-      (ensures (fun h0 _ h1 -> True))
+      (ensures (fun h0 _ h1 ->
+        let c = S.index (as_seq h0 conn) 0 in
+        live h1 conn /\
+        (if FStar.UInt32.v c.cc_num = 0 then modifies_none h0 h1 else
+          live h1 c.cc_active /\
+          modifies (loc_union (loc_buffer conn) (loc_buffer c.cc_active)) h0 h1 /\
+          (let c1 = S.index (as_seq h1 conn) 0 in
+           c1.cc_active == c.cc_active /\ c1.cc_capacity == c.cc_capacity /\
+           (c1.cc_num == c.cc_num \/ FStar.UInt32.v c1.cc_num + 1 == FStar.UInt32.v c.cc_num) /\
+           (distinct_slots (as_seq h0 c.cc_active) ==> distinct_slots (as_seq h1 c.cc_active))))))
 
 let close_stream conn_ptr id =
   let conn = LowStar.Buffer.index conn_ptr 0ul in

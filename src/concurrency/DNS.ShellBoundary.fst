@@ -18,6 +18,22 @@ let shell_phase_code phase =
   | STREAM.ReadingMessage _ -> 1uy
   | STREAM.Processing _ -> 2uy
   | STREAM.Done -> 3uy
+  | STREAM.AwaitingFin _ -> 4uy
+
+val dispatch_authenticated_stream_fin :
+  ctx_ptr:buffer STREAM.stream_context ->
+  ST FStar.UInt8.t
+    (requires (fun h -> live h ctx_ptr /\ LowStar.Buffer.length ctx_ptr >= 1 /\
+      (let ctx = FStar.Seq.index (as_seq h ctx_ptr) 0 in
+       live h ctx.STREAM.sc_buf /\ LowStar.Buffer.length ctx.STREAM.sc_buf >= 2)))
+    (ensures (fun h0 code h1 ->
+      modifies (loc_buffer ctx_ptr) h0 h1 /\ live h1 ctx_ptr /\
+      (let ctx = FStar.Seq.index (as_seq h0 ctx_ptr) 0 in
+       code == shell_phase_code (STREAM.finish_doq_phase ctx.STREAM.sc_phase
+         (FStar.Seq.index (as_seq h0 ctx.STREAM.sc_buf) 0)
+         (FStar.Seq.index (as_seq h0 ctx.STREAM.sc_buf) 1)))))
+let dispatch_authenticated_stream_fin ctx_ptr =
+  shell_phase_code (STREAM.handle_stream_fin ctx_ptr)
 
 (* First stable shell boundary: authenticated MsQuic stream bytes entering the
    verified DoQ length-framing state machine. The shell is responsible for the

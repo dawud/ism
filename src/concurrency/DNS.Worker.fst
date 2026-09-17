@@ -19,7 +19,11 @@ module L = FStar.List.Tot
 val build_worker_response_bytes :
   root:Z.tree_node ->
   request:dns_packet ->
-  Tot (option (list FStar.UInt8.t))
+  Tot (result:option (list FStar.UInt8.t){
+    match result with
+    | Some bytes -> exists response. Z.build_authoritative_response_packet root request == Some response /\
+        PARSE.parse_dns_packet_bytes bytes == Some response
+    | None -> True})
 
 let build_worker_response_bytes root request =
   match Z.build_authoritative_response_packet root request with
@@ -34,18 +38,45 @@ val build_worker_response_bytes_from_buffer :
     (requires (fun h0 ->
       live h0 request_buffer /\
       FStar.UInt32.v request_len <= LowStar.Buffer.length request_buffer))
-    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+    (ensures (fun h0 result h1 -> modifies_none h0 h1 /\
+      (match result with
+       | None -> True
+       | Some bytes -> exists request response.
+           PARSE.parse_dns_packet_bytes (PARSE.sequence_bytes (as_seq h0 request_buffer) 0
+             (FStar.UInt32.v request_len)) == Some request /\
+           Z.build_authoritative_response_packet root request == Some response /\
+           PARSE.parse_dns_packet_bytes bytes == Some response)))
 
 let build_worker_response_bytes_from_buffer root request_buffer request_len =
   match PARSE.parse_dns_packet_buffer request_buffer request_len with
   | Some request -> build_worker_response_bytes root request
   | None -> None
 
+#push-options "--fuel 8 --ifuel 4"
 let worker_exact_response_bytes_serialize_test =
-  assert_norm (
-    match build_worker_response_bytes Z.wildcard_test_root Z.exact_question_request with
-    | Some _ -> true
-    | None -> false)
+  let rr = Z.exact_record in
+  let packet = { Z.exact_question_request with
+    header = { Z.exact_question_request.header with
+      flags = PARSE.uint16_to_flags 0x8100us; ancount = 1us };
+    answers = [rr] } in
+  let payload = [127uy;0uy;0uy;1uy] in
+  let name = SER.serialize_qname_labels rr.name in
+  let qs = L.append name [0uy;1uy;0uy;1uy] in
+  let rs = L.append name [0uy;1uy;0uy;1uy;0uy;0uy;0uy;60uy;0uy;4uy;127uy;0uy;0uy;1uy] in
+  assert_norm (DNS.Protocol.OPT.bytes_to_list rr.rdata == payload);
+  SER.lemma_record_payload_serialization rr payload;
+  assert_norm (SER.serialize_resource_record_fields_bytes rr.name A 1us 60ul payload == Some rs);
+  assert (SER.serialize_resource_record_bytes rr == Some rs);
+  assert_norm (L.append rs [] == rs);
+  assert (SER.serialize_resource_records_bytes packet.answers == Some rs);
+  assert_norm (SER.serialize_questions_bytes packet.questions == Some qs);
+  assert_norm (Z.build_authoritative_response_packet Z.wildcard_test_root
+    Z.exact_question_request == Some packet);
+  assert_norm (PARSE.parse_dns_packet_bytes (L.append (SER.serialize_header_bytes packet.header)
+    (L.append qs rs)) == Some packet);
+  SER.lemma_checked_packet_serialization packet qs rs [] [];
+  assert (Some? (build_worker_response_bytes Z.wildcard_test_root Z.exact_question_request))
+#pop-options
 
 let worker_nodata_response_bytes_parse_test =
   assert_norm (

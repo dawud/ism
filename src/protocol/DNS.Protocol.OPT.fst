@@ -43,7 +43,7 @@ val bytes_to_list_from :
   fuel:nat ->
   offset:nat ->
   b:bytes{offset + fuel <= length b} ->
-  Tot (list FStar.UInt8.t) (decreases fuel)
+  Tot (out:list FStar.UInt8.t{L.length out == fuel}) (decreases fuel)
 
 let rec bytes_to_list_from fuel offset b =
   if fuel = 0 then
@@ -51,7 +51,7 @@ let rec bytes_to_list_from fuel offset b =
   else
     index b offset :: bytes_to_list_from (fuel - 1) (offset + 1) b
 
-let bytes_to_list (b:bytes) : list FStar.UInt8.t =
+let bytes_to_list (b:bytes) : out:list FStar.UInt8.t{L.length out == length b} =
   bytes_to_list_from (length b) 0 b
 
 val repeat_byte :

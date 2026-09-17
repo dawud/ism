@@ -4,6 +4,20 @@
 
 #include "ism_shell.h"
 
+/* These fixtures represent complete byte delivery followed by an explicit FIN. */
+static uint8_t ingest_direct_complete(ism_shell_connection *conn, uint64_t id,
+                                     uint8_t *data, uint32_t len)
+{
+  uint8_t phase = ism_shell_on_authenticated_stream_data(conn, id, data, len);
+  return phase == 4U ? ism_shell_on_authenticated_stream_fin(conn, id) : phase;
+}
+static uint8_t ingest_scheduler_complete(ism_shell_connection *conn, uint64_t id,
+                                        uint8_t *data, uint32_t len)
+{
+  uint8_t phase = ism_shell_dispatch_authenticated_stream_data(conn, id, data, len);
+  return phase == 4U ? ism_shell_on_authenticated_stream_fin(conn, id) : phase;
+}
+
 bool ism_smoke_shell_scaffold(void)
 {
   ism_shell_connection conn;
@@ -14,26 +28,26 @@ bool ism_smoke_shell_scaffold(void)
   ism_shell_connection validated_worker_conn;
   ism_shell_connection validated_dispatcher_conn;
   ism_shell_connection invalid_validated_conn;
-  uint8_t zero_length_doq_message[] = { 0U, 0U };
+  uint8_t header_only_doq_message[14] = { 0U, 12U };
   uint8_t response_buffer[1] = { 0U };
   uint8_t exact_a_query[] = {
     0x00U, 0x21U,
-    0x12U, 0x34U,
+    0x00U, 0x00U,
     0x01U, 0x00U,
     0x00U, 0x01U,
     0x00U, 0x00U,
     0x00U, 0x00U,
     0x00U, 0x00U,
-    0x03U, 0x63U, 0x6fU, 0x6dU,
-    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
     0x03U, 0x77U, 0x77U, 0x77U,
+    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
+    0x03U, 0x63U, 0x6fU, 0x6dU,
     0x00U,
     0x00U, 0x01U,
     0x00U, 0x01U
   };
   uint8_t invalid_header_query[] = {
     0x00U, 0x0cU,
-    0x56U, 0x78U,
+    0x00U, 0x00U,
     0x01U, 0x00U,
     0x00U, 0x00U,
     0x00U, 0x00U,
@@ -41,38 +55,38 @@ bool ism_smoke_shell_scaffold(void)
     0x00U, 0x00U
   };
   uint8_t expected_validated_response[] = {
-    0x12U, 0x34U,
+    0x00U, 0x00U,
     0x81U, 0x00U,
     0x00U, 0x01U,
     0x00U, 0x00U,
     0x00U, 0x00U,
     0x00U, 0x00U,
-    0x03U, 0x63U, 0x6fU, 0x6dU,
-    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
     0x03U, 0x77U, 0x77U, 0x77U,
+    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
+    0x03U, 0x63U, 0x6fU, 0x6dU,
     0x00U,
     0x00U, 0x01U,
     0x00U, 0x01U
   };
   uint8_t expected_validated_stream_response[] = {
     0x00U, 0x21U,
-    0x12U, 0x34U,
+    0x00U, 0x00U,
     0x81U, 0x00U,
     0x00U, 0x01U,
     0x00U, 0x00U,
     0x00U, 0x00U,
     0x00U, 0x00U,
-    0x03U, 0x63U, 0x6fU, 0x6dU,
-    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
     0x03U, 0x77U, 0x77U, 0x77U,
+    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
+    0x03U, 0x63U, 0x6fU, 0x6dU,
     0x00U,
     0x00U, 0x01U,
     0x00U, 0x01U
   };
   uint8_t expected_invalid_stream_response[] = {
     0x00U, 0x0cU,
-    0x56U, 0x78U,
-    0x81U, 0x03U,
+    0x00U, 0x00U,
+    0x81U, 0x01U,
     0x00U, 0x00U,
     0x00U, 0x00U,
     0x00U, 0x00U,
@@ -107,11 +121,11 @@ bool ism_smoke_shell_scaffold(void)
   }
 
   uint8_t phase =
-    ism_shell_on_authenticated_stream_data(
+    ingest_direct_complete(
       &conn,
       first_stream_id,
-      zero_length_doq_message,
-      (uint32_t)sizeof zero_length_doq_message
+      header_only_doq_message,
+      (uint32_t)sizeof header_only_doq_message
     );
   if (phase != 2U || conn.ctx.cc_num != 1U)
   {
@@ -147,17 +161,17 @@ bool ism_smoke_shell_scaffold(void)
 
   if
   (
-    ism_shell_on_authenticated_stream_data(
+    ingest_direct_complete(
       &conn,
       first_stream_id,
-      zero_length_doq_message,
-      (uint32_t)sizeof zero_length_doq_message
+      header_only_doq_message,
+      (uint32_t)sizeof header_only_doq_message
     ) != 2U ||
-    ism_shell_on_authenticated_stream_data(
+    ingest_direct_complete(
       &conn,
       second_stream_id,
-      zero_length_doq_message,
-      (uint32_t)sizeof zero_length_doq_message
+      header_only_doq_message,
+      (uint32_t)sizeof header_only_doq_message
     ) != 2U ||
     conn.ctx.cc_num != 2U
   )
@@ -191,7 +205,7 @@ bool ism_smoke_shell_scaffold(void)
 
   ism_shell_connection_init(&worker_conn);
 
-  if (ism_shell_on_authenticated_stream_data(
+  if (ingest_direct_complete(
         &worker_conn,
         worker_stream_id,
         exact_a_query,
@@ -210,10 +224,10 @@ bool ism_smoke_shell_scaffold(void)
     );
 
   if (worker_response_len != 12U ||
-      worker_response[0] != 0x12U ||
-      worker_response[1] != 0x34U ||
+      worker_response[0] != 0x00U ||
+      worker_response[1] != 0x00U ||
       worker_response[2] != 0x81U ||
-      worker_response[3] != 0x03U ||
+      worker_response[3] != 0x01U ||
       worker_response[4] != 0x00U ||
       worker_response[5] != 0x00U ||
       worker_response[6] != 0x00U ||
@@ -228,7 +242,7 @@ bool ism_smoke_shell_scaffold(void)
 
   ism_shell_connection_init(&dispatcher_conn);
 
-  if (ism_shell_dispatch_authenticated_stream_data(
+  if (ingest_scheduler_complete(
         &dispatcher_conn,
         dispatcher_stream_id,
         exact_a_query,
@@ -247,10 +261,10 @@ bool ism_smoke_shell_scaffold(void)
     );
 
   if (dispatcher_response_len != 12U ||
-      dispatcher_response[0] != 0x12U ||
-      dispatcher_response[1] != 0x34U ||
+      dispatcher_response[0] != 0x00U ||
+      dispatcher_response[1] != 0x00U ||
       dispatcher_response[2] != 0x81U ||
-      dispatcher_response[3] != 0x03U ||
+      dispatcher_response[3] != 0x01U ||
       dispatcher_response[4] != 0x00U ||
       dispatcher_response[5] != 0x00U ||
       dispatcher_response[6] != 0x00U ||
@@ -277,7 +291,7 @@ bool ism_smoke_shell_scaffold(void)
 
   ism_shell_connection_init(&empty_worker_conn);
 
-  if (ism_shell_on_authenticated_stream_data(
+  if (ingest_direct_complete(
         &empty_worker_conn,
         empty_worker_stream_id,
         exact_a_query,
@@ -296,8 +310,8 @@ bool ism_smoke_shell_scaffold(void)
     );
 
   if (empty_worker_response_len != 12U ||
-      empty_worker_response[0] != 0x12U ||
-      empty_worker_response[1] != 0x34U ||
+      empty_worker_response[0] != 0x00U ||
+      empty_worker_response[1] != 0x00U ||
       empty_worker_response[2] != 0x81U ||
       empty_worker_response[3] != 0x00U ||
       empty_worker_response[4] != 0x00U ||
@@ -314,7 +328,7 @@ bool ism_smoke_shell_scaffold(void)
 
   ism_shell_connection_init(&empty_dispatcher_conn);
 
-  if (ism_shell_dispatch_authenticated_stream_data(
+  if (ingest_scheduler_complete(
         &empty_dispatcher_conn,
         empty_dispatcher_stream_id,
         exact_a_query,
@@ -333,8 +347,8 @@ bool ism_smoke_shell_scaffold(void)
     );
 
   if (empty_dispatcher_response_len != 12U ||
-      empty_dispatcher_response[0] != 0x12U ||
-      empty_dispatcher_response[1] != 0x34U ||
+      empty_dispatcher_response[0] != 0x00U ||
+      empty_dispatcher_response[1] != 0x00U ||
       empty_dispatcher_response[2] != 0x81U ||
       empty_dispatcher_response[3] != 0x00U ||
       empty_dispatcher_response[4] != 0x00U ||
@@ -363,7 +377,7 @@ bool ism_smoke_shell_scaffold(void)
 
   ism_shell_connection_init(&validated_worker_conn);
 
-  if (ism_shell_on_authenticated_stream_data(
+  if (ingest_direct_complete(
         &validated_worker_conn,
         validated_worker_stream_id,
         exact_a_query,
@@ -394,7 +408,7 @@ bool ism_smoke_shell_scaffold(void)
 
   ism_shell_connection_init(&validated_dispatcher_conn);
 
-  if (ism_shell_dispatch_authenticated_stream_data(
+  if (ingest_scheduler_complete(
         &validated_dispatcher_conn,
         validated_dispatcher_stream_id,
         exact_a_query,
@@ -459,7 +473,7 @@ bool ism_smoke_shell_scaffold(void)
 
   ism_shell_connection_init(&invalid_validated_conn);
 
-  if (ism_shell_dispatch_authenticated_stream_data(
+  if (ingest_scheduler_complete(
         &invalid_validated_conn,
         invalid_validated_stream_id,
         invalid_header_query,
@@ -478,10 +492,10 @@ bool ism_smoke_shell_scaffold(void)
     );
 
   if (invalid_validated_response_len != 12U ||
-      invalid_validated_response[0] != 0x56U ||
-      invalid_validated_response[1] != 0x78U ||
+      invalid_validated_response[0] != 0x00U ||
+      invalid_validated_response[1] != 0x00U ||
       invalid_validated_response[2] != 0x81U ||
-      invalid_validated_response[3] != 0x03U ||
+      invalid_validated_response[3] != 0x01U ||
       invalid_validated_response[4] != 0x00U ||
       invalid_validated_response[5] != 0x00U ||
       invalid_validated_response[6] != 0x00U ||

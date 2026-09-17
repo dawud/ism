@@ -3,6 +3,7 @@ FROM fedora:44
 ARG USER_NAME=ism
 ARG USER_ID=1000
 ARG GROUP_ID=1000
+ARG KARAMEL_COMMIT=11bb8e1ac2f720fb7144b9b768c7251526caa149
 
 # 1. Install System Dependencies
 RUN dnf install -y \
@@ -45,6 +46,8 @@ RUN opam init --disable-sandboxing -y \
     && opam install -y ocamlfind batteries zarith stdint yojson visitors menhir fix process ctypes ctypes-foreign uucp ppx_deriving_yojson sedlex wasm pprint \
     && git clone https://github.com/FStarLang/karamel.git ${KRML_HOME} \
     && cd ${KRML_HOME} \
+    && git checkout --detach ${KARAMEL_COMMIT} \
+    && test "$(git rev-parse HEAD)" = "${KARAMEL_COMMIT}" \
     && export FSTAR_HOME=${FSTAR_HOME} \
     && export PATH="${FSTAR_HOME}/bin:${PATH}" \
     && make \

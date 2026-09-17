@@ -1,74 +1,41 @@
-# Architectural Design: Verified DNS-over-QUIC Server
+# Architecture and verification scope
 
-This document outlines the high-assurance architecture of the server, focusing on the separation between verified and unverified components.
+ISM is a DNS-over-QUIC prototype with verified F*/Low* components, not an end-to-end verified DNS server. Verification establishes the contracts actually written, under caller preconditions and the trusted interfaces in [THREAT_MODEL.md](THREAT_MODEL.md).
 
-## Layered Security Architecture
+## Current linked path
 
-The server is designed as a series of defensive rings. Each layer must pass its own verification checks before data is allowed to penetrate deeper into the system.
-
-```mermaid
-graph TD
-    subgraph "Unverified Shell (The Outside World)"
-        A[POSIX Sockets / OS Kernel] --> B[C Entry Point / Event Loop]
-    end
-
-    subgraph "Unverified QUIC/TLS Boundary"
-        B --> C{MsQuic QUIC/TLS Stack}
-        C -- Auth Failure --> D[Drop Packet]
-        C -- Authenticated Stream Bytes --> E{DoQ Ingress Boundary}
-    end
-
-    subgraph "Verified Logic Core (F* / Low*)"
-        E --> P{EverParse Gatekeeper}
-        P -- Malformed --> F[Reject & Log]
-        P -- Valid DNS_Packet Type --> G[Radix Tree Lookup]
-        G --> H[Recursive Resolver]
-    end
-
-    subgraph "Concurrent Memory Management (Steel)"
-        G <--> I[(Sharded Concurrent Cache)]
-        H <--> I
-    end
-
-    subgraph "Output Path"
-        G --> J[EverParse Serializer]
-        J --> K[Shell QUIC/TLS Egress]
-        K --> L[QUIC Write Stream]
-    end
-
-    style A fill:#f96,stroke:#333,stroke-width:2px
-    style B fill:#f96,stroke:#333,stroke-width:2px
-    style C fill:#f96,stroke:#333,stroke-width:2px
-    style E fill:#69f,stroke:#333,stroke-width:4px
-    style P fill:#69f,stroke:#333,stroke-width:4px
-    style G fill:#9f6,stroke:#333,stroke-width:2px
-    style I fill:#9f6,stroke:#333,stroke-width:2px
+```text
+MsQuic (trusted TLS/QUIC)
+  -> C receive-copy and serialized event dispatch
+  -> Low* DoQ length/body accumulation, then FIN
+  -> minimal zero-ID request validation + generated question validator
+  -> question-echo / zero-answer NOERROR, or FORMERR
+  -> Low* two-byte response framing
+  -> C single-send ownership -> MsQuic -> completion cleanup
 ```
 
----
+Protocol errors (short framing, premature FIN, excess bytes, nonzero DNS ID) are distinct from malformed DNS questions. The connection runtime closes the owning connection on fatal DoQ errors. The minimal responder does not perform authoritative lookup or recursive resolution.
 
-## Architectural Pillars
+## Reference/model path
 
-### 1. The Parser-Rejecting Boundary
-The most critical security layer is the **EverParse** validator. Unlike traditional DNS parsers that may attempt to "fix" or partially parse malformed data, our server rejects any packet that does not perfectly conform to the formal F* specification of a DNS message. This eliminates entire classes of "Shotgun Parsing" vulnerabilities.
+The general parser reads the actual buffer bytes, applies a generated subset gate, and constructs a packet with the handwritten pure parser. Its postcondition proves accepted-value soundness relative to that parser. It does not prove acceptance equivalence with the external C validator; see [PARSER_EQUIVALENCE.md](PARSER_EQUIVALENCE.md).
 
-**Parser strategy decision:** EverParse remains the target architecture for the production parser and serializer. The current handwritten F*/Low* parser is a bootstrap/reference implementation used to close DNS semantics, establish tests, and exercise the verified Low* buffer boundary early. It should not silently become a second permanent parser architecture. Once the DNS grammar and tests are stable, the EverParse-generated parser should either replace the handwritten parser or be proved behaviorally equivalent to it.
+Compressed targets must be earlier structural name-suffix offsets collected from question names, RR owners, or supported name-bearing RDATA. Targets in headers, label payloads, and opaque RDATA are not valid name offsets. Pointer targets decrease along a chain. This is a deliberately restricted compression model, not complete DNS grammar coverage.
 
-### 2. Separation of Concerns: Shell vs. Core
-- **The Shell (Unverified):** Responsible for "messy" tasks like socket syscalls, QUIC/TLS stack integration, thread scheduling, and signal handling. It is written in C, kept as small as possible, and constrained by the contract in [UNVERIFIED_SHELL.md](UNVERIFIED_SHELL.md).
-- **The Core (Verified):** Responsible for DNS semantics, DoQ stream-message framing above authenticated streams, parser boundaries, lookup, response construction, and resource invariants. It is written in F* and extracted to C only after proofs are closed.
+Names remain in wire order and preserve spelling. A distinct traversal-key conversion reverses them for the TLD-first radix tree. ASCII case-folded comparison is shared by tree, cache, and bailiwick logic.
 
-### 3. Language-Based Security
-Because we use **Steel** (F*'s concurrency framework), we don't rely on OS-level process isolation for internal safety. Instead, we use **Separation Logic** to mathematically prove that even though threads share an address space, they cannot interfere with each other's memory or cause data races.
+The authoritative tree, binary single-entry zone loader, first-slot cache, and full worker are verification/model components outside the linked minimal responder. CNAME chasing is fuel-bounded but does not implement complete CNAME/RRset synthesis; wildcard lookup is not full RFC 4592 closest-encloser semantics. Cache insertion applies a suffix-based bailiwick check, not complete referral, ranking, or DNSSEC policy.
 
-### 4. Post-Quantum Readiness
-The architecture delegates cryptographic transport to MsQuic in the shell. Post-quantum transition work belongs in that shell-stack selection and policy boundary unless a future decision brings a maintained verified TLS dependency into scope.
+The general serializer rejects inconsistent lengths and unsupported embedded-name encodings. A successful full-packet serialization is checked against the pure parser and guarantees an exact parse-back. This costs an additional parse; it is not a completeness theorem or a production performance claim.
 
-## Data Flow (The Query Lifecycle)
+## Ownership and concurrency
 
-1.  **Ingress:** A QUIC packet is received by the Unverified Shell.
-2.  **Authentication:** The MsQuic shell stack authenticates the connection and exposes only authenticated stream bytes to the verified core.
-3.  **Validation:** The DoQ ingress boundary enforces stream framing, then `EverParse` transforms the raw DNS bytes into a high-level F* `DNS_Packet` record. This process is proven to be memory-safe and overflow-free.
-4.  **Lookup:** The `Verified Logic` searches the `Radix Tree` (for authoritative data) or the `Sharded Cache` (for recursive data).
-5.  **Bailiwick Check:** For recursive results, the server performs a proven suffix-match to prevent cache poisoning.
-6.  **Egress:** The response is serialized by the verified core, then handed to the MsQuic shell stack for encryption and transport.
+Low* proves sequential buffer-access bounds, liveness, disjointness obligations, and specified mutation/semantic results. Stream close swaps active and available slots; allocation initializes the next available slot and preserves other active contexts under explicit ownership preconditions.
+
+The local Steel adapter defines `vprop = unit`. It supplies no exclusive capability, lock, race-freedom proof, or concurrent resource invariant. Callers must serialize access to each connection, stream table, cache, queue, and shared send buffer. The C scaffold is not a production multi-threaded scheduler.
+
+TLS authenticity, certificates, transport flow control, and cryptography are delegated to MsQuic and its TLS provider. Logging, constant-time cache access, jitter, automatic padding policy, PQC, global CPU/memory budgets, and CompCert integration are not implemented/proved mitigations here.
+
+## Remaining promotion gates
+
+Real concurrent ownership, full DNS semantics, external-validator semantic equivalence, and production extraction/integration are separate gates. Passing verification, extraction, fixtures, or loopback tests alone does not close them. See [TODO.md](TODO.md) and [UNVERIFIED_SHELL.md](UNVERIFIED_SHELL.md).

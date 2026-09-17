@@ -2,7 +2,30 @@
 
 This document outlines the design, architecture, and phased implementation of a mathematically verified DNS-over-QUIC (DoQ) server using F*, Low*, and the Project Everest ecosystem.
 
+## Proof-audit scope (2026-09-12)
+
+The end-to-end server is a goal, not a current guarantee. Implemented component
+contracts and remaining gates are summarized in [THREAT_MODEL.md](THREAT_MODEL.md).
+The current linked worker is a minimal question-echo/FORMERR responder, not the
+authoritative/recursive worker described by the target architecture below.
+The historical RFC matrix records partial features and examples, not universal
+RFC correctness proofs or external-validator equivalence.
+
+Audit remediation adds wire-order/case-insensitive names, contextual compression
+targets, checked successful serialization round-trips, byte-exact buffer-parser
+soundness, active/available stream-slot swapping, semantic sequential allocation
+and cache contracts, aged TTLs, bailiwick-checked insertion, and explicit FIN and
+zero-ID enforcement. Body-count fragmentation equivalence is proved; complete
+callback traces, byte accumulation, and C failure handling also have executable
+regressions but do not constitute a whole-runtime trace theorem.
+
+Keep separate promotion gates for external EverParse success/failure semantics,
+complete DNS/zone/RRset behavior, genuine concurrent ownership, and production
+extraction/scheduler/multi-send integration. No mock interface may be relabeled
+as a proof of these properties.
+
 ## 1. Project Objectives
+
 - **Mathematically Proven Safety:** Eliminate buffer overflows, use-after-free errors, and data races through formal verification.
 - **Modern Standards Compliance:** Implement DNS-over-QUIC (RFC 9250) using TLS 1.3 (RFC 8446).
 - **Single-Binary Multi-threading:** High-performance execution using a task-based scheduler without relying on process isolation.
@@ -13,7 +36,8 @@ This document outlines the design, architecture, and phased implementation of a 
 
 The server follows a "Defensive Ring" architecture, separating the unverified I/O shell from the verified logic core. See [DECISIONS.md](DECISIONS.md) for the accepted architecture and trusted-boundary decisions, and [UNVERIFIED_SHELL.md](UNVERIFIED_SHELL.md) for the shell/core ownership and scheduling contract.
 
-### Architectural Layers
+### Target Architectural Layers (not current guarantees)
+
 1. **Unverified Shell (C):** Handles POSIX sockets, thread scheduling, maintained QUIC/TLS stack integration, authenticated stream delivery, and the documented buffer-ownership contract.
 2. **DoQ Ingress Boundary:** Accepts authenticated QUIC stream bytes from the shell, enforces DoQ length framing, and hands complete DNS messages to parsing.
 3. **The Gatekeeper (EverParse):** Validates the DNS wire format against the formal specification. Rejects any non-conforming input.
@@ -52,7 +76,7 @@ Phase completion gates are recorded in [DECISIONS.md](DECISIONS.md). Keep this r
 - **Scope:** RFC 8310, RFC 8446, RFC 8914, RFC 9000, RFC 9001, RFC 9002, RFC 9250.
 - **Sub-phases:**
   - **2A: DNS-over-QUIC framing:** Implement the RFC 9250 two-octet DNS message length prefix, reject malformed frame boundaries, and prove bounds on frame accumulation.
-  - **2B: Stream accumulation:** Implement `ReadingLength`, `ReadingMessage`, `Processing`, and cleanup transitions without admitted state changes.
+  - **2B: Stream accumulation:** Implement `ReadingLength`, `ReadingLengthHigh`, `ReadingMessage`, `AwaitingFin`, `Processing`, and cleanup transitions without admitted state changes; require a zero ID and exact body length before peer FIN permits processing.
   - **2C: Stream multiplexing:** Implement stream lookup/allocation/close with explicit resource bounds and denial-of-service behavior.
   - **2D: Shell TLS/AEAD contract:** Replace the current trusted AEAD decrypt adapter path with an authenticated stream-byte contract exported by the MsQuic shell stack. Current work adds `DNS.QUIC.MsQuicIngress.handle_authenticated_stream_fragment` as the verified ingress boundary.
   - **2E: Transport lifecycle contract:** Document session teardown, key update, authentication, and forward-secrecy requirements as shell-stack obligations.
@@ -237,9 +261,10 @@ Non-RFC standards dependencies to track separately:
 Extraction status: containerized `make extract` is now a CI smoke gate. It verifies all F*/spec modules first, then sends the current protocol/security/transport boundary plus `DNS.Worker.Minimal`, `DNS.ShellScheduler`, `DNS.ShellBoundary`, and `DNS.ShellResponseBoundary` to KaRaMeL; the full `DNS.Worker`/`DNS.Zone.RadixTree` response path and broader Phase 3/4 cache/concurrency scaffolds remain verification-only. `make c-compile-smoke` syntax-checks the extracted C bundle and EverParse wrapper, `make c-link-smoke` links and runs the current emitted protocol/EverParse, shell-ingress, minimal 12-byte FORMERR worker error-response, header-only empty NOERROR response, generated-validator-backed question-echo response selector, DoQ egress response framing, scheduler-helper, response handoff/completion, fixed-capacity C shell scaffold, MsQuic-shaped adapter smoke path for validated question-echo and invalid FORMERR responses, and fixed-capacity C shell event queue without linking a final shell binary, `make msquic-runtime-compile-smoke` syntax-checks real MsQuic stream, connection, and listener callback wrappers, `make msquic-runtime-connection-smoke` links and runs the fake-API connection and `StreamSend` callback behavior harness, `make msquic-runtime-link-smoke` links and runs a no-network MsQuic API-table open/close check against the pinned shared library, `make msquic-runtime-lifecycle-smoke` opens/closes no-network registration, configuration, and listener handles, `make msquic-runtime-listener-smoke` starts/stops a loopback listener on an ephemeral local port, and `make msquic-runtime-stream-smoke` runs a live loopback client/server stream exchange through the real receive/send callback boundary using test-only credentials.
 
 ## 8. Threat Model Summary
-- **Spoofing:** Mitigated by TLS 1.3 identity and verified Bailiwick checks.
-- **Tampering:** Mitigated by EverCrypt AEAD integrity checks.
-- **Information Disclosure:** Mitigated by constant-time crypto and EDNS0 padding.
-- **Denial of Service:** Mitigated by Steel-enforced memory bounds and fuel-based recursion limits.
-- **Elevation of Privilege:** Mitigated by EverParse-guaranteed memory safety.
-- **Harvest Now, Decrypt Later:** Mitigated by Hybrid Post-Quantum Key Exchange.
+
+TLS/QUIC security depends on MsQuic and configuration. Local parsing and buffer
+contracts provide conditional component guarantees; bailiwick is only one part
+of recursive validation. Fuel and fixed capacities do not prove global resource
+bounds. Constant-time cache behavior, jitter, verified logging, automatic
+padding policy, hybrid PQC, and Steel race-freedom/resource invariants are not
+implemented mitigations. See the complete [trusted inventory](THREAT_MODEL.md).

@@ -55,6 +55,13 @@ fake_send(
   return !capture->fail;
 }
 
+static uint8_t ingest_with_fin(ism_msquic_adapter *adapter, uint64_t id,
+                               uint8_t *data, uint32_t len)
+{
+  uint8_t phase = ism_msquic_adapter_on_authenticated_stream_bytes(adapter, id, data, len);
+  return phase == 4U ? ism_msquic_adapter_on_authenticated_stream_fin(adapter, id) : phase;
+}
+
 bool ism_smoke_msquic_adapter(void)
 {
   ism_msquic_adapter adapter;
@@ -78,8 +85,8 @@ bool ism_smoke_msquic_adapter(void)
   fake_msquic_send failed_send_capture = { .fail = true };
   uint8_t expected_formerr_stream[] = {
     0x00U, 0x0cU,
-    0x56U, 0x78U,
-    0x81U, 0x03U,
+    0x00U, 0x00U,
+    0x81U, 0x01U,
     0x00U, 0x00U,
     0x00U, 0x00U,
     0x00U, 0x00U,
@@ -87,37 +94,37 @@ bool ism_smoke_msquic_adapter(void)
   };
   uint8_t expected_validated_stream_response[] = {
     0x00U, 0x21U,
-    0x12U, 0x34U,
+    0x00U, 0x00U,
     0x81U, 0x00U,
     0x00U, 0x01U,
     0x00U, 0x00U,
     0x00U, 0x00U,
     0x00U, 0x00U,
-    0x03U, 0x63U, 0x6fU, 0x6dU,
-    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
     0x03U, 0x77U, 0x77U, 0x77U,
+    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
+    0x03U, 0x63U, 0x6fU, 0x6dU,
     0x00U,
     0x00U, 0x01U,
     0x00U, 0x01U
   };
   uint8_t exact_a_query[] = {
     0x00U, 0x21U,
-    0x12U, 0x34U,
+    0x00U, 0x00U,
     0x01U, 0x00U,
     0x00U, 0x01U,
     0x00U, 0x00U,
     0x00U, 0x00U,
     0x00U, 0x00U,
-    0x03U, 0x63U, 0x6fU, 0x6dU,
-    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
     0x03U, 0x77U, 0x77U, 0x77U,
+    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
+    0x03U, 0x63U, 0x6fU, 0x6dU,
     0x00U,
     0x00U, 0x01U,
     0x00U, 0x01U
   };
   uint8_t invalid_header_query[] = {
     0x00U, 0x0cU,
-    0x56U, 0x78U,
+    0x00U, 0x00U,
     0x01U, 0x00U,
     0x00U, 0x00U,
     0x00U, 0x00U,
@@ -142,7 +149,7 @@ bool ism_smoke_msquic_adapter(void)
   );
 
   uint8_t phase =
-    ism_msquic_adapter_on_authenticated_stream_bytes(
+    ingest_with_fin(
       &adapter,
       stream_id,
       exact_a_query,
@@ -242,7 +249,7 @@ bool ism_smoke_msquic_adapter(void)
   );
 
   uint8_t invalid_phase =
-    ism_msquic_adapter_on_authenticated_stream_bytes(
+    ingest_with_fin(
       &invalid_adapter,
       invalid_stream_id,
       invalid_header_query,
@@ -260,7 +267,7 @@ bool ism_smoke_msquic_adapter(void)
       invalid_adapter.send_len != invalid_capture.len ||
       invalid_capture.first != 0x00U ||
       invalid_capture.second != 0x0cU ||
-      invalid_capture.rcode_low != 0x03U ||
+      invalid_capture.rcode_low != 0x01U ||
       memcmp(
         invalid_send_buffer,
         expected_formerr_stream,
@@ -318,7 +325,7 @@ bool ism_smoke_msquic_adapter(void)
   );
 
   uint8_t reset_phase =
-    ism_msquic_adapter_on_authenticated_stream_bytes(
+    ingest_with_fin(
       &reset_adapter,
       reset_stream_id,
       partial_length_prefix,
@@ -361,7 +368,7 @@ bool ism_smoke_msquic_adapter(void)
     &failed_send_capture
   );
 
-  if (ism_msquic_adapter_on_authenticated_stream_bytes(
+  if (ingest_with_fin(
         &failed_send_adapter,
         stream_id,
         exact_a_query,

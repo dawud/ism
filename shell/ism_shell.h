@@ -35,6 +35,9 @@ DNS_QUIC_StreamMapping_stream_context
 *ism_shell_open_stream(ism_shell_connection *conn, uint64_t stream_id);
 
 uint8_t
+ism_shell_on_authenticated_stream_fin(ism_shell_connection *conn, uint64_t stream_id);
+
+uint8_t
 ism_shell_on_authenticated_stream_data(
   ism_shell_connection *conn,
   uint64_t stream_id,

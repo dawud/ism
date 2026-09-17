@@ -52,6 +52,56 @@ smoke_handle(uintptr_t value)
   return (HQUIC)value;
 }
 
+static uint32_t protocol_shutdowns;
+static void QUIC_API
+smoke_protocol_shutdown(HQUIC connection, QUIC_CONNECTION_SHUTDOWN_FLAGS flags,
+                        QUIC_UINT62 error)
+{
+  if (connection == smoke_handle(99U) &&
+      flags == QUIC_CONNECTION_SHUTDOWN_FLAG_NONE && error == 2U)
+  {
+    protocol_shutdowns++;
+  }
+}
+
+static bool
+smoke_protocol_errors(void)
+{
+  static ism_msquic_adapter adapter;
+  uint8_t response[64], send[64], ingress[64];
+  ism_shell_event events[1];
+  ism_shell_event_queue queue;
+  ism_msquic_runtime_stream runtime;
+  const QUIC_API_TABLE api = { .ConnectionShutdown = smoke_protocol_shutdown };
+  uint8_t query[] = {0,17, 0,0,1,0,0,1,0,0,0,0,0,0, 0,0,1,0,1,0xff};
+  protocol_shutdowns = 0;
+  for (uint32_t scenario = 0; scenario < 4; ++scenario)
+  {
+    ism_msquic_adapter_init(&adapter,response,sizeof response,send,sizeof send,NULL,NULL);
+    ism_shell_event_queue_init(&queue,events,1);
+    ism_msquic_runtime_stream_init(&runtime,&adapter,&queue,4,ingress,sizeof ingress);
+    ism_msquic_runtime_bind_msquic_stream(&runtime,&api,smoke_handle(98U));
+    runtime.connection = smoke_handle(99U);
+    query[2] = scenario == 1 ? 1 : 0;
+    QUIC_BUFFER buffer = { .Length = scenario == 0 ? 10U : scenario == 2 ? 20U : 19U,
+                           .Buffer = query };
+    QUIC_STREAM_EVENT event = { .Type = QUIC_STREAM_EVENT_RECEIVE,
+      .RECEIVE = { .Buffers = &buffer, .BufferCount = 1,
+                  .Flags = scenario == 3 ? QUIC_RECEIVE_FLAG_NONE : QUIC_RECEIVE_FLAG_FIN } };
+    QUIC_STATUS status = ism_msquic_runtime_stream_callback(runtime.stream,&runtime,&event);
+    if (scenario == 3)
+    {
+      if (QUIC_FAILED(status)) return false;
+      buffer.Buffer = query + 19;
+      buffer.Length = 1;
+      event.RECEIVE.Flags = QUIC_RECEIVE_FLAG_FIN;
+      status = ism_msquic_runtime_stream_callback(runtime.stream,&runtime,&event);
+    }
+    if (QUIC_SUCCEEDED(status) || protocol_shutdowns != scenario + 1) return false;
+  }
+  return true;
+}
+
 static void QUIC_API
 smoke_set_callback_handler(
   HQUIC handle,
@@ -207,30 +257,30 @@ main(void)
   uint8_t send_buffer[128] = { 0U };
   uint8_t exact_a_query[] = {
     0x00U, 0x21U,
-    0x12U, 0x34U,
+    0x00U, 0x00U,
     0x01U, 0x00U,
     0x00U, 0x01U,
     0x00U, 0x00U,
     0x00U, 0x00U,
     0x00U, 0x00U,
-    0x03U, 0x63U, 0x6fU, 0x6dU,
-    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
     0x03U, 0x77U, 0x77U, 0x77U,
+    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
+    0x03U, 0x63U, 0x6fU, 0x6dU,
     0x00U,
     0x00U, 0x01U,
     0x00U, 0x01U
   };
   const uint8_t expected_response[] = {
     0x00U, 0x21U,
-    0x12U, 0x34U,
+    0x00U, 0x00U,
     0x81U, 0x00U,
     0x00U, 0x01U,
     0x00U, 0x00U,
     0x00U, 0x00U,
     0x00U, 0x00U,
-    0x03U, 0x63U, 0x6fU, 0x6dU,
-    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
     0x03U, 0x77U, 0x77U, 0x77U,
+    0x07U, 0x65U, 0x78U, 0x61U, 0x6dU, 0x70U, 0x6cU, 0x65U,
+    0x03U, 0x63U, 0x6fU, 0x6dU,
     0x00U,
     0x00U, 0x01U,
     0x00U, 0x01U
@@ -514,5 +564,5 @@ main(void)
     return 1;
   }
 
-  return 0;
+  return smoke_protocol_errors() ? 0 : 1;
 }

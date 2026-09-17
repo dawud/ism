@@ -218,7 +218,8 @@ val parse_rdata_bytes :
 
 let parse_rdata_bytes rdlen input =
   let len = FStar.UInt16.v rdlen in
-  if L.length input < len then
+  if len = 0 then Some (FStar.Bytes.empty_bytes, input)
+  else if L.length input < len then
     None
   else
     let (rdata, tail) = L.splitAt len input in
@@ -682,15 +683,6 @@ let validate_dns_packet_bytes (input:list FStar.UInt8.t) : bool =
   match parse_dns_packet_bytes input with
   | Some _ -> true
   | None -> false
-
-val parse_dns_packet_buffer :
-  buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
-  len:FStar.UInt32.t ->
-  Stack (option dns_packet)
-    (requires (fun h0 ->
-      LowStar.Buffer.live h0 buffer /\
-      FStar.UInt32.v len <= LowStar.Buffer.length buffer))
-    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
 
 val generated_uncompressed_question_qname_length :
   input:list FStar.UInt8.t ->
@@ -2146,6 +2138,18 @@ let validate_generated_edns0_opt_additional_packet_subset_buffer buffer len byte
   | None ->
       false
 
+let generated_subset_applicable (bytes:list FStar.UInt8.t) : bool =
+  generated_edns0_opt_additional_packet_subset_applicable bytes ||
+  generated_compressed_answer_name_packet_subset_applicable bytes ||
+  generated_compressed_name_rdata_packet_subset_applicable bytes ||
+  generated_compressed_mx_packet_subset_applicable bytes ||
+  generated_compressed_both_soa_packet_subset_applicable bytes ||
+  generated_compressed_soa_packet_subset_applicable bytes ||
+  generated_compressed_srv_packet_subset_applicable bytes ||
+  generated_uncompressed_question_two_a_answer_packet_subset_applicable bytes ||
+  generated_uncompressed_question_answer_packet_subset_applicable bytes ||
+  generated_uncompressed_question_subset_applicable bytes
+
 val validate_generated_subset_gate_buffer :
   buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
   len:FStar.UInt32.t ->
@@ -2154,7 +2158,8 @@ val validate_generated_subset_gate_buffer :
     (requires (fun h0 ->
       LowStar.Buffer.live h0 buffer /\
       FStar.UInt32.v len <= LowStar.Buffer.length buffer))
-    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+    (ensures (fun h0 result h1 -> modifies_none h0 h1 /\
+      (result ==> generated_subset_applicable bytes)))
 
 let validate_generated_subset_gate_buffer buffer len bytes =
   if generated_edns0_opt_additional_packet_subset_applicable bytes then
@@ -2180,6 +2185,14 @@ let validate_generated_subset_gate_buffer buffer len bytes =
   else
     false
 
+(* Semantic snapshot used by both the Low* reader and boundary contracts. *)
+let rec sequence_bytes
+  (s:FStar.Seq.seq FStar.UInt8.t) (pos:nat)
+  (remaining:nat{pos + remaining <= FStar.Seq.length s})
+  : Tot (bytes:list FStar.UInt8.t{L.length bytes == remaining}) (decreases remaining) =
+  if remaining = 0 then []
+  else FStar.Seq.index s pos :: sequence_bytes s (pos + 1) (remaining - 1)
+
 val read_buffer_range :
   buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
   pos:nat ->
@@ -2189,7 +2202,8 @@ val read_buffer_range :
       LowStar.Buffer.live h0 buffer /\
       pos + remaining <= LowStar.Buffer.length buffer /\
       pos + remaining <= 4294967295))
-    (ensures (fun h0 _ h1 -> modifies_none h0 h1))
+    (ensures (fun h0 bytes h1 -> modifies_none h0 h1 /\
+      bytes == sequence_bytes (LowStar.Buffer.as_seq h0 buffer) pos remaining))
     (decreases remaining)
 
 let rec read_buffer_range buffer pos remaining =
@@ -2201,6 +2215,20 @@ let rec read_buffer_range buffer pos remaining =
     let b = LowStar.Buffer.index buffer idx in
     let rest = read_buffer_range buffer (pos + 1) (remaining - 1) in
     b :: rest
+
+val parse_dns_packet_buffer :
+  buffer:LowStar.Buffer.buffer FStar.UInt8.t ->
+  len:FStar.UInt32.t ->
+  Stack (option dns_packet)
+    (requires (fun h0 ->
+      LowStar.Buffer.live h0 buffer /\
+      FStar.UInt32.v len <= LowStar.Buffer.length buffer))
+    (ensures (fun h0 result h1 -> modifies_none h0 h1 /\
+      (let bytes = sequence_bytes (LowStar.Buffer.as_seq h0 buffer) 0 (FStar.UInt32.v len) in
+       match result with
+       | Some packet -> generated_subset_applicable bytes /\
+                        parse_dns_packet_bytes bytes == Some packet
+       | None -> True)))
 
 let parse_dns_packet_buffer buffer len =
   let bytes = read_buffer_range buffer 0 (FStar.UInt32.v len) in

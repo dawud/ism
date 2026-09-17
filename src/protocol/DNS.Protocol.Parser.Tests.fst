@@ -292,13 +292,27 @@ let result_success_response_builder_test =
         p.additionals == []
     | None -> false)
 
+#push-options "--split_queries always"
 let result_success_response_serialize_test =
-  assert_norm (
-    match SER.serialize_result_response_bytes
-            valid_single_question_dns_packet
-            (RC.Success [result_response_answer]) with
-    | Some _ -> true
-    | None -> false)
+  let packet = { valid_single_question_dns_packet with
+    header = { valid_single_question_dns_packet.header with
+      flags = uint16_to_flags 0x8100us; ancount = 1us };
+    answers = [result_response_answer] } in
+  let qs = [0uy;0uy;1uy;0uy;1uy] in
+  let rs = [0uy;0uy;13uy;0uy;1uy;0uy;0uy;0uy;60uy;0uy;0uy] in
+  SER.lemma_record_payload_serialization result_response_answer [];
+  assert_norm (SER.serialize_resource_record_fields_bytes [] HINFO 1us 60ul [] == Some rs);
+  assert (SER.serialize_resource_record_bytes result_response_answer == Some rs);
+  assert (SER.serialize_resource_records_bytes packet.answers == Some rs);
+  assert_norm (SER.serialize_questions_bytes packet.questions == Some qs);
+  assert_norm (SER.build_result_response_packet valid_single_question_dns_packet
+    (RC.Success [result_response_answer]) == Some packet);
+  assert_norm (parse_dns_packet_bytes (L.append (SER.serialize_header_bytes packet.header)
+    (L.append qs rs)) == Some packet);
+  SER.lemma_checked_packet_serialization packet qs rs [] [];
+  assert (Some? (SER.serialize_result_response_bytes
+    valid_single_question_dns_packet (RC.Success [result_response_answer])))
+#pop-options
 
 let result_error_response_parse_packet_test =
   assert_norm (
@@ -595,11 +609,20 @@ let serialized_unknown_answer_packet : dns_packet =
     additionals = [];
   }
 
+#push-options "--split_queries always"
 let serialized_unknown_answer_packet_serialize_test =
-  assert_norm (
-    match SER.serialize_dns_packet_bytes serialized_unknown_answer_packet with
-    | Some _ -> true
-    | None -> false)
+  let packet = serialized_unknown_answer_packet in
+  let rr = L.hd packet.answers in
+  let rs = [0uy;0xfduy;0xe8uy;0uy;1uy;0uy;0uy;0uy;60uy;0uy;0uy] in
+  SER.lemma_record_payload_serialization rr [];
+  assert_norm (SER.serialize_resource_record_fields_bytes [] (UNKNOWN 65000us) 1us 60ul [] == Some rs);
+  assert (SER.serialize_resource_record_bytes rr == Some rs);
+  assert_norm (L.append rs [] == rs);
+  assert (SER.serialize_resource_records_bytes packet.answers == Some rs);
+  assert_norm (parse_dns_packet_bytes (L.append (SER.serialize_header_bytes packet.header) rs) == Some packet);
+  SER.lemma_checked_packet_serialization packet [] rs [] [];
+  assert (Some? (SER.serialize_dns_packet_bytes packet))
+#pop-options
 
 let serialized_padding_opt_packet : dns_packet =
   {
@@ -619,11 +642,20 @@ let serialized_padding_opt_packet : dns_packet =
     ];
   }
 
+#push-options "--split_queries always"
 let serialized_empty_opt_packet_serialize_test =
-  assert_norm (
-    match SER.serialize_dns_packet_bytes serialized_padding_opt_packet with
-    | Some _ -> true
-    | None -> false)
+  let packet = serialized_padding_opt_packet in
+  let rr = L.hd packet.additionals in
+  let rs = [0uy;0uy;41uy;4uy;0xd0uy;0uy;0uy;0uy;0uy;0uy;0uy] in
+  SER.lemma_record_payload_serialization rr [];
+  assert_norm (SER.serialize_resource_record_fields_bytes [] OPT 1232us 0ul [] == Some rs);
+  assert (SER.serialize_resource_record_bytes rr == Some rs);
+  assert_norm (L.append rs [] == rs);
+  assert (SER.serialize_resource_records_bytes packet.additionals == Some rs);
+  assert_norm (parse_dns_packet_bytes (L.append (SER.serialize_header_bytes packet.header) rs) == Some packet);
+  SER.lemma_checked_packet_serialization packet [] [] [] rs;
+  assert (Some? (SER.serialize_dns_packet_bytes packet))
+#pop-options
 
 let mismatched_count_packet : dns_packet =
   {

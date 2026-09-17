@@ -54,4 +54,5 @@ val handle_authenticated_stream_fragment :
       live h1 ctx_ptr))
 
 let handle_authenticated_stream_fragment _auth _borrow ctx_ptr fragment =
-  handle_stream_data ctx_ptr fragment.msif_data fragment.msif_len
+  let phase = handle_stream_data ctx_ptr fragment.msif_data fragment.msif_len in
+  if fragment.msif_fin then handle_stream_fin ctx_ptr else phase

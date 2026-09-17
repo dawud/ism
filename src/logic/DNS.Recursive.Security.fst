@@ -9,22 +9,14 @@ val label_bytes_eq :
   b:list FStar.UInt8.t ->
   Tot bool (decreases a)
 
-let rec label_bytes_eq a b =
-  match a, b with
-  | [], [] -> true
-  | ah :: at, bh :: bt -> ah = bh && label_bytes_eq at bt
-  | _, _ -> false
+let label_bytes_eq a b =
+  DNS.Name.canonical_bytes a = DNS.Name.canonical_bytes b
 
 val label_eq : label -> label -> Tot bool
-let label_eq a b =
-  label_bytes_eq a b
+let label_eq a b = DNS.Name.label_eq a b
 
 val qname_eq : qname -> qname -> Tot bool
-let rec qname_eq a b =
-  match a, b with
-  | [], [] -> true
-  | ah :: at, bh :: bt -> label_eq ah bh && qname_eq at bt
-  | _, _ -> false
+let qname_eq a b = DNS.Name.qname_eq a b
 
 val has_suffix : name:qname -> suffix:qname -> Tot bool (decreases name)
 let rec has_suffix name suffix =

@@ -75,6 +75,23 @@ let rec scan_uncompressed_qname_length request_buffer request_len pos consumed =
         end
     end
 
+(* This is the application-level DoQ ID rule, independent of the trusted
+   generated validator. A protocol violation must not receive a DNS reply. *)
+val valid_doq_request_id :
+  request_buffer:buffer FStar.UInt8.t -> request_len:FStar.UInt32.t ->
+  Stack bool
+    (requires (fun h -> live h request_buffer /\
+      FStar.UInt32.v request_len <= LowStar.Buffer.length request_buffer))
+    (ensures (fun h0 valid h1 -> modifies_none h0 h1 /\
+      (valid <==> (FStar.UInt32.v request_len >= 12 /\
+        FStar.Seq.index (as_seq h0 request_buffer) 0 == 0uy /\
+        FStar.Seq.index (as_seq h0 request_buffer) 1 == 0uy))))
+let valid_doq_request_id request_buffer request_len =
+  if FStar.UInt32.lt request_len 12ul then false else
+  let hi = LowStar.Buffer.index request_buffer 0ul in
+  let lo = LowStar.Buffer.index request_buffer 1ul in
+  FStar.UInt8.eq hi 0uy && FStar.UInt8.eq lo 0uy
+
 val validate_minimal_uncompressed_question_request :
   request_buffer:buffer FStar.UInt8.t ->
   request_len:FStar.UInt32.t ->
@@ -85,7 +102,8 @@ val validate_minimal_uncompressed_question_request :
     (ensures (fun h0 _ h1 -> modifies_none h0 h1))
 
 let validate_minimal_uncompressed_question_request request_buffer request_len =
-  if FStar.UInt32.lt request_len 17ul ||
+  let id_valid = valid_doq_request_id request_buffer request_len in
+  if not id_valid || FStar.UInt32.lt request_len 17ul ||
      FStar.UInt32.lt 271ul request_len then
     false
   else
@@ -149,9 +167,12 @@ val prepare_worker_minimal_error_response_send :
       (let ctx = FStar.Seq.index (LowStar.Buffer.as_seq h0 ctx_ptr) 0 in
        live h0 ctx.sc_buf /\
        FStar.UInt32.v request_len <= LowStar.Buffer.length ctx.sc_buf)))
-    (ensures (fun h0 _ h1 ->
+    (ensures (fun h0 len h1 ->
       modifies (loc_buffer response_buffer) h0 h1 /\
-      live h1 response_buffer))
+      live h1 response_buffer /\
+      (FStar.UInt32.v len > 0 ==>
+        len == 12ul /\ LowStar.Buffer.length response_buffer >= 12 /\
+        FStar.Seq.index (as_seq h1 response_buffer) 3 == 0x01uy)))
 
 let prepare_worker_minimal_error_response_send
   ctx_ptr
@@ -184,7 +205,6 @@ let prepare_worker_minimal_error_response_send
       LowStar.Buffer.upd response_buffer 0ul id_hi;
       LowStar.Buffer.upd response_buffer 1ul id_lo;
       LowStar.Buffer.upd response_buffer 2ul 0x81uy;
-      LowStar.Buffer.upd response_buffer 3ul 0x03uy;
       LowStar.Buffer.upd response_buffer 4ul 0x00uy;
       LowStar.Buffer.upd response_buffer 5ul 0x00uy;
       LowStar.Buffer.upd response_buffer 6ul 0x00uy;
@@ -193,6 +213,7 @@ let prepare_worker_minimal_error_response_send
       LowStar.Buffer.upd response_buffer 9ul 0x00uy;
       LowStar.Buffer.upd response_buffer 10ul 0x00uy;
       LowStar.Buffer.upd response_buffer 11ul 0x00uy;
+      LowStar.Buffer.upd response_buffer 3ul 0x01uy;
       12ul
     end
 
@@ -394,6 +415,8 @@ let prepare_worker_validated_minimal_response_send
   response_capacity
   request_len =
   let s = LowStar.Buffer.index ctx_ptr 0ul in
+  let id_valid = valid_doq_request_id s.sc_buf request_len in
+  if not id_valid then 0ul else
   let valid =
     validate_minimal_uncompressed_question_request s.sc_buf request_len in
   if valid then

@@ -32,7 +32,8 @@ val get_shard_index :
 let get_shard_index name num_shards =
   0ul
 
-(* Concurrent Cache Get *)
+(* Sequential API despite the historical name. The caller must serialize
+   access to the shard table and entries; the unit permission proves nothing. *)
 val concurrent_get : 
   sc:sharded_cache -> 
   name:qname -> 
@@ -58,9 +59,10 @@ let concurrent_get sc name now =
 (* Concurrent Cache Add *)
 val concurrent_add : 
   sc:sharded_cache -> 
+  query:qname -> authority_zone:qname ->
   record:resource_record -> 
   now:FStar.UInt64.t -> 
-  ST unit
+  ST bool
     (requires (fun h0 ->
       live h0 sc.sc_shards /\
       FStar.UInt32.v sc.sc_num <= LowStar.Buffer.length sc.sc_shards /\
@@ -70,10 +72,10 @@ val concurrent_add :
         FStar.UInt32.v shard.c_size <= LowStar.Buffer.length shard.c_entries))))
     (ensures (fun h0 _ h1 -> True))
 
-let concurrent_add sc record now =
+let concurrent_add sc query authority_zone record now =
   if FStar.UInt32.v sc.sc_num = 0 then
-    ()
+    false
   else
     let idx = get_shard_index record.name sc.sc_num in
     let shard = LowStar.Buffer.index sc.sc_shards idx in
-    add_to_cache shard record now
+    add_to_cache shard query authority_zone record now

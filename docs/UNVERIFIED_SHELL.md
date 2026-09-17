@@ -1,5 +1,42 @@
 # Unverified Shell Boundary
 
+## Proof-audit contract update (2026-09-12)
+
+This section supersedes older bootstrap descriptions below where they differ.
+All calls touching a connection, stream table, cache shard, event queue, or
+shared send buffer must be exclusive and serialized, including callbacks for
+different streams. Unit-valued authentication/borrow/Steel tokens enforce no
+concurrency ownership. Production synchronization remains a separate gate.
+
+Ingress ABI phase codes are `0` reading prefix, `1` reading body, `4` complete
+body awaiting FIN, `2` ready after FIN, and `3` terminal/rejected. Deliver bytes
+in order through the data boundary, then deliver FIN explicitly through
+`dispatch_authenticated_stream_fin`. Do not treat phase `4` as ready. The
+MsQuic runtime propagates RECEIVE/FIN and PEER_SEND_SHUTDOWN, deduplicates the
+same FIN notification, and reports fatal framing/ID errors to the owning
+connection using DOQ_PROTOCOL_ERROR. The dependency-free API exposes
+`ism_msquic_runtime_on_fin` separately from `on_receive`.
+
+Message length must cover a DNS header, the payload must exactly match the
+prefix, and DNS ID must be zero. Nonempty input after completion is rejected.
+The runtime's connection handle must be set by its owning connection callback;
+a standalone stream seam can report failure but cannot close an unknown owner.
+These rules follow [RFC 9250 sections 4.2.1 and 4.3.3](https://www.rfc-editor.org/rfc/rfc9250.html#section-4.3.3).
+
+The stream pointer table contains a distinct active prefix and available suffix.
+Close swaps the removed pointer with the last active pointer; allocation takes
+the first available pointer. Contexts, message buffers, connection storage, and
+table storage must not alias improperly. C initialization establishes these
+preconditions operationally, not with a verified C ownership proof.
+
+The linked responder is only a zero-ID, uncompressed question-only selector
+that emits question-echo NOERROR or FORMERR. The full parser/zone/cache worker
+is not the linked runtime responder. A zero response length means no response;
+the adapter must not send an empty two-byte DoQ frame. One send buffer remains
+tracked in flight. A second ready stream requires explicit scheduling after
+that slot becomes available; fairness, production polling, multiple sends,
+timers, global resource budgets, and a concurrent scheduler are not proved.
+
 This document defines the contract for the C shell that surrounds the verified
 DNS-over-QUIC core. The shell is trusted code: it is allowed to perform OS,
 QUIC, TLS, allocation, and scheduling work that is not yet verified, but it must

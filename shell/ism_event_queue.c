@@ -83,6 +83,16 @@ ism_shell_event_queue_enqueue_authenticated_stream_bytes(
 }
 
 bool
+ism_shell_event_queue_enqueue_authenticated_stream_fin(
+  ism_shell_event_queue *queue, uint64_t stream_id)
+{
+  return ism_shell_event_queue_enqueue(queue, (ism_shell_event){
+    .kind = ISM_SHELL_EVENT_AUTHENTICATED_STREAM_FIN,
+    .stream_id = stream_id
+  });
+}
+
+bool
 ism_shell_event_queue_enqueue_ready_response(
   ism_shell_event_queue *queue,
   uint64_t stream_id
@@ -186,8 +196,11 @@ ism_shell_event_queue_dispatch_one(
         ) > 0U;
       }
 
-      return true;
+      return phase != 3U;
     }
+
+    case ISM_SHELL_EVENT_AUTHENTICATED_STREAM_FIN:
+      return ism_msquic_adapter_on_authenticated_stream_fin(adapter, event.stream_id) == 2U;
 
     case ISM_SHELL_EVENT_READY_RESPONSE:
       (void)ism_msquic_adapter_prepare_ready_response(

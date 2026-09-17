@@ -96,6 +96,7 @@ C_COMPILE_SMOKE_SOURCES = $(DIST_DIR)/DNS_Protocol.c \
                           $(EVERPARSE_OUT_DIR)/DNSProtocolWrapper.c
 C_LINK_SMOKE = $(DIST_DIR)/c-link-smoke
 C_LINK_SMOKE_SOURCES = shell/link_smoke.c \
+                       shell/link_proof_audit_smoke.c \
                        shell/link_protocol_smoke.c \
                        shell/link_everparse_smoke.c \
                        shell/link_shell_boundary_smoke.c \
@@ -137,7 +138,8 @@ ALL_FST_FILES = $(PROTOCOL_FST_FILES) \
                 $(wildcard src/transport/*.fst) \
                 $(wildcard src/logic/*.fst) \
                 $(wildcard src/concurrency/*.fst) \
-                $(wildcard spec/*.fsti)
+                $(wildcard spec/*.fsti) \
+                src/protocol/DNS.ProofAudit.Tests.fst
 
 # Extraction is narrower than verification while most Phase 3/4 scaffolds still
 # contain specification-oriented lists and Steel placeholders. It includes the
@@ -276,7 +278,7 @@ c-link-smoke: extract
 	  -I "$$KRML_INCLUDEDIR" \
 	  -I "$$KRML_LIBDIR/dist/minimal" \
 	  $(C_LINK_SMOKE_SOURCES) \
-	  -o $(C_LINK_SMOKE); \
+	  -o $(C_LINK_SMOKE) && \
 	$(C_LINK_SMOKE)
 
 msquic-runtime-compile-smoke: extract
@@ -330,7 +332,7 @@ msquic-runtime-connection-smoke: extract
 	  shell/ism_shell.c \
 	  shell/link_krml_compat_stubs.c \
 	  $(C_COMPILE_SMOKE_SOURCES) \
-	  -o $(MSQUIC_CONNECTION_SMOKE); \
+	  -o $(MSQUIC_CONNECTION_SMOKE) && \
 	$(MSQUIC_CONNECTION_SMOKE)
 
 msquic-runtime-stream-smoke: extract
@@ -351,7 +353,7 @@ msquic-runtime-stream-smoke: extract
 	  $(C_COMPILE_SMOKE_SOURCES) \
 	  $(MSQUIC_LDFLAGS) \
 	  -pthread \
-	  -o $(MSQUIC_STREAM_SMOKE); \
+	  -o $(MSQUIC_STREAM_SMOKE) && \
 	$(MSQUIC_STREAM_SMOKE) $(MSQUIC_STREAM_CERT) $(MSQUIC_STREAM_KEY)
 
 # 4. EverParse generation scaffold

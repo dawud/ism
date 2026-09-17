@@ -1,5 +1,9 @@
 module DNS.Protocol.Parser.EverParseGenerated
 
+(* Historical name: this is a handwritten pure compatibility model, NOT the
+   generated DNSProtocol implementation. Its equivalence lemmas do not specify
+   the external generated C validator's success/failure semantics. *)
+
 open DNS.Protocol
 open DNS.Protocol.Parser
 module L = FStar.List.Tot

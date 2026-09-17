@@ -83,6 +83,11 @@ ism_msquic_adapter_prepare_ready_response(
       adapter->response_capacity
     );
 
+  if (response_len == 0U)
+  {
+    return 0U;
+  }
+
   uint32_t send_len =
     ism_shell_prepare_doq_response_send(
       &adapter->connection,
@@ -124,6 +129,22 @@ ism_msquic_adapter_prepare_ready_response(
   }
 
   return send_len;
+}
+
+uint8_t
+ism_msquic_adapter_on_authenticated_stream_fin(
+  ism_msquic_adapter *adapter, uint64_t stream_id)
+{
+  if (adapter == NULL)
+  {
+    return 3U;
+  }
+  uint8_t phase = ism_shell_on_authenticated_stream_fin(&adapter->connection, stream_id);
+  if (phase == 2U && !adapter->send_in_flight)
+  {
+    (void)ism_msquic_adapter_prepare_ready_response(adapter, stream_id);
+  }
+  return phase;
 }
 
 bool

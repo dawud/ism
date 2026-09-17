@@ -264,7 +264,7 @@ where qname_length >= 1 && qname_length <= 255 &&
   UINT32BE ttl;
   UINT16BE rdlength { rdlength == 2 };
   UINT8 rdata_name_ptr_hi { rdata_name_ptr_hi == rdata_name_ptr_hi_value };
-  UINT8 rdata_name_ptr_lo { rdata_name_ptr_lo == rdata_name_ptr_lo_value };
+  UINT8 rdata_name_ptr_lo { rdata_name_ptr_lo == rdata_name_ptr_lo_value && (rdata_name_ptr_hi_value > 192 || rdata_name_ptr_lo >= 12) };
 } dns_uncompressed_question_compressed_name_rdata_answer_packet;
 
 entrypoint typedef struct _dns_uncompressed_question_mx_answer_packet (
@@ -326,7 +326,7 @@ where qname_length >= 1 && qname_length <= 255 &&
   UINT16BE rdlength { rdlength == 4 };
   UINT16BE preference;
   UINT8 exchange_name_ptr_hi { exchange_name_ptr_hi == exchange_name_ptr_hi_value };
-  UINT8 exchange_name_ptr_lo { exchange_name_ptr_lo == exchange_name_ptr_lo_value };
+  UINT8 exchange_name_ptr_lo { exchange_name_ptr_lo == exchange_name_ptr_lo_value && (exchange_name_ptr_hi_value > 192 || exchange_name_ptr_lo >= 12) };
 } dns_uncompressed_question_compressed_mx_answer_packet;
 
 entrypoint typedef struct _dns_uncompressed_question_soa_answer_packet (
@@ -397,7 +397,7 @@ where qname_length >= 1 && qname_length <= 255 &&
   UINT32BE ttl;
   UINT16BE rdlength { rdlength == rname_length + 22 };
   UINT8 mname_ptr_hi { mname_ptr_hi == mname_ptr_hi_value };
-  UINT8 mname_ptr_lo { mname_ptr_lo == mname_ptr_lo_value };
+  UINT8 mname_ptr_lo { mname_ptr_lo == mname_ptr_lo_value && (mname_ptr_hi_value > 192 || mname_ptr_lo >= 12) };
   dns_label rname_labels[:byte-size (rname_length - 1)];
   UINT8 rname_root { rname_root == 0 };
   UINT32BE serial;
@@ -439,7 +439,7 @@ where qname_length >= 1 && qname_length <= 255 &&
   dns_label mname_labels[:byte-size (mname_length - 1)];
   UINT8 mname_root { mname_root == 0 };
   UINT8 rname_ptr_hi { rname_ptr_hi == rname_ptr_hi_value };
-  UINT8 rname_ptr_lo { rname_ptr_lo == rname_ptr_lo_value };
+  UINT8 rname_ptr_lo { rname_ptr_lo == rname_ptr_lo_value && (rname_ptr_hi_value > 192 || rname_ptr_lo >= 12) };
   UINT32BE serial;
   UINT32BE refresh;
   UINT32BE retry;
@@ -479,9 +479,9 @@ where qname_length >= 1 && qname_length <= 255 &&
   UINT32BE ttl;
   UINT16BE rdlength { rdlength == 24 };
   UINT8 mname_ptr_hi { mname_ptr_hi == mname_ptr_hi_value };
-  UINT8 mname_ptr_lo { mname_ptr_lo == mname_ptr_lo_value };
+  UINT8 mname_ptr_lo { mname_ptr_lo == mname_ptr_lo_value && (mname_ptr_hi_value > 192 || mname_ptr_lo >= 12) };
   UINT8 rname_ptr_hi { rname_ptr_hi == rname_ptr_hi_value };
-  UINT8 rname_ptr_lo { rname_ptr_lo == rname_ptr_lo_value };
+  UINT8 rname_ptr_lo { rname_ptr_lo == rname_ptr_lo_value && (rname_ptr_hi_value > 192 || rname_ptr_lo >= 12) };
   UINT32BE serial;
   UINT32BE refresh;
   UINT32BE retry;
@@ -552,7 +552,7 @@ where qname_length >= 1 && qname_length <= 255 &&
   UINT16BE weight;
   UINT16BE port;
   UINT8 target_name_ptr_hi { target_name_ptr_hi == target_name_ptr_hi_value };
-  UINT8 target_name_ptr_lo { target_name_ptr_lo == target_name_ptr_lo_value };
+  UINT8 target_name_ptr_lo { target_name_ptr_lo == target_name_ptr_lo_value && (target_name_ptr_hi_value > 192 || target_name_ptr_lo >= 12) };
 } dns_uncompressed_question_compressed_srv_answer_packet;
 
 entrypoint typedef struct _dns_uncompressed_question_txt_answer_packet (
@@ -605,7 +605,7 @@ where qname_length >= 1 && qname_length <= 255 &&
   UINT16BE qtype;
   UINT16BE qclass;
   UINT8 rr_name_ptr_hi { rr_name_ptr_hi == rr_name_ptr_hi_value };
-  UINT8 rr_name_ptr_lo { rr_name_ptr_lo == rr_name_ptr_lo_value };
+  UINT8 rr_name_ptr_lo { rr_name_ptr_lo == rr_name_ptr_lo_value && (rr_name_ptr_hi_value > 192 || rr_name_ptr_lo >= 12) };
   UINT16BE rtype;
   UINT16BE rclass;
   UINT32BE ttl;

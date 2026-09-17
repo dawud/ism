@@ -54,6 +54,10 @@ ism_msquic_adapter_prepare_ready_response(
   uint64_t stream_id
 );
 
+uint8_t
+ism_msquic_adapter_on_authenticated_stream_fin(
+  ism_msquic_adapter *adapter, uint64_t stream_id);
+
 bool
 ism_msquic_adapter_on_send_complete(
   ism_msquic_adapter *adapter,

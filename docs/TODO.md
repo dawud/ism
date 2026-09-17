@@ -4,9 +4,17 @@ This roadmap tracks the development of the verified DNS-over-QUIC server in F*, 
 
 ## Source Audit Status
 
-Last source audit: 2026-05-05.
+Last source audit: 2026-09-11; remediation evidence updated: 2026-09-17.
 
-The repository currently contains F* models and bootstrap skeletons for phases 1-4. The current scaffold verifies, but broad roadmap items should not be read as production-complete while they still rely on `admit()`, `assume`, mock interfaces under `spec/`, or placeholder functions that return fixed values.
+The audit remediation is tracked in [PROOF_AUDIT_ACTIONS.md](PROOF_AUDIT_ACTIONS.md).
+Passing gates establish only their written component contracts. In particular,
+external C-validator acceptance equivalence, full DNS semantics, real concurrency
+ownership, and production worker extraction/integration remain separate gates.
+
+The repository contains F* models and bootstrap skeletons for phases 1-4. The
+September source scan found no explicit project `admit`, `assume`, or `magic`.
+Abstract interfaces under `spec/`, weak contracts, and fixed-value placeholders
+still prevent interpreting passing verification as production completeness.
 
 Verification was run through the local container image with:
 
@@ -123,7 +131,7 @@ The containerized `make extract` command now completes and emits C/H files under
   - [x] Extend the generated boundary to cover compressed SRV target-name pointers to the question name.
   - [x] Extend the generated boundary to cover compressed SRV target-name pointers to prior valid message-name offsets.
   - [x] Document the boundary/reference equivalence contract and generated-subset limits in [PARSER_EQUIVALENCE.md](PARSER_EQUIVALENCE.md).
-  - [x] Replace the handwritten parser or document/prove behavioral equivalence before Phase 1 is production-ready. Current work documents the coexistence contract, adds generated-subset accept/reject lemmas showing boundary/reference agreement for packets covered by the generated validator gate, classifies accepted reference-only shapes that are outside the generated subset, and makes the active production boundary reject those reference-only shapes instead of accepting them as fallback traffic.
+  - [/] Replace the handwritten parser or prove runtime behavioral equivalence before Phase 1 is production-ready. Pure-model subset accept/reject lemmas and byte-exact buffer accepted-value soundness are implemented. The real generated validator and C wrapper still lack the success/failure semantic refinement needed for runtime acceptance equivalence; see [PARSER_EQUIVALENCE.md](PARSER_EQUIVALENCE.md).
 
 ## Next Technical Milestone
 
@@ -152,9 +160,9 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 - [x] Define `crypto_context` for session state.
 - [/] Delegate TLS 1.3 handshake and authentication policy to the MsQuic shell stack. Current `DNS.Security.Handshake` defines the state type and transitions, but `verify_client_hello` still delegates success/failure to the trusted `EverCrypt.Cipher.validate_client_hello` bootstrap adapter until the shell boundary bypasses it.
 - [/] Replace `DNS.Security.Gateway` authenticated decryption with authenticated stream-byte ingress from the MsQuic shell stack. Current decrypt delegates success/failure to the trusted `EverCrypt.AEAD.decrypt_authenticated` bootstrap adapter, and the gateway copies the bounded ciphertext range into a concrete Low* plaintext workspace before parsing it instead of admitting allocation; `DNS.QUIC.MsQuicIngress.handle_authenticated_stream_fragment` is now the preferred verified ingress boundary for authenticated MsQuic stream bytes.
-- [/] Implement `DNS.QUIC.StreamMapping` state machine (ReadingLength, ReadingLengthHigh, ReadingMessage). State types exist, the two-byte DoQ length prefix parser reads a bounded Low* buffer, `handle_stream_data` copies bounded body bytes into the stream buffer, persists stream phase updates, stores a one-byte partial length prefix as its own phase, accounts for body bytes after a completed length prefix, advances `ReadingMessage` to `Processing` with the completed DNS message length once enough bytes arrive, and transitions to `Done` for overlong body fragments. Stream accumulation now carries the expected message length as a bounded `UInt32`, uses machine-integer comparisons and arithmetic for state transitions and copy lengths, passes processing lengths to worker paths without a `UInt16` widening helper, and widens length-prefix bytes through the extractable integer cast API. Resource-bound proofs remain incomplete.
-- [/] Implement Stream ID Multiplexer to handle concurrent streams. `find_stream` performs a verified bounded scan over active stream slots with explicit ownership preconditions; `allocate_stream` uses the connection capacity to initialize the next active slot and increment the active count; and `close_stream` scans the active prefix, compacts the table by moving the last active stream pointer into the removed slot, and decrements the active count. Broader stream lifecycle integration and resource-bound proofs remain incomplete.
-- [x] Implement EDNS0 (OPT) handling with padding for traffic analysis protection. Current `calculate_padding_len` handles zero block size and computes block padding, structural OPT parsing accepts version 0 in the additional section and structurally parses bounded EDNS options, and basic OPT option/padding response serialization round-trips through the parser. Full response-policy integration is not implemented.
+- [/] Implement `DNS.QUIC.StreamMapping` state machine. Bounded Low* reads and copies handle split length prefixes and body fragments. Exact completion enters `AwaitingFin`; explicit peer FIN with a zero message ID permits `Processing`. Short lengths, premature FIN, and excess bytes (including later fragments) fail. State transitions have semantic contracts and a body-count fragmentation lemma; whole-trace byte accumulation, callback refinement, and global resource proofs remain incomplete.
+- [/] Implement Stream ID Multiplexer under serialized access. `find_stream` specifies matching IDs; allocation refuses duplicates and preserves other active contexts under disjointness preconditions. Close swaps removed/last pointers, retaining distinct active and available slots. A full connection invariant spanning IDs, message buffers, initialization, and wrappers remains open; this is not a concurrent ownership proof.
+- [/] Implement EDNS0 (OPT) handling and padding policy. Padding length helpers and basic option serialization exist, and structural OPT parsing accepts version 0 with bounded options. Automatic response-policy integration and traffic-analysis protection are not established.
 - [/] **Validation:** Prove the verified core only processes authenticated stream bytes. Current code models the boundary through a trusted AEAD adapter result; the accepted architecture moves authenticity to the MsQuic shell stack, `DNS.QUIC.MsQuicIngress` defines the explicit shell/core ingress contract, and the C shell now has a MsQuic-shaped adapter scaffold over fake callback data that routes ready streams through the generated-validator-backed response selector. The stable container also links/runs no-network MsQuic API-table, registration/configuration/listener lifecycle, loopback listener-start, and live loopback stream smokes against the pinned shared library, syntax-checks listener new-connection, connection peer-stream, and stream callback seams against the pinned upstream header, and runs fake-API behavior coverage for connection and peer-stream callback dispatch. Remaining work is to wire production socket polling, timers, event-loop behavior to that contract and bypass the legacy decrypt/client-hello adapters.
 
 ## Phase 3: Verified Core Logic & Backend

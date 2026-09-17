@@ -27,7 +27,7 @@ let rec find_child children l =
   match children with
   | [] -> None
   | hd :: tl ->
-      if hd.tn_label = l then Some hd
+      if DNS.Name.label_eq hd.tn_label l then Some hd
       else find_child tl l
 
 (* Termination: We use the length of the query (list of labels) as a metric.
@@ -61,6 +61,12 @@ let rec lookup_with_wildcard root query =
           match find_child root.tn_children wildcard_label with
           | Some wildcard -> lookup_with_wildcard wildcard tl
           | None -> None
+
+let lookup_dns_name (root:tree_node) (name:qname)
+  : Tot (result:option (list resource_record){
+      result == lookup_with_wildcard root (FStar.List.Tot.rev name)}) =
+  let TreeKey labels = name_to_tree_key name in
+  lookup_with_wildcard root labels
 
 val parse_cname_target_bytes :
   input:list FStar.UInt8.t ->
@@ -104,7 +110,7 @@ val chase_cname :
 let rec chase_cname root target hops =
   if hops = 0 then Error ServFail (* Prevent CNAME loops *)
   else
-    match lookup_with_wildcard root target with
+    match lookup_dns_name root target with
     | Some rrs ->
         begin match find_cname_target rrs with
         | NoCname -> Success rrs
@@ -171,14 +177,17 @@ let label_mail : label = [0x6duy; 0x61uy; 0x69uy; 0x6cuy]
 let label_example : label = [0x65uy; 0x78uy; 0x61uy; 0x6duy; 0x70uy; 0x6cuy; 0x65uy]
 let label_com : label = [0x63uy; 0x6fuy; 0x6duy]
 
+let loopback_a_rdata : FStar.Bytes.bytes =
+  FStar.Bytes.init 4ul (fun i -> FStar.List.Tot.index [127uy; 0uy; 0uy; 1uy] (FStar.UInt32.v i))
+
 let exact_record : resource_record =
   {
     name = [label_www; label_example; label_com];
     rtype = A;
     rclass = 1us;
     ttl = 60ul;
-    rdlen = 0us;
-    rdata = FStar.Bytes.empty_bytes;
+    rdlen = 4us;
+    rdata = loopback_a_rdata;
   }
 
 let wildcard_record : resource_record =
@@ -187,8 +196,8 @@ let wildcard_record : resource_record =
     rtype = A;
     rclass = 1us;
     ttl = 60ul;
-    rdlen = 0us;
-    rdata = FStar.Bytes.empty_bytes;
+    rdlen = 4us;
+    rdata = loopback_a_rdata;
   }
 
 let exact_leaf : tree_node =
@@ -317,28 +326,15 @@ let cname_target_record : resource_record =
     rtype = A;
     rclass = 1us;
     ttl = 60ul;
-    rdlen = 0us;
-    rdata = FStar.Bytes.empty_bytes;
+    rdlen = 4us;
+    rdata = loopback_a_rdata;
   }
 
-let cname_leaf rr : tree_node =
-  {
-    tn_label = label_com;
-    tn_records = [rr];
-    tn_children = [];
-  }
-
-let cname_branch first rr : tree_node =
+let cname_leaf first rr : tree_node =
   {
     tn_label = first;
-    tn_records = [];
-    tn_children = [
-      {
-        tn_label = label_example;
-        tn_records = [];
-        tn_children = [cname_leaf rr];
-      }
-    ];
+    tn_records = [rr];
+    tn_children = [];
   }
 
 let cname_test_root : tree_node =
@@ -346,8 +342,12 @@ let cname_test_root : tree_node =
     tn_label = wildcard_label;
     tn_records = [];
     tn_children = [
-      cname_branch label_alias cname_record;
-      cname_branch label_api cname_target_record
+      { tn_label = label_com; tn_records = []; tn_children = [
+        { tn_label = label_example; tn_records = []; tn_children = [
+          cname_leaf label_alias cname_record;
+          cname_leaf label_api cname_target_record
+        ] }
+      ] }
     ];
   }
 
@@ -375,35 +375,35 @@ let chase_cname_hop_exhaustion_test =
 
 let exact_a_question : question =
   {
-    qname = [label_com; label_example; label_www];
+    qname = [label_www; label_example; label_com];
     qtype = A;
     qclass = 1us;
   }
 
 let wildcard_a_question : question =
   {
-    qname = [label_com; label_example; label_api];
+    qname = [label_api; label_example; label_com];
     qtype = A;
     qclass = 1us;
   }
 
 let missing_a_question : question =
   {
-    qname = [label_com; label_mail; label_api];
+    qname = [label_api; label_mail; label_com];
     qtype = A;
     qclass = 1us;
   }
 
 let nodata_aaaa_question : question =
   {
-    qname = [label_com; label_example; label_www];
+    qname = [label_www; label_example; label_com];
     qtype = AAAA;
     qclass = 1us;
   }
 
 let class_mismatch_question : question =
   {
-    qname = [label_com; label_example; label_www];
+    qname = [label_www; label_example; label_com];
     qtype = A;
     qclass = 3us;
   }

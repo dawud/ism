@@ -97,7 +97,7 @@ DNS_QUIC_StreamMapping_stream_context
   for (uint32_t i = 0U; i < ISM_SHELL_MAX_STREAMS; i++)
   {
     ism_shell_stream *slot = &conn->streams[i];
-    if (!slot->active)
+    if (&slot->ctx == conn->ctx.cc_active[conn->ctx.cc_num] && !slot->active)
     {
       slot->ctx.sc_id = stream_id;
       slot->ctx.sc_phase = (DNS_QUIC_StreamMapping_stream_phase){
@@ -105,13 +105,21 @@ DNS_QUIC_StreamMapping_stream_context
       };
       slot->ctx.sc_buf = slot->message_buffer;
       slot->active = true;
-      conn->ctx.cc_active[conn->ctx.cc_num] = &slot->ctx;
       conn->ctx.cc_num++;
       return &slot->ctx;
     }
   }
 
   return NULL;
+}
+
+uint8_t
+ism_shell_on_authenticated_stream_fin(ism_shell_connection *conn, uint64_t stream_id)
+{
+  DNS_QUIC_StreamMapping_stream_context *stream =
+    ism_shell_open_stream(conn, stream_id);
+  return stream == NULL ? 3U :
+    DNS_ShellBoundary_dispatch_authenticated_stream_fin(stream);
 }
 
 uint8_t

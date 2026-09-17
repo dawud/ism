@@ -5,6 +5,22 @@ parser and the EverParse-generated production-target boundary.
 
 ## Current Boundary
 
+There are two different boundaries. The list-valued functions and lemmas below
+model the subset policy in pure F*. Despite its historical name,
+`DNS.Protocol.Parser.EverParseGenerated` is handwritten and calls the reference
+parsing routines; it is not the generated `DNSProtocol.fst` implementation.
+Their equivalence lemmas do not prove anything about the external C wrapper's
+return value.
+
+The executable Low* `parse_dns_packet_buffer` has a different, explicit
+contract. `read_buffer_range` equals `sequence_bytes (as_seq h0 buffer) pos len`.
+If the buffer parser returns `Some packet`, the reference parser on that exact
+snapshot returns `Some packet`, and a generated-subset classifier applies.
+The buffer is not modified. This accepted-value soundness holds even if the
+external validator returns an arbitrary boolean; an always-false wrapper can
+still reject every input. Acceptance completeness and success/failure
+equivalence for the generated validator remain unproved.
+
 The active parser boundary is `EverParseGeneratedSubset` in
 `DNS.Protocol.Parser.EverParseBoundary`. The boundary uses the generated-subset
 classifier as the production acceptance gate. Packets inside the generated
@@ -13,7 +29,7 @@ uses the handwritten parser as the semantic construction layer. Packets outside
 the generated subset are rejected by the production boundary even if the
 handwritten reference parser can parse them.
 
-The boundary contract is now:
+The pure list-model boundary contract is:
 
 - for generated-subset packets,
   `parse_dns_packet_bytes_at_boundary input == parse_dns_packet_bytes input`;
@@ -30,14 +46,18 @@ Those obligations are named in:
 - `lemma_boundary_accepts_reference_result`
 - `lemma_boundary_rejects_reference_rejection`
 
-The generated-subset accept/reject lemmas make the coexistence contract explicit
-for packets covered by the generated validator gate. The shared fixture tests
+The generated-subset accept/reject lemmas make the pure coexistence policy explicit.
+They do not connect the separately generated validator's semantics to that policy.
+The shared fixture tests
 also assert boundary/reference equality across the implemented valid and
 malformed packet examples.
 
 ## Generated Subset
 
 The generated validator gate is classified by `classify_generated_subset`.
+Contextual pointer provenance is checked by the F* structural name-offset pass,
+not by a standalone generated validator. Generated pointer-field checks reject
+header offsets, but do not by themselves establish prior-name membership.
 The current cases are:
 
 - `GeneratedQuestionOnly`: question-only packets with bounded uncompressed
@@ -109,9 +129,26 @@ Phase 1 is not production-complete until one of these is true:
   handwritten parser as a verified reference construction layer behind a
   generated validator gate.
 
-The current production policy uses the second option in narrow form: generated
+The current target policy uses the second option in narrow form: generated
 validators gate the accepted wire shapes, while the handwritten parser still
 constructs the packet value that downstream verified code consumes for those
 covered shapes. The handwritten parser remains available as the
 bootstrap/reference parser, but reference-only accepted shapes are no longer
 accepted at the active production boundary.
+
+## Serializer contract
+
+`well_formed_record` ties RDLENGTH to actual bytes, bounds owner names, and checks
+the parser's supported RDATA shapes. Compressed name-bearing RDATA is rejected
+on serialization because its offsets cannot safely be relocated. Unknown and
+other opaque RDATA types are not semantically interpreted.
+
+`serialize_dns_packet_bytes` performs checked construction: success implies the
+reference parser returns the exact input packet, proved by
+`lemma_serialized_packet_roundtrip`. This adds a parse-back check and does not
+establish completeness, optimality, or a generated-serializer implementation.
+
+Remaining closure: a semantic success/failure refinement for the real generated
+validator and its adapter, a grammar-wide name-offset correspondence proof,
+typed relocation-safe RDATA, and full supported-domain completeness. These are
+not supplied by more fixtures or by weakening the external interface to an axiom.

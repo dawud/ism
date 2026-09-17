@@ -3,25 +3,29 @@
 This project aims to implement a mathematically verified DNS server using F*, Low*, and the Project Everest ecosystem (HACL*, EverCrypt, EverParse, Steel).
 
 ## Documentation
-- **[Architecture](docs/ARCHITECTURE.md)**: Layered security design and Mermaid diagrams.
+
+- **[Architecture](docs/ARCHITECTURE.md)**: Runtime flow, verified components, and trust boundaries.
 - **[Implementation Plan](docs/PLAN.md)**: High-level strategy and RFC roadmap.
 - **[Threat Model](docs/THREAT_MODEL.md)**: STRIDE analysis and Post-Quantum assessment.
 - **[Development Roadmap](docs/TODO.md)**: Active task tracking and progress.
+- **[Proof-audit actions](docs/PROOF_AUDIT_ACTIONS.md)**: Implemented repairs, verification evidence, and open proof gates.
 
 ## Key Features
-- **Formal Verification:** Memory safety and functional correctness proven in F*.
-- **DNS-over-QUIC (DoQ):** Implementation based on RFC 9250.
-- **Modern Standards:** Support for TLS 1.3 and modern DNS resource records.
-- **Security First:** Parser-rejecting architecture and verified cryptographic primitives.
+
+- **Verified components:** Sequential Low* memory-safety obligations and selected functional contracts, under explicit caller assumptions.
+- **DoQ prototype:** Length/FIN framing and a minimal question-echo responder, with trusted MsQuic transport and TLS.
+- **DNS models:** Bounded parsing, checked serialization, authoritative lookup and cache scaffolds; not complete RFC semantics.
+- **Explicit limits:** No end-to-end server correctness, race-freedom, constant-time, or local cryptographic proof. See the [trusted-boundary inventory](docs/THREAT_MODEL.md).
 
 ## Project Structure
+
 - `src/protocol`: DNS wire format and protocol definitions.
-- `src/security`: Cryptographic integration and TLS 1.3 handshake.
+- `src/security`: Legacy cryptographic/handshake adapters, not the runtime TLS stack.
 - `src/transport`: QUIC stream mapping and framing.
 - `src/logic`: Core DNS lookup logic (Authoritative & Recursive).
-- `src/concurrency`: Steel-based concurrent memory management.
-- `spec`: High-level RFC specifications.
-- `tests`: Unit tests and fuzzing harness.
+- `src/concurrency`: Sequential worker/cache/shell scaffolds; Steel permissions are placeholders.
+- `spec`: Trusted local compatibility and external-library interfaces.
+- `shell`: C adapters and executable smoke tests; F* regressions live with the sources.
 
 ## Building & Running
 The project uses F* for verification and KaRaMel for extraction to C.
@@ -35,6 +39,10 @@ in a separate migration lane until the Low*/Pulse/KaRaMeL strategy is settled.
 Routine development should use the pinned container image. Upgrading the main
 toolchain past `v2026.03.24` is a migration task, not a routine dependency
 refresh.
+
+Stable KaRaMeL is pinned to `11bb8e1ac2f720fb7144b9b768c7251526caa149`.
+Base-image and transitive package inputs are not fully locked, so this is not
+a claim of fully reproducible builds.
 
 The repository also includes a non-blocking migration container in
 `Containerfile.migration`. That image tracks a recent F* release for compatibility
