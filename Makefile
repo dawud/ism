@@ -6,9 +6,13 @@ INCLUDE_DIR = $(FSTAR_HOME)/ulib/.cache
 # Project Directories
 SRC_DIRS    = src/protocol src/security src/transport src/logic src/concurrency spec
 MIGRATION_DIR = migration
-OBJ_DIR     = obj
-DIST_DIR    = dist
-GENERATED_DIR = generated
+# The stable layout is unchanged. Candidate/latest jobs must never share its
+# checked files, .krml files, generated parsers, or C output.
+BUILD_LANE ?= stable
+LANE_SUFFIX = $(if $(filter stable,$(BUILD_LANE)),,/$(BUILD_LANE))
+OBJ_DIR     = obj$(LANE_SUFFIX)
+DIST_DIR    = dist$(LANE_SUFFIX)
+GENERATED_DIR = generated$(LANE_SUFFIX)
 EVERPARSE_SRC_DIR = everparse
 EVERPARSE_OUT_DIR = $(GENERATED_DIR)/everparse
 EVERPARSE_CMD ?= everparse.sh
@@ -32,6 +36,7 @@ PULSE_INCLUDE_DIRS = $(MIGRATION_DIR) \
 
 # F* configuration
 FSTAR_OPTS  = --odir $(OBJ_DIR) --cache_dir $(OBJ_DIR) \
+              --cache_checked_modules \
               $(addprefix --include , $(SRC_DIRS))
 
 PULSE_PILOT_OBJ_DIR = $(OBJ_DIR)/pulse-pilot
@@ -162,12 +167,14 @@ EVERPARSE_3D_FILES = $(wildcard $(EVERPARSE_SRC_DIR)/*.3d)
 all: extract
 
 # 2. Verification Stage
-# We verify each file individually to ensure we see the specific errors.
-# We no longer rely on complex .depend for this bootstrap phase.
+# Current F*'s fly_deps accepts one root per invocation. Keep all roots (including
+# local interfaces and tests), stop at the first failure, and cache dependencies.
 verify:
 	@mkdir -p $(OBJ_DIR)
 	@echo "Verifying Source Files..."
-	$(FSTAR_HOME)/bin/fstar.exe $(FSTAR_OPTS) $(ALL_FST_FILES)
+	@for f in $(ALL_FST_FILES); do \
+		$(FSTAR_HOME)/bin/fstar.exe $(FSTAR_OPTS) $$f || exit $$?; \
+	done
 
 verify-pulse-pilot:
 	@mkdir -p $(PULSE_PILOT_OBJ_DIR)
@@ -379,3 +386,6 @@ everparse-verify: everparse-generate
 # 4. Cleanup
 clean:
 	rm -rf $(OBJ_DIR) $(DIST_DIR) $(GENERATED_DIR) .depend
+
+# Explicit, pinned promotion candidate; no Rust dependency or tolerated failure.
+include migration/candidate.mk

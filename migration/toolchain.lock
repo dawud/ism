@@ -1,0 +1,11 @@
+# Linux x86_64 release bundle: compiler, Pulse, KaRaMeL and solvers together.
+# Also valid as a shell fragment and a Make include. No floating inputs here.
+FSTAR_VERSION=v2026.09.13
+FSTAR_COMMIT=53415f6cc2d3e5e65e1db93ec6f79c2963ff46ec
+FSTAR_SHA256=41b3b86b37734aae6a7b1beae808f3029568a67883f6be757d13e6d153ae255b
+KARAMEL_COMMIT=9abbb865b10a0cd5c557da81c024c3965cb6ff53
+Z3_VERSION=4.13.3
+Z3_BUNDLED_VERSIONS=4.8.5,4.13.3,4.15.3
+# Separate baseline generator; not installed or recompiled in the candidate lane.
+EVERPARSE_VERSION=v2026.03.21
+EVERPARSE_SHA256=467d391c819dbc513173bdb4bb71aa0073e497fe50acfe116099b4ff27b7ebd8

@@ -33,8 +33,10 @@ The project uses F* for verification and KaRaMel for extraction to C.
 ### Toolchain Version Policy
 This repository is currently pinned to F* `v2026.03.24`, the last project
 baseline before the removal of the old Low* sublanguage in F* `v2026.04.17`.
-Newer F* releases, including the weekly `v2026.05.03` line, should be tracked
-in a separate migration lane until the Low*/Pulse/KaRaMeL strategy is settled.
+The accepted [migration plan](docs/PLAN.md#cross-cutting-pulse-migration-and-toolchain-update)
+ports imperative code and proofs to Pulse, keeps KaRaMeL C extraction and the
+C/MsQuic shell, and promotes a newer pinned toolchain only after verification
+and integration gates pass. Rust extraction remains a separate experiment.
 
 Routine development should use the pinned container image. Upgrading the main
 toolchain past `v2026.03.24` is a migration task, not a routine dependency
@@ -44,10 +46,13 @@ Stable KaRaMeL is pinned to `11bb8e1ac2f720fb7144b9b768c7251526caa149`.
 Base-image and transitive package inputs are not fully locked, so this is not
 a claim of fully reproducible builds.
 
-The repository also includes a non-blocking migration container in
-`Containerfile.migration`. That image tracks a recent F* release for compatibility
-testing only; failures there are migration evidence and do not replace the pinned
-development lane.
+The pinned candidate lane uses `Containerfile.candidate` and
+[`migration/toolchain.lock`](migration/toolchain.lock): F* `v2026.09.13`, its
+bundled KaRaMeL, and Z3 4.13.3. Its blocking CI job currently covers the two
+pilot proofs and **value-only** C extraction/compile/link/run, not a migrated
+server. See the [contract/ABI inventory](docs/PULSE_MIGRATION_INVENTORY.md).
+The separate `Containerfile.migration` remains an optional latest-release/Rust
+exploration lane; neither replaces the stable development lane.
 
 ### Using Podman/Docker (Recommended)
 The development toolchain is provided by the local container image
@@ -68,12 +73,44 @@ If the local image is missing, build it from the checked-in `Containerfile`:
 podman build -t localhost/verified-dns-server:latest -f Containerfile .
 ```
 
-To test the current sources against a recent F* release without changing the
-stable toolchain, build and run the migration image:
+To run the pinned M1 candidate checks without changing the stable toolchain:
+
+```bash
+podman build -t localhost/verified-dns-server:pulse-candidate -f Containerfile.candidate .
+
+podman run --rm \
+  --userns=keep-id \
+  -v "$(pwd):/workspace:z" \
+  localhost/verified-dns-server:pulse-candidate
+```
+
+The default command is `make candidate-check`: validate tool identities,
+check the complete source inventory, verify both pilots, extract the value
+pilot to C, and compile/link/run its smoke test using the generated header.
+It does not invoke Rust or tolerate failed candidate checks. Artifacts and
+provenance are isolated under `obj/candidate-v2026.09.13/` and
+`dist/candidate-v2026.09.13/`; stable output paths remain unchanged. Use the
+shared SELinux label `:z` when running multiple lanes on the same checkout.
+
+For a native installation of the locked bundle:
+
+```bash
+make candidate-check FSTAR_HOME=/path/to/fstar
+python3 -m unittest discover -s migration/tests -v
+```
+
+Full legacy verification on the new compiler is still expected to fail on APIs
+that need migration; a passing M1 pilot gate does not establish compatibility.
+Base-image/system packages are not fully locked; `toolchain.json` records the
+actual C compiler, target, OS, compiler/extractor identities and solver versions.
+EverParse remains the separately pinned baseline generator.
+
+To run optional release/Rust experiments, build the exploration image (defaults
+to the same evaluated release). For a different release, override **both**
+`FSTAR_VERSION` and `FSTAR_SHA256` using the official release archive digest:
 
 ```bash
 podman build \
-  --build-arg FSTAR_VERSION=v2026.05.10 \
   -t localhost/verified-dns-server:fstar-migration \
   -f Containerfile.migration .
 
@@ -83,16 +120,16 @@ podman run --rm \
   localhost/verified-dns-server:fstar-migration
 ```
 
-The migration image's default command verifies only the Pulse pilot. To also
-capture the current Rust-extraction assessment and legacy F*/Low*
-incompatibilities, run:
+The exploration image isolates its output under `obj/exploration-<version>/`,
+`dist/exploration-<version>/`, and `generated/exploration-<version>/`. Its default
+command verifies only the Pulse pilots. Probe legacy compatibility independently:
 
 ```bash
 podman run --rm \
   --userns=keep-id \
   -v "$(pwd):/workspace:Z" \
   localhost/verified-dns-server:fstar-migration \
-  bash -lc 'make verify-pulse-pilot && make pulse-rust-smoke && make verify'
+  make verify
 ```
 
 To compile and run the generated Rust smoke check for the value-state Pulse

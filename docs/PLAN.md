@@ -42,7 +42,7 @@ The server follows a "Defensive Ring" architecture, separating the unverified I/
 2. **DoQ Ingress Boundary:** Accepts authenticated QUIC stream bytes from the shell, enforces DoQ length framing, and hands complete DNS messages to parsing.
 3. **The Gatekeeper (EverParse):** Validates the DNS wire format against the formal specification. Rejects any non-conforming input.
 4. **Verified Core Logic (F*):** Implements Radix Tree lookups, Wildcard matching, and CNAME chasing.
-5. **Concurrent Memory (Steel):** Manages the shared recursive cache using separation logic to prove the absence of data races.
+5. **Concurrent Memory (Pulse target):** Eventually manages the shared recursive cache using separation logic; real concurrent invariants remain separate from the sequential migration.
 
 ---
 
@@ -52,6 +52,83 @@ Roadmap status is tracked in terms of maturity, not only feature names. The matu
 
 ### Phase Definition of Done
 Phase completion gates are recorded in [DECISIONS.md](DECISIONS.md). Keep this roadmap aligned with those gates when updating phase status.
+
+### Cross-cutting: Pulse migration and toolchain update
+
+**Status:** M1 implemented (2026-09-19); M2–M5 planned, accepted in DR-0017. Migrate the imperative
+Low* implementation and proofs to **Pulse → KaRaMeL → C**, retaining the C shell,
+MsQuic, and EverParse parser path. Rust extraction remains an independent
+experiment, not a prerequisite or promotion gate for this migration.
+
+The September 18 evaluation verified the existing pilots on F* `v2026.09.13`,
+but they do not implement the real stream lifecycle or replace a linked
+boundary. No blocking Pulse language feature gap has been identified; C-path
+implementation, proof preservation, and integration still need to be tested.
+The reference pilot's Rust extraction failure is not evidence of a C blocker.
+
+Execute these milestones in order, keeping the stable build available:
+
+1. **M1 — Reproducible candidate lane and contract inventory.** Start from the
+   evaluated F* `v2026.09.13` or explicitly select and evaluate a newer release;
+   pin F*, its compatible KaRaMeL revision, and solver versions. Record the
+   EverParse and C toolchain versions separately. Fix the current multi-file
+   verification invocation for `fly_deps`, isolate each lane's caches/artifacts,
+   and inventory every legacy Low*/HyperStack/Steel dependency with its current
+   contracts, callers, extraction status, and migration disposition. Keep
+   `v2026.03.24` as the stable baseline; do not change the mainline pin here.
+   Exit: a reproducible candidate build and an explicit contract/ABI checklist.
+   Implemented by `Containerfile.candidate`, `migration/toolchain.lock`,
+   `make candidate-check`, and the checked
+   [source inventory](PULSE_MIGRATION_INVENTORY.md). The C smoke is value-only;
+   it does not close M2/M3. See DR-0018 for exact lane scope and limitations.
+2. **M2 — Shared semantics and a real Pulse ingress boundary.** Factor the
+   stream transition model into Low*-independent F* definitions usable by both
+   lanes. Port the actual `DNS.QUIC.StreamMapping` behavior, including split
+   prefixes, declared lengths, `AwaitingFin`, zero ID, terminal states, and
+   excess-byte rejection. Specify valid states and prove the Pulse operations
+   implement the shared model while preserving the existing bounds, mutation,
+   and ownership obligations for contexts and message buffers. Preserve the
+   body-fragmentation lemma; add the evaluation's invalid/closed-state cases
+   to the existing audit regressions. Exit: equivalent written contracts and
+   a verified boundary, not merely the existing capacity-counter pilot.
+3. **M3 — C extraction and shell integration.** Add dedicated Pulse-to-C
+   extraction, compile, and link gates. Exercise real references and byte
+   buffers; inspect generated C, erased proofs, integer behavior, runtime
+   dependencies, and compiler warnings. Preserve the shell ABI or document and
+   test a narrow adapter, including phase codes, layout, ownership, and lifetime
+   rules. Route the actual MsQuic receive/FIN path through the replacement and
+   run the existing audit and callback tests plus live loopback. A temporary
+   mixed Low*/Pulse build may join independently built components only through
+   an explicit C ABI, never by mixing incompatible checked/extraction artifacts.
+   Exit: one integrated Pulse/C boundary with unchanged component guarantees.
+4. **M4 — Remaining imperative surfaces.** Port stream-table lookup/allocation/
+   close, ingress/egress, send completion, minimal worker and shell/scheduler
+   boundaries, then parser buffer adapters, full-worker buffers, and sequential
+   cache operations. Reuse pure DNS/name/serializer/zone models where possible.
+   Preserve byte-exact parser soundness, successful serializer round trips,
+   stream preservation, and cache TTL/bailiwick contracts. For unused legacy
+   security and compatibility modules, either port them or explicitly retire
+   their interfaces/callers and record the effect on the trusted inventory.
+   Do not obtain a passing build by silently excluding existing proofs or
+   adding admissions. Exit: every inventoried module has a reviewed disposition
+   and no required mainline module depends on removed Low* APIs.
+5. **M5 — Promote the toolchain.** On a clean candidate build, pass `make verify`,
+   `make everparse-verify`, `make extract`, `make c-compile-smoke`,
+   `make c-link-smoke`, and all existing `msquic-runtime-*-smoke` gates with the
+   replacement selected. Keep baseline checks and candidate checks for the
+   migrated scope required during migration; retain non-blocking latest-release
+   exploration separately.
+   Review contract coverage, trusted boundaries, extraction warnings, and
+   resource/performance regressions before updating the stable Containerfile,
+   Makefile, CI, README, and toolchain decision together. Archive the baseline
+   pins and rollback instructions before removing obsolete dependencies.
+
+Tests supplement, but do not replace, preservation proofs. The migration must
+not weaken existing specifications or silently widen the trusted boundary.
+Sequential exclusive access remains the scheduling assumption. Real concurrency,
+full DNS semantics, external-validator equivalence, and production worker
+expansion remain separate work; migration alone does not close those audit gaps.
+Track completion in [TODO.md](TODO.md#pulse-to-c-migration-and-toolchain-update).
 
 ### Phase 1: Formalized Wire Format & Verified Parsing
 *Goal: Create a zero-copy, verified parser and serializer for modern DNS messages.*
@@ -94,13 +171,13 @@ Phase completion gates are recorded in [DECISIONS.md](DECISIONS.md). Keep this r
   - Implement the **Authoritative Radix Tree** (Trie) for O(log n) lookups.
   - Implement **CNAME Chasing** with a verified hop-count limit to prevent exhaustion loops.
   - Implement **Bailiwick Validation** to prevent cache poisoning in recursive results.
-  - Implement the **Verified Cache** with Steel-enforced absolute TTL.
+  - Implement the **Verified Cache** with TTL contracts and Pulse ownership proofs.
 - **Verification:** Prove that lookup functions always terminate and never leak data between query contexts.
 
 ### Phase 4: Secure Concurrency & I/O Integration
-*Goal: Thread-safe execution using Steel.*
+*Goal: Thread-safe execution using Pulse, after the sequential migration.*
 - **Tasks:**
-  - Implement a **Sharded Concurrent Cache** using Steel invariants to proof the absence of data races.
+  - Implement a **Sharded Concurrent Cache** using real Pulse invariants to prove the absence of data races.
   - Create the **Worker Thread Harness** to coordinate parsing, logic, and response generation.
   - Integrate with the documented [Unverified Shell](UNVERIFIED_SHELL.md) for UDP/QUIC socket I/O.
 - **Verification:** Use F*'s separation logic to prove that threads cannot interfere with each other's memory regions.
@@ -108,7 +185,7 @@ Phase completion gates are recorded in [DECISIONS.md](DECISIONS.md). Keep this r
 ### Phase 5: Hardening & Supply Chain Verification
 *Goal: Final binary extraction and formal audit.*
 - **Tasks:**
-  - Extract verified F* / Low* code to C using the **KaRaMeL** toolchain.
+  - Extract verified F*/Pulse code to C using **KaRaMeL** after migration; retain the pinned Low* baseline until promotion.
   - Perform **Grammar-Based Fuzzing** using EverParse specs as a seed source.
   - Transition to **Post-Quantum Cryptography**:
     - Implement Hybrid ML-KEM + X25519 Key Exchange.
@@ -149,16 +226,17 @@ entries.
 
 ### F* Release Policy
 
-The stable lane is pinned to F* `v2026.03.24` while old Low* APIs remain in
-use. Newer F* releases are tracked in a non-blocking migration lane using
-`Containerfile.migration` and the scheduled latest-F* workflow job. Pulse is a
-migration evaluation track for stateful transport/shell-boundary code, not a
-committed broad rewrite; the parser production path remains EverParse-generated
-C. Recent F*, Pulse, and safe Rust extraction are the preferred long-term
-migration direction only after an end-to-end migration-lane pilot proves
-verification, extraction, FFI ergonomics, generated-code quality, and threat
-model compatibility. Promotion gates for moving a Pulse/Rust wrapper into a
-checked production boundary are recorded in [DECISIONS.md](DECISIONS.md).
+The stable lane remains pinned to F* `v2026.03.24` until the Pulse-to-C
+migration milestones above pass. DR-0017 accepts incremental migration and a
+subsequent toolchain update; it does not change the current pin. The candidate
+lane must use an explicit compatible F*/KaRaMeL/solver set and required checks
+for its migrated scope. Keep the scheduled latest-F* exploration non-blocking
+and separate from candidate promotion. EverParse-generated C and the C/MsQuic
+shell remain the integration path; EverParse may retain a separately pinned
+generator toolchain while its emitted C is checked with the candidate bundle.
+Rust experiments neither block nor establish Pulse/C readiness. Update build
+configuration and documentation together only after M5, preserving a reproducible
+baseline rollback. See [DECISIONS.md](DECISIONS.md#dr-0017-migrate-to-pulse-with-c-extraction-before-updating-the-stable-toolchain).
 
 ## 6. Parser and Protocol Test Plan
 

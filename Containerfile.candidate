@@ -1,0 +1,39 @@
+FROM fedora:44
+
+ARG USER_NAME=ism
+ARG USER_ID=1000
+ARG GROUP_ID=1000
+
+# OS/C dependencies are recorded by candidate-toolchain-check, not fully locked.
+RUN dnf install -y gcc make curl tar gzip gmp libunwind libffi python3 which \
+    && dnf clean all
+
+COPY migration/toolchain.lock /opt/ism/toolchain.lock
+RUN . /opt/ism/toolchain.lock \
+    && curl --fail --location --retry 3 \
+      "https://github.com/FStarLang/FStar/releases/download/${FSTAR_VERSION}/fstar-${FSTAR_VERSION}-Linux-x86_64.tar.gz" \
+      -o /tmp/ism-candidate-fstar.tar.gz \
+    && echo "${FSTAR_SHA256}  /tmp/ism-candidate-fstar.tar.gz" | sha256sum -c - \
+    && mkdir -p /opt/fstar \
+    && tar -xzf /tmp/ism-candidate-fstar.tar.gz -C /opt/fstar \
+    && rm /tmp/ism-candidate-fstar.tar.gz
+
+# Release .checked files retain the builder's UID and 0600 mode. Keep the
+# installation immutable to the build user, but make bundled caches readable.
+RUN chmod -R a+rX /opt/fstar/fstar
+
+ENV FSTAR_HOME=/opt/fstar/fstar
+ENV PATH="${FSTAR_HOME}/bin:${PATH}"
+ENV BUILD_LANE=candidate-v2026.09.13
+
+RUN groupadd --gid ${GROUP_ID} ${USER_NAME} \
+    && useradd --uid ${USER_ID} --gid ${GROUP_ID} --create-home --shell /bin/bash ${USER_NAME} \
+    && mkdir -p /workspace \
+    && chown ${USER_NAME}:${USER_NAME} /workspace
+
+USER ${USER_NAME}
+WORKDIR /workspace
+COPY --chown=${USER_NAME}:${USER_NAME} . /workspace
+
+# Rust and the legacy full-project compatibility probe are independent jobs.
+CMD ["make", "candidate-check"]

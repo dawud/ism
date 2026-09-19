@@ -7,6 +7,7 @@ on:
     branches: [ "main" ]
   schedule:
     - cron: "0 6 * * 1"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -105,8 +106,39 @@ jobs:
             localhost/verified-dns-server:latest \
             bash -lc 'cd /workspace && make msquic-runtime-stream-smoke'
 
+  pulse-candidate:
+    name: Pinned Pulse candidate (M1 scope)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Test migration gate checks
+        run: python3 -m unittest discover -s migration/tests -v
+
+      - name: Build pinned candidate image
+        run: docker build -t localhost/verified-dns-server:pulse-candidate -f Containerfile.candidate .
+
+      - name: Check inventory, verify pilots, extract and run C smoke
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -v "${PWD}:/workspace" \
+            localhost/verified-dns-server:pulse-candidate
+
+      - name: Retain candidate provenance and generated C
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pulse-candidate-evidence
+          path: dist/candidate-*/
+          if-no-files-found: warn
+
   latest-fstar-migration:
     name: Latest F* migration lane
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     continue-on-error: true
 
@@ -116,21 +148,44 @@ jobs:
 
       - name: Resolve latest F* release
         run: |
-          LATEST_FSTAR_VERSION="$(curl -fsSL https://api.github.com/repos/FStarLang/FStar/releases/latest | sed -n 's/.*"tag_name": "\(v[^"]*\)".*/\1/p' | head -n1)"
-          if [ -z "${LATEST_FSTAR_VERSION}" ]; then
-            LATEST_FSTAR_VERSION="v2026.05.10"
-          fi
+          RELEASE="$(curl -fsSL https://api.github.com/repos/FStarLang/FStar/releases/latest)"
+          LATEST_FSTAR_VERSION="$(jq -er '.tag_name' <<< "$RELEASE")"
+          ARCHIVE="fstar-${LATEST_FSTAR_VERSION}-Linux-x86_64.tar.gz"
+          DIGEST="$(jq -er --arg archive "$ARCHIVE" '.assets[] | select(.name == $archive) | .digest' <<< "$RELEASE")"
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
           echo "FSTAR_VERSION=${LATEST_FSTAR_VERSION}" >> "${GITHUB_ENV}"
+          echo "FSTAR_SHA256=${DIGEST#sha256:}" >> "${GITHUB_ENV}"
           echo "Using F* ${LATEST_FSTAR_VERSION} for the migration lane"
 
       - name: Build latest F* migration image
-        run: docker build --build-arg FSTAR_VERSION="${FSTAR_VERSION}" -t localhost/verified-dns-server:fstar-migration -f Containerfile.migration .
+        run: docker build --build-arg FSTAR_VERSION="${FSTAR_VERSION}" --build-arg FSTAR_SHA256="${FSTAR_SHA256}" -t localhost/verified-dns-server:fstar-migration -f Containerfile.migration .
 
-      - name: Verify against latest F*
+      - name: Verify pilots against latest F*
+        continue-on-error: true
         run: |
           docker run --rm \
             --user "$(id -u):$(id -g)" \
             -e HOME=/tmp \
             -v "${PWD}:/workspace" \
             localhost/verified-dns-server:fstar-migration \
-            bash -lc 'cd /workspace && make verify-pulse-pilot && make pulse-rust-smoke && make verify'
+            make verify-pulse-pilot
+
+      - name: Probe legacy compatibility independently
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -v "${PWD}:/workspace" \
+            localhost/verified-dns-server:fstar-migration \
+            make verify
+
+      - name: Assess experimental Rust independently
+        continue-on-error: true
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -v "${PWD}:/workspace" \
+            localhost/verified-dns-server:fstar-migration \
+            make pulse-rust-smoke

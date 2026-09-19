@@ -3,7 +3,8 @@ FROM fedora:44
 ARG USER_NAME=ism
 ARG USER_ID=1000
 ARG GROUP_ID=1000
-ARG FSTAR_VERSION=v2026.05.10
+ARG FSTAR_VERSION=v2026.09.13
+ARG FSTAR_SHA256=41b3b86b37734aae6a7b1beae808f3029568a67883f6be757d13e6d153ae255b
 
 RUN dnf install -y \
     gcc gcc-c++ make git curl wget gmp-devel libunwind-devel libffi-devel \
@@ -12,15 +13,19 @@ RUN dnf install -y \
 
 ENV FSTAR_HOME=/opt/fstar/fstar
 ENV PATH="${FSTAR_HOME}/bin:${PATH}"
+ENV BUILD_LANE=exploration-${FSTAR_VERSION}
 
 WORKDIR /tmp
 RUN FSTAR_URL=https://github.com/FStarLang/FStar/releases/download/${FSTAR_VERSION}/fstar-${FSTAR_VERSION}-Linux-x86_64.tar.gz \
     && echo "Downloading migration F* ${FSTAR_VERSION} from ${FSTAR_URL}" \
     && wget "${FSTAR_URL}" -O fstar.tar.gz \
+    && echo "${FSTAR_SHA256}  fstar.tar.gz" | sha256sum -c - \
     && mkdir -p /opt/fstar \
     && tar -xzf fstar.tar.gz -C /opt/fstar \
     && chmod +x ${FSTAR_HOME}/bin/fstar.exe \
     && rm fstar.tar.gz
+
+RUN chmod -R a+rX /opt/fstar/fstar
 
 RUN groupadd --gid ${GROUP_ID} ${USER_NAME} \
     && useradd --uid ${USER_ID} --gid ${GROUP_ID} --create-home --shell /bin/bash ${USER_NAME} \

@@ -51,19 +51,64 @@ The containerized `make extract` command now completes and emits C/H files under
 
 ## Near-Term Technical Work
 
-- [ ] Maintain F* release policy:
-  - [x] Keep the stable container pinned to F* `v2026.03.24` while Low* APIs remain in use.
-  - [x] Add a non-blocking latest-F* migration container or CI lane.
-  - [x] Test F* weekly releases in the migration lane on a scheduled cadence.
-  - [x] Decide whether post-Low* migration means Pulse, EverParse-generated C boundaries, or a legacy Low* toolchain. See [DECISIONS.md](DECISIONS.md): Pulse is an evaluation track, EverParse remains the parser production path, and legacy Low*/KaRaMeL stays pinned until a migration lane proves a replacement.
-  - [/] Prototype a small transport or shell-boundary module in Pulse in the non-blocking migration lane. Current work adds `migration/DNS.Migration.PulseShellBoundary.fst`, a minimal authenticated stream-byte capacity transition over a Pulse-owned `ref`, and verifies it through the migration-only `make verify-pulse-pilot` target before the broader latest-F* compatibility check.
-  - [/] Extract the Pulse pilot to safe Rust and assess generated-code quality, FFI shape, dependency surface, and threat-model impact. Current work adds `make assess-pulse-pilot-rust`, which verifies and emits Pulse pilot `.krml` artifacts, then attempts Rust translation. The ref-based pilot is blocked because the generated code references `Pulse.Lib.Reference.op_Bang`, which KaRaMeL reports has no corresponding runtime implementation. A value-state pilot using `FStar.UInt32.t` translates to safe Rust when the unused `C` support module is dropped from the Rust backend pass.
-  - [x] Investigate whether Pulse Rust extraction should use a supported reference runtime, a different Pulse state representation, or a narrow trusted Rust/C adapter for mutable shell-boundary state. Current evidence favors extraction-supported value-state APIs for shell-boundary data passed over FFI, while Pulse references remain useful for proofs until runtime support is proven.
-  - [/] Extend the value-state Pulse pilot into an FFI-shaped shell-boundary API and assess generated Rust compile/link behavior. Current work adds `make pulse-rust-smoke`, which compiles and runs a tiny Rust program against the generated value-state Pulse module in the migration container, then builds an extern-friendly Rust `staticlib` wrapper and links it from a C smoke caller.
-  - [x] Add extern-friendly generated Rust wrappers and document the ABI shape needed by the unverified shell.
-  - [x] Define promotion gates for moving Pulse/Rust wrappers from migration evidence to checked production boundaries.
-  - [ ] Promote the Pulse/Rust wrapper from migration smoke artifact to a checked production boundary only after the shell ABI, ownership model, and promotion criteria are settled.
-  - [ ] Promote a newer F* only after verification, extraction strategy, trusted-boundary review, and parser strategy are all clear.
+### Pulse-to-C migration and toolchain update
+
+Accepted plan: DR-0017, 2026-09-18. Follow the ordered M1–M5 milestones in
+[PLAN.md](PLAN.md#cross-cutting-pulse-migration-and-toolchain-update).
+The implementation target is Pulse → KaRaMeL → C, retaining EverParse and the
+C/MsQuic shell. Rust is not on this migration's critical path.
+
+- [x] Retain the stable F* `v2026.03.24` baseline and a separate scheduled,
+  non-blocking latest-F* exploration lane.
+- [x] Evaluate the existing pilots on F* `v2026.09.13`. Both verify; the
+  value-only Rust/C smoke passes, but the pilot omits the real DoQ lifecycle
+  and is not a verified/integrated replacement. The original full legacy build
+  failed on the multi-file invocation and removed HyperStack APIs. After fixing
+  invocation, the first full-build incompatibility is `Prims.op_Addition` in
+  `DNS.Name`; removed HyperStack remains another known porting dependency.
+- [x] **M1: Candidate lane.** F* `v2026.09.13` bundle checksum, bundled KaRaMeL
+  and solver identities pinned; Z3 4.13.3 selected explicitly. EverParse pin
+  recorded separately, actual C/OS toolchain recorded in provenance. Added
+  isolated candidate/exploration artifacts, one-root verification invocations,
+  complete checked [inventory](PULSE_MIGRATION_INVENTORY.md), blocking candidate
+  pilot/C CI, and independent optional latest/Rust checks. C smoke covers only
+  the value pilot. See DR-0018; stable pins remain unchanged.
+- [ ] **M2: Verified ingress port.** Share a Low*-independent stream model;
+  port actual prefix/body/FIN/ID/error behavior and context/buffer obligations
+  to Pulse. Preserve existing lemmas and regressions; test closed/invalid
+  states and prove semantic preservation, not just example agreement.
+- [ ] **M3: Integrated C boundary.** Add Pulse/C extraction, compilation, and
+  linkage gates for references and byte buffers. Audit ABI/ownership and route
+  real MsQuic ingress through the replacement; pass audit, callback, and live
+  loopback tests with that implementation selected.
+- [ ] **M4: Remaining modules.** Port multiplexer, egress/completion, worker/
+  shell boundaries, parser buffer adapters, and sequential cache operations.
+  Reuse pure models; explicitly port or retire unused legacy interfaces without
+  silently dropping proof coverage. Review every inventory entry.
+- [ ] **M5: Stable promotion.** Pass full verification, EverParse, extraction,
+  C compile/link, and all MsQuic smoke gates on a clean candidate build. Review
+  contract/TCB/warning/resource changes, update stable build pins and docs
+  together, and retain baseline rollback instructions.
+
+Full concurrency, RFC completeness, and runtime-validator equivalence remain
+separate gates; do not make those unimplemented guarantees a prerequisite for
+preserving the existing sequential ones.
+
+### Experimental Rust extraction (independent)
+
+- [/] Assess the ref-based Rust path. The configured extraction pipeline still
+  reports missing `Pulse.Lib.Reference.op_Bang` implementation on the evaluated
+  F* `v2026.09.13`; this is not a demonstrated Pulse/C limitation.
+- [x] Extract a value-state pilot and compile/run generated Rust plus an
+  extern-friendly static library called from C using `make pulse-rust-smoke`.
+- [x] Document experimental ABI and Rust-specific promotion gates in
+  [UNVERIFIED_SHELL.md](UNVERIFIED_SHELL.md#pulserust-migration-abi) and DR-0014.
+- [ ] Revisit Rust runtime support, ownership, semantic coverage, generated-code
+  quality, and real integration before proposing a separate Rust promotion.
+  A passing value-only smoke does not close the failed ref-based path.
+
+### Existing parser and build work
+
 - [x] Remove parser proof debt:
   - [x] Replace `DNS.Name.cast_to_label`'s `assume` with a checked constructor path.
   - [x] Finish `DNS.Name.lemma_parser_rejecting` without `admit()`.
@@ -177,9 +222,9 @@ Prioritize Phase 1 parser closure before transport, cache, or worker work:
 - [/] **Validation:** Prove that response generation never leaks cross-thread memory. A pure authoritative response adapter now maps parsed requests through lookup/CNAME resolution into response packets, the response packet builder echoes request questions, maps success records to the answer section, maps error results to empty-answer responses with the selected RCODE, and the worker `Processing` branch parses completed stream buffers, builds response bytes, copies them into a caller-provided Low* response buffer with an explicit capacity check, and prepares a MsQuic send descriptor for that buffer. `DNS.QUIC.MsQuicSendCompletion.complete_response_send` models close cleanup after the shell completes or drops the send, and the C adapter tracks one in-flight send buffer until matching completion. Broader cross-thread buffer lifetime and aliasing proofs are not present.
 
 ## Phase 4: Secure Concurrency & I/O Integration
-*Goal: Thread-safe execution using Steel.*
+*Goal: Thread-safe execution using Pulse, separately from the sequential migration.*
 
-- [/] Implement `DNS.Cache.Sharded` using Steel invariants for thread-safe access. Current module defines the sharded cache shape, `shard_permission` is a concrete erased `vprop` placeholder through the trusted Steel bootstrap adapter, and concurrent get/add conservatively delegate to the first shard with explicit ownership preconditions. Real hash-based shard selection and Steel invariants are still incomplete.
+- [/] Implement `DNS.Cache.Sharded` using real Pulse invariants for thread-safe access. Current code still uses the unit-valued Steel compatibility permission and routes sequential get/add through the first shard. The migration first preserves those sequential contracts; real shard selection, synchronization, and concurrent ownership proofs remain separate work.
 - [/] Implement the Worker Thread harness (`worker_loop`). Current harness uses verified stream lookup, reads a matching active stream context, parses completed `Processing` stream buffers into response bytes, copies the serialized response into a caller-provided Low* response buffer, wraps response bytes in a DoQ length-prefixed stream buffer, prepares a MsQuic send descriptor without admits, exposes a verified send-completion/drop cleanup boundary that closes the stream, routes shell-selected events through `DNS.ShellScheduler.dispatch_shell_event`, exposes generated C ingress and minimal worker FORMERR/header-only empty NOERROR/generated-validator-backed question-echo response ABIs through `DNS.ShellBoundary`, exposes C-shaped scheduler helper wrappers for ingress/minimal worker/send-completion events, exposes `DNS.ShellBoundary.dispatch_stream_reset_via_scheduler` for reset/drop cleanup without an in-flight send, exposes `DNS.ShellResponseBoundary` C symbols for response send handoff/completion and DoQ egress framing, has a fixed-capacity C shell scaffold that owns connection/stream buffers and calls those generated ABIs, has a MsQuic-shaped C adapter scaffold whose fake callback smoke coverage uses the generated-validator-backed question-echo/FORMERR selector, single-send in-flight tracking, and reset/drop cleanup, has a fixed-capacity C shell event queue with smoke coverage for FIFO order, overflow rejection, synchronous ready-response service after completed ingress, send-completion cleanup, and reset cleanup, has a real-MsQuic stream callback seam that copies `QUIC_STREAM_EVENT` receive bytes into shell-owned storage before queueing and maps send-completion/reset shapes into the queue/adapter path, has a real-MsQuic connection callback seam that accepts listener `NEW_CONNECTION` events, sets connection configuration, reads peer-started stream IDs, maps them into fixed shell-owned stream slots, installs the stream callback, and closes the MsQuic stream handle when stream shutdown completes, syntax-checks those seams against pinned upstream `msquic.h` in CI, and covers listener new-connection, peer-stream mapping, stream callback installation, shutdown cleanup, and rejected-stream closure with a fake MsQuic API-table behavior smoke, has a no-network smoke binary that opens and closes the pinned MsQuic shared library API table, has a no-network lifecycle smoke that opens/closes MsQuic registration, configuration, and listener handles, has a listener-start smoke that binds a loopback ephemeral UDP listener, and has a live loopback stream smoke that sends a valid DoQ query from a real client stream into the server receive callback boundary and validates the exact DoQ response bytes received by the client after real `StreamSend` submission and completion. The C-linked shell bundle uses `DNS.Worker.Minimal` for the current narrow response paths, while the full parser/serializer/zone-backed `DNS.Worker` remains verification-only. Real polling, production worker response extraction, rich-dispatcher C ABI coverage, and C/MsQuic scheduler integration remain incomplete.
 - [/] Integrate with the documented [Unverified Shell](UNVERIFIED_SHELL.md) for UDP/QUIC socket I/O. Current work adds `shell/ism_shell.c` as a fixed-capacity shell-owned buffer and stream-context scaffold over the generated ingress/egress/reset ABIs, `shell/msquic_adapter.c` as a MsQuic-shaped callback adapter that prepares DoQ length-prefixed validated-minimal response bytes and handles reset/drop cleanup, `shell/ism_event_queue.c` as a fixed-capacity local event queue, `shell/msquic_runtime.c` as a real-MsQuic callback receive-copy/send-completion/reset seam, `shell/msquic_connection_runtime.c` as a real-MsQuic listener/connection/peer-stream callback attachment seam checked against pinned upstream `msquic.h` and covered by a fake-API behavior smoke, a no-network real-library link/load smoke, a no-network lifecycle smoke that opens/closes registration, configuration, and listener handles, a listener-start smoke that binds loopback UDP on an ephemeral local port, and a live loopback stream smoke that uses test-only credentials to exercise real MsQuic receive and send callbacks, validate exact response bytes at the client, and observe send completion. It still does not wire production polling, timers, production allocation, or multi-send buffer ownership.
 - [ ] Implement LRU eviction policy for the concurrent cache. No LRU metadata or eviction path is present.

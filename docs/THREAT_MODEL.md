@@ -38,8 +38,8 @@ Keep this inventory current when assumptions, mocks, interfaces, or adapters cha
 | Full worker / authoritative logic | Test-zone default, partial CNAME/wildcard/RRset logic; worker loop discards send descriptor; not linked production processing | Semantic zone model, full response synthesis, extraction/link integration |
 | Binary zone parser | One binary entry, not an RFC text master-file loader | Multi-entry loading, full supported RDATA validation, semantic tree construction |
 | Recursive cache / bailiwick | First-slot semantic lookup/insertion contracts; TTL aging and saturated expiry; caller supplies trusted time and authority zone. Suffix validation alone is insufficient against poisoning. | Referral/ranking/query/type/class/DNSSEC policy, eviction and negative caching |
-| Migration Pulse/Rust pilot | Non-blocking experiment, not production ABI; extern wrapper remains unverified | Promotion gates in DECISIONS and UNVERIFIED_SHELL |
-| Build reproducibility | Stable F* and KaRaMeL revision are pinned; base image, system/opam packages and remaining transitive inputs are not fully locked | Do not claim a fully reproducible supply chain |
+| Migration Pulse/C and Rust pilots | Blocking candidate job checks two pilot proofs and value-only generated C; no production substitution or reference/buffer C guarantee. Separate optional Rust extern wrapper remains unverified. No runtime adapter is added by M1. | M2–M5 preservation/integration gates in DECISIONS and PULSE_MIGRATION_INVENTORY; Rust gates remain separate |
+| Build reproducibility | Stable pins unchanged. Candidate F*/Pulse/KaRaMeL/solver bundle has a checked archive digest and tool identities; compiler/OS provenance recorded. Base image, system/opam packages and remaining transitive inputs are not fully locked. | Do not claim a fully reproducible supply chain |
 
 ## Operational assumptions
 

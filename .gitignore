@@ -4,6 +4,7 @@ obj/
 dist/
 generated/
 .depend
+__pycache__/
 
 # OS / IDE
 .DS_Store

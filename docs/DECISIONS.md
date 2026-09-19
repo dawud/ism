@@ -53,6 +53,9 @@ proof debt, extraction, tests, and documentation are aligned.
 
 **Status:** Accepted
 
+**Amendment:** DR-0017 selects Pulse as the planned imperative/proof target
+while retaining KaRaMeL C extraction; the Low* stable lane remains until promotion.
+
 **Context:** The project needs high-assurance parsing, concurrency,
 extraction, compilation, and a clear boundary for transport security.
 
@@ -254,6 +257,9 @@ the project.
 
 **Status:** Accepted
 
+**Amendment:** DR-0017 advances from evaluation to a planned incremental
+Pulse-to-C migration, retaining this decision's no-regression promotion gates.
+
 **Context:** The stable repository lane is pinned to F* `v2026.03.24` because
 F* `v2026.04.17` removed the old Low* sublanguage. The project still relies on
 legacy Low*/KaRaMeL APIs for executable verified boundaries, while the parser
@@ -278,6 +284,10 @@ c-compile-smoke`, and `make c-link-smoke` gates.
 ## DR-0014: Evaluate Recent F*, Pulse, and Rust as the Long-Term Path
 
 **Status:** Accepted
+
+**Amendment:** DR-0017 separates Pulse/toolchain migration from Rust. The active
+migration target is C; the Rust evaluation and Rust-specific gates below remain
+experimental and are not prerequisites for Pulse/C promotion.
 
 **Context:** Recent F* releases have moved the ecosystem away from the old Low*
 sublanguage and toward Pulse for verified mutable and concurrent programming.
@@ -399,3 +409,90 @@ This does not lock the entire base image or transitive package supply chain.
 trusted inventory together; retain the audit's counterexamples as regressions
 with corrected expected outcomes; rerun verification, extraction, generated
 parser checks and C/runtime gates. No admissions are introduced by this decision.
+
+## DR-0017: Migrate to Pulse with C Extraction Before Updating the Stable Toolchain
+
+**Status:** Accepted (2026-09-18); M1 implemented in DR-0018, M2–M5 planned;
+stable pins unchanged.
+
+**Context:** The existing migration pilots verify on the evaluated F*
+`v2026.09.13`, but are not replacements for the actual Low* boundaries. Their
+limited semantics, missing integration, and the repository's legacy build/API
+dependencies require project work. No blocking Pulse language feature gap has
+been established. The reference pilot's failure in the configured Rust backend
+does not establish a Pulse-to-C limitation.
+
+**Decision:** Adopt an incremental Low* to Pulse implementation/proof migration
+and subsequent stable toolchain update, following M1–M5 in
+[PLAN.md](PLAN.md#cross-cutting-pulse-migration-and-toolchain-update). Keep
+KaRaMeL as the C extraction tool, EverParse as the parser generation path, and
+the existing C/MsQuic shell. Retain pure F* models where practical. Rust remains
+an independent experiment; neither its success nor failure determines C-path
+promotion. This amends the implementation targets in DR-0004, DR-0013, and
+DR-0014, not their requirement to preserve verified contracts and integration.
+
+**Scope:** First preserve the existing sequential behavior and caller-owned
+buffer contracts. Port a real stream ingress boundary, extract and integrate
+its C output, then migrate remaining imperative surfaces. Reuse a shared
+semantic specification and prove each replacement implements it; passing
+fixtures alone is insufficient. Document any temporary mixed-toolchain C ABI.
+The shared model must cover exact framing, FIN, zero ID, terminal/error states,
+and the relevant ownership and mutation obligations, not just buffer capacity.
+
+**Toolchain promotion:** Evaluate an explicitly pinned compatible F*/KaRaMeL/
+solver set, initially using `v2026.09.13` as an evaluated candidate rather than
+an automatic new stable pin. Keep separate artifacts and required baseline/
+candidate checks for the migrated scope; latest-release exploration stays
+non-blocking. A separately pinned EverParse generator may coexist through
+validated C artifacts. Promote only after the full intended verification
+surface, EverParse, C extraction/compile/link, and existing MsQuic runtime
+smokes pass with the migrated implementation. Review generated code, trusted
+boundaries, warnings, and resource regressions; update build configuration and
+documentation together, with baseline pins and rollback instructions retained.
+
+**Consequences:** No broad rewrite or toolchain switch is performed by this
+planning change. Do not weaken contracts, add admissions, silently omit failing
+modules, or widen trusted interfaces to make promotion pass. Explicit retirement
+of unused legacy code requires caller and proof-coverage review. Full DNS
+semantics, external-validator equivalence, genuine concurrent ownership, and
+production worker expansion remain separate from preservation of current
+guarantees. Update the trusted inventory as actual boundaries change.
+
+## DR-0018: Pin a Separate Pulse/C Candidate with Explicit M1 Gate Scope
+
+**Status:** Accepted (2026-09-19).
+
+**Decision:** Keep the stable Containerfile and its F*/KaRaMeL pins unchanged.
+Use `Containerfile.candidate` and `migration/toolchain.lock` for the evaluated
+F* `v2026.09.13` Linux x86_64 bundle, verified by SHA-256. Validate its F* commit,
+bundled KaRaMeL `9abbb865b10a0cd5c557da81c024c3965cb6ff53`, and Z3 4.8.5/4.13.3/
+4.15.3 identities; explicitly select bundled Z3 4.13.3. Record the actual C
+compiler/target/OS and the separately pinned EverParse generator. Do not claim
+fully reproducible binaries while base-image and system-package inputs float.
+
+`make candidate-check` and the blocking candidate CI job verify both existing
+pilots and extract/compile/link/run **only the pure value pilot** as C. Use the
+generated header directly. Neither this C smoke nor pilot verification proves
+real stream semantics, reference/buffer C support, or runtime integration.
+Those are M2/M3 gates. Rust is absent from the candidate image and job; latest
+release and Rust exploration are independent non-blocking scheduled/manual
+checks, never fallbacks for a failed candidate gate. Repository branch-protection
+settings are outside this change; the workflow itself does not tolerate a
+candidate failure.
+
+**Build discipline:** Pass one root to each verification invocation for current
+`fly_deps`; retain every previous verification/extraction root. Isolate candidate
+and exploration caches, `.krml`, C, and generated-parser output from stable
+artifacts. Invoke the selected F* explicitly from KaRaMeL, then translate the
+module-named `.krml` in a separate step: the bundled one-step C driver expects
+`out.krml`, which this F* no longer emits for this invocation. Make installed
+release caches readable to unprivileged container users without making the
+toolchain writable. No unchecked replacement library is introduced.
+
+**Inventory:** Maintain [PULSE_MIGRATION_INVENTORY.md](PULSE_MIGRATION_INVENTORY.md)
+for all source/interface files, their current gates, contract limits, and
+dispositions. A checked lexical dependency/caller report supplements manual
+ABI review; it is not a proof of contract equivalence. Changing source coverage
+without updating the inventory fails M1. Removed Low*/HyperStack/Steel APIs and
+pure-library compatibility changes, including `Prims.op_Addition` in `DNS.Name`,
+remain explicit porting work. No existing contracts or trusted interfaces change.
