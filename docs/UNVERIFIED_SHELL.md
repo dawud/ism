@@ -1,5 +1,21 @@
 # Unverified Shell Boundary
 
+## Pulse C integration update (2026-09-22)
+
+The explicit M3 `pulse-integration-check` lane selects the real extracted Pulse
+stream implementation for both shell data entry points and FIN, through two
+reviewed but unverified C marshalers. Ordinary builds still use Low*. Public
+shell types and phase result codes do not change; table, worker, response,
+reset and completion paths remain stable. See [PULSE_C_ABI.md](PULSE_C_ABI.md)
+for the neutral ABI, artifact isolation, ownership and rollback rules.
+
+Pulse input is fully owned, separate from message/context storage, and returned
+unchanged; a read-only shared borrow is not sufficient. The runtime copies
+receive bytes into its owned ingress buffer and dispatches synchronously, under
+the same exclusive/serialized-callback assumption below. The C adapters cannot
+prove truthful capacities, allocation liveness or race freedom. Their tests
+supplement the conditional Pulse proofs; they do not verify the shell itself.
+
 ## Proof-audit contract update (2026-09-12)
 
 This section supersedes older bootstrap descriptions below where they differ.
@@ -40,7 +56,8 @@ timers, global resource budgets, and a concurrent scheduler are not proved.
 This document defines the contract for the C shell that surrounds the verified
 DNS-over-QUIC core. The shell is trusted code: it is allowed to perform OS,
 QUIC, TLS, allocation, and scheduling work that is not yet verified, but it must
-cross into the F*/Low* core only through narrow, documented entry points.
+cross into the F*/Low* or selected Pulse core only through narrow, documented
+entry points.
 
 ## Scope
 

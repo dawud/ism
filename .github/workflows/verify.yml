@@ -106,8 +106,35 @@ jobs:
             localhost/verified-dns-server:latest \
             bash -lc 'cd /workspace && make msquic-runtime-stream-smoke'
 
+      - name: Build pinned Pulse image for mixed C integration
+        run: docker build -t localhost/verified-dns-server:pulse-candidate -f Containerfile.candidate .
+
+      - name: Verify, extract and test the real Pulse stream archive
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "${PWD}:/workspace" \
+            localhost/verified-dns-server:pulse-candidate
+
+      - name: Test C and live MsQuic with Pulse ingress selected
+        run: |
+          docker run --rm \
+            --user "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "${PWD}:/workspace" \
+            localhost/verified-dns-server:latest make pulse-integration-check
+
+      - name: Retain mixed Pulse C integration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pulse-integration-evidence
+          path: |
+            dist/pulse-integration-*/
+            obj/pulse-integration-*/
+            dist/candidate-*/pulse-stream/
+
   pulse-candidate:
-    name: Pinned Pulse candidate (M1 scope)
+    name: Pinned Pulse candidate (M1–M3 C scope)
     runs-on: ubuntu-latest
 
     steps:
@@ -120,7 +147,7 @@ jobs:
       - name: Build pinned candidate image
         run: docker build -t localhost/verified-dns-server:pulse-candidate -f Containerfile.candidate .
 
-      - name: Check inventory, verify pilots, extract and run C smoke
+      - name: Check inventory, verify stream and pilots, extract and test real stream C
         run: |
           docker run --rm \
             --user "$(id -u):$(id -g)" \

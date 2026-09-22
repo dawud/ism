@@ -34,14 +34,14 @@ def strip_block_comments(source):
     return "".join(result)
 
 
-def inventory(root, verified, extracted):
+def inventory(root, verified, extracted, candidate=(), candidate_extracted=()):
     paths = sorted(path.relative_to(root).as_posix()
-                   for directory in ("src", "spec")
+                   for directory in ("src", "spec", "migration")
                    for path in (root / directory).rglob("*.fst*")
                    if path.suffix in (".fst", ".fsti"))
     document = (root / "docs/PULSE_MIGRATION_INVENTORY.md").read_text()
     rows = {}
-    for match in re.finditer(r"^\| `((?:src|spec)/[^`]+)` \| ([^|]+) \| ([^|]+) \| ([^|]+) \|$",
+    for match in re.finditer(r"^\| `((?:src|spec|migration)/[^`]+)` \| ([^|]+) \| ([^|]+) \| ([^|]+) \|$",
                              document, re.MULTILINE):
         path, gate, contract, disposition = (value.strip() for value in match.groups())
         if path in rows:
@@ -50,8 +50,10 @@ def inventory(root, verified, extracted):
     if set(paths) != set(rows):
         raise ValueError("Inventory drift: missing=" + str(sorted(set(paths) - set(rows)))
                          + ", stale=" + str(sorted(set(rows) - set(paths))))
-    verified, extracted = set(verified), set(extracted)
-    if not extracted <= verified or not verified <= set(paths):
+    verified, extracted, candidate = set(verified), set(extracted), set(candidate)
+    candidate_extracted = set(candidate_extracted)
+    if (not extracted <= verified or not candidate_extracted <= candidate or
+            not (verified | candidate) <= set(paths)):
         raise ValueError("Make verification/extraction roots are inconsistent with inventory")
     sources = {path: without_comments((root / path).read_text()) for path in paths}
     names = {path: re.search(r"^module\s+([\w.]+)", source).group(1)
@@ -67,6 +69,8 @@ def inventory(root, verified, extracted):
     result = {}
     for path in paths:
         expected = ("verify+extract" if path in extracted else "verify" if path in verified
+                    else "candidate-verify+extract" if path in candidate_extracted
+                    else "candidate-verify" if path in candidate
                     else "everparse-verify" if path == adapter else "uncovered")
         if expected == "uncovered" or rows[path]["gate"] != expected:
             raise ValueError("Build coverage drift for " + path + ": expected " + expected)
@@ -77,7 +81,8 @@ def inventory(root, verified, extracted):
             if item not in closure:
                 closure.add(item)
                 pending.extend(deps[item])
-        result[path] = dict(rows[path], module=names[path],
+        result[path] = dict(rows[path], module=names[path], candidate_verified=path in candidate,
+                            candidate_extracted=path in candidate_extracted,
                             direct_legacy_dependencies=direct[path],
                             transitive_legacy_dependencies=sorted({d for p in closure for d in direct[p]}),
                             local_dependencies=sorted(deps[path]),
@@ -90,9 +95,12 @@ def main():
     parser.add_argument("--root", type=Path, default=Path("."))
     parser.add_argument("--verified", nargs="+", required=True)
     parser.add_argument("--extracted", nargs="+", required=True)
+    parser.add_argument("--candidate", nargs="+", default=[])
+    parser.add_argument("--candidate-extracted", nargs="+", default=[])
     args = parser.parse_args()
     try:
-        print(json.dumps(inventory(args.root, args.verified, args.extracted), indent=2))
+        print(json.dumps(inventory(args.root, args.verified, args.extracted, args.candidate,
+                                   args.candidate_extracted), indent=2))
     except (OSError, ValueError) as error:
         print("Migration inventory check failed: " + str(error), file=sys.stderr)
         return 1

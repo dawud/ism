@@ -71,16 +71,23 @@ C/MsQuic shell. Rust is not on this migration's critical path.
   recorded separately, actual C/OS toolchain recorded in provenance. Added
   isolated candidate/exploration artifacts, one-root verification invocations,
   complete checked [inventory](PULSE_MIGRATION_INVENTORY.md), blocking candidate
-  pilot/C CI, and independent optional latest/Rust checks. C smoke covers only
-  the value pilot. See DR-0018; stable pins remain unchanged.
-- [ ] **M2: Verified ingress port.** Share a Low*-independent stream model;
-  port actual prefix/body/FIN/ID/error behavior and context/buffer obligations
-  to Pulse. Preserve existing lemmas and regressions; test closed/invalid
-  states and prove semantic preservation, not just example agreement.
-- [ ] **M3: Integrated C boundary.** Add Pulse/C extraction, compilation, and
-  linkage gates for references and byte buffers. Audit ABI/ownership and route
-  real MsQuic ingress through the replacement; pass audit, callback, and live
-  loopback tests with that implementation selected.
+  pilot/C CI, and independent optional latest/Rust checks. The original M1 C
+  smoke covers only the value pilot. See DR-0018; stable pins remain unchanged.
+- [x] **M2: Verified ingress port.** Shared Low*-independent stream model,
+  stable representation bridge, and real Pulse prefix/body/FIN/ID/error behavior
+  with reference/array ownership. Both implementations prove exact transitions
+  and byte-copy footprints; shared validity/body-fragmentation lemmas, stable
+  audit regressions and imperative Pulse tests cover closed/invalid states.
+  Required candidate gate and inventory include all new proof roots. See
+  DR-0019 for conditional validity and unchanged invalid-state behavior;
+  actual Pulse C extraction/integration is covered by M3.
+- [x] **M3: Integrated C boundary.** Real reference/array C extraction and strict
+  compilation; versioned C-only ABI with reviewed, unverified marshalers. Actual
+  shell receive/FIN selects Pulse in `pulse-integration-check`; 1071 differential
+  comparisons, audit, callback and live loopback tests pass. Source/artifact and
+  compiled-selection guards prevent stale/legacy test substitution. See
+  [PULSE_C_ABI.md](PULSE_C_ABI.md) and DR-0020 for caller/trust obligations.
+  Stable defaults and pins remain unchanged; this is not M4/M5 promotion.
 - [ ] **M4: Remaining modules.** Port multiplexer, egress/completion, worker/
   shell boundaries, parser buffer adapters, and sequential cache operations.
   Reuse pure models; explicitly port or retire unused legacy interfaces without

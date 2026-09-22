@@ -93,3 +93,14 @@ let processing_extra_byte_rejected =
   assert_norm (T.fragment_phase (T.Processing 12ul) 1ul 0uy 0uy == T.Done)
 let valid_fin_processing =
   assert_norm (T.finish_doq_phase (T.AwaitingFin 12ul) 0uy 0uy == T.Processing 12ul)
+
+(* M2: retain the evaluated closed/invalid-state cases on the stable adapter. *)
+let closed_stream_never_reopens =
+  assert_norm (T.fragment_phase T.Done 0ul 0uy 0uy == T.Done /\
+    T.fragment_phase T.Done 14ul 0uy 12uy == T.Done /\
+    T.finish_doq_phase T.Done 0uy 0uy == T.Done)
+let invalid_body_states_rejected =
+  assert_norm (T.fragment_phase (T.ReadingMessage (11ul, 0ul)) 0ul 0uy 0uy == T.Done /\
+    T.fragment_phase (T.ReadingMessage (12ul, 13ul)) 0ul 0uy 0uy == T.Done)
+let repeated_fin_preserves_processing =
+  assert_norm (T.finish_doq_phase (T.Processing 12ul) 0uy 0uy == T.Processing 12ul)

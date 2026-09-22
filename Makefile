@@ -87,6 +87,7 @@ KRML_OPTS   = -drop 'FStar.Tactics.*' -drop 'FStar.Reflection.*' \
 # EverParse wrapper are consumable by a C compiler.
 CC ?= cc
 C_SMOKE_CFLAGS = -std=c11 -D_DEFAULT_SOURCE -D_BSD_SOURCE \
+                 $(SHELL_INGRESS_CFLAGS) \
                  -I $(DIST_DIR) \
                  -I $(DIST_DIR)/internal \
                  -I $(EVERPARSE_OUT_DIR) \
@@ -99,7 +100,13 @@ C_COMPILE_SMOKE_SOURCES = $(DIST_DIR)/DNS_Protocol.c \
                           $(wildcard $(DIST_DIR)/DNS_ShellResponseBoundary.c) \
                           $(EVERPARSE_OUT_DIR)/DNSProtocol.c \
                           $(EVERPARSE_OUT_DIR)/DNSProtocolWrapper.c
-C_LINK_SMOKE = $(DIST_DIR)/c-link-smoke
+SMOKE_DIR ?= $(DIST_DIR)
+# Empty in the stable lane. M3 supplies separately compiled objects through a
+# checked C ABI; never mix F* checked files or KaRaMeL inputs across toolchains.
+SHELL_INGRESS_CFLAGS ?=
+SHELL_INGRESS_OBJECTS ?=
+SHELL_IMPL_SOURCE ?= shell/ism_shell.c
+C_LINK_SMOKE = $(SMOKE_DIR)/c-link-smoke
 C_LINK_SMOKE_SOURCES = shell/link_smoke.c \
                        shell/link_proof_audit_smoke.c \
                        shell/link_protocol_smoke.c \
@@ -113,16 +120,16 @@ C_LINK_SMOKE_SOURCES = shell/link_smoke.c \
                        shell/ism_event_queue.c \
                        shell/msquic_adapter.c \
                        shell/msquic_runtime.c \
-                       shell/ism_shell.c \
+                       $(SHELL_IMPL_SOURCE) \
                        shell/link_krml_compat_stubs.c \
-                       $(C_COMPILE_SMOKE_SOURCES)
+                       $(C_COMPILE_SMOKE_SOURCES) $(SHELL_INGRESS_OBJECTS)
 MSQUIC_CFLAGS ?= -I $(MSQUIC_HOME)/include
 MSQUIC_LDFLAGS ?= -L $(MSQUIC_HOME)/lib -Wl,-rpath,$(MSQUIC_HOME)/lib -lmsquic
-MSQUIC_LINK_SMOKE = $(DIST_DIR)/msquic-runtime-link-smoke
-MSQUIC_LIFECYCLE_SMOKE = $(DIST_DIR)/msquic-runtime-lifecycle-smoke
-MSQUIC_LISTENER_SMOKE = $(DIST_DIR)/msquic-runtime-listener-smoke
-MSQUIC_CONNECTION_SMOKE = $(DIST_DIR)/msquic-runtime-connection-smoke
-MSQUIC_STREAM_SMOKE = $(DIST_DIR)/msquic-runtime-stream-smoke
+MSQUIC_LINK_SMOKE = $(SMOKE_DIR)/msquic-runtime-link-smoke
+MSQUIC_LIFECYCLE_SMOKE = $(SMOKE_DIR)/msquic-runtime-lifecycle-smoke
+MSQUIC_LISTENER_SMOKE = $(SMOKE_DIR)/msquic-runtime-listener-smoke
+MSQUIC_CONNECTION_SMOKE = $(SMOKE_DIR)/msquic-runtime-connection-smoke
+MSQUIC_STREAM_SMOKE = $(SMOKE_DIR)/msquic-runtime-stream-smoke
 MSQUIC_STREAM_CERT = shell/msquic_loopback_cert.pem
 MSQUIC_STREAM_KEY = shell/msquic_loopback_key.pem
 
@@ -153,7 +160,7 @@ ALL_FST_FILES = $(PROTOCOL_FST_FILES) \
 # proofs remain verification-only.
 EXTRACT_FST_FILES = $(filter-out src/protocol/%.Tests.fst, $(PROTOCOL_FST_FILES)) \
                     $(wildcard src/security/*.fst) \
-                    $(wildcard src/transport/*.fst) \
+                    $(filter-out src/transport/%.Tests.fst,$(wildcard src/transport/*.fst)) \
                     src/concurrency/DNS.Worker.Minimal.fst \
                     src/concurrency/DNS.ShellScheduler.fst \
                     src/concurrency/DNS.ShellBoundary.fst \
@@ -336,9 +343,10 @@ msquic-runtime-connection-smoke: extract
 	  shell/msquic_runtime.c \
 	  shell/ism_event_queue.c \
 	  shell/msquic_adapter.c \
-	  shell/ism_shell.c \
+	  $(SHELL_IMPL_SOURCE) \
 	  shell/link_krml_compat_stubs.c \
 	  $(C_COMPILE_SMOKE_SOURCES) \
+	  $(SHELL_INGRESS_OBJECTS) \
 	  -o $(MSQUIC_CONNECTION_SMOKE) && \
 	$(MSQUIC_CONNECTION_SMOKE)
 
@@ -355,9 +363,10 @@ msquic-runtime-stream-smoke: extract
 	  shell/msquic_runtime.c \
 	  shell/ism_event_queue.c \
 	  shell/msquic_adapter.c \
-	  shell/ism_shell.c \
+	  $(SHELL_IMPL_SOURCE) \
 	  shell/link_krml_compat_stubs.c \
 	  $(C_COMPILE_SMOKE_SOURCES) \
+	  $(SHELL_INGRESS_OBJECTS) \
 	  $(MSQUIC_LDFLAGS) \
 	  -pthread \
 	  -o $(MSQUIC_STREAM_SMOKE) && \

@@ -7,8 +7,10 @@ contracts, not just this summary. See [DR-0017](DECISIONS.md#dr-0017-migrate-to-
 and the [trusted inventory](THREAT_MODEL.md).
 
 `make migration-inventory-check` checks that **every** F* source/interface under
-`src/` and `spec/` appears exactly once below, and that its gate agrees with the
-Makefile's verification/extraction root lists. It emits direct and transitive
+`src/`, `spec/`, and `migration/` appears exactly once below, and that its gate
+agrees with the Makefile's stable and candidate verification/extraction roots.
+It also records candidate verification and extraction for shared stable modules.
+It emits direct and transitive
 LowStar/HyperStack/Steel dependencies and local callers/importers in
 `dist/candidate-v2026.09.13/inventory.json`. This conservative lexical scan is
 not F* dependency analysis: unused imports count, and generated C/external
@@ -17,7 +19,9 @@ root without updating its row fails the candidate check.
 
 `verify+extract` means included in the stable extraction input list, **not**
 necessarily linked or executable without warning debt. `verify` means the
-mainline proof gate only. `everparse-verify` uses the separately pinned generator
+mainline proof gate only; `candidate-verify` denotes candidate-only proof roots;
+`candidate-verify+extract` also requires candidate C extraction coverage.
+`everparse-verify` uses the separately pinned generator
 and its own F*/Low* dependencies. Remaining “pure” modules can still depend
 transitively on legacy code and must be checked after splitting those imports.
 
@@ -25,13 +29,19 @@ transitively on legacy code and must be checked after splitting those imports.
 
 | File | Gate | Contracts and limits to preserve | Migration disposition |
 | --- | --- | --- | --- |
-| `src/transport/DNS.QUIC.StreamMapping.fst` | verify+extract | `fragment_phase`, `handle_stream_data`, `handle_stream_fin`: exact prefix/body transitions, FIN and zero ID, bounds, mutation footprint; body-fragmentation lemma; caller-owned 65535-byte storage | M2: split shared pure model; Pulse context/buffer operations; first real C boundary in M3 |
+| `src/transport/DNS.QUIC.StreamMapping.fst` | verify+extract | Exact shared-model transitions and byte-copy footprint, FIN and zero ID, bounds, mutation footprint; body-fragmentation lemma; caller-owned 65535-byte storage | M2 ABI-preserving bridge; retained baseline and M3 differential oracle; mixed shell uses Pulse ingress/FIN |
+| `src/transport/DNS.QUIC.StreamModel.fst` | verify+extract | Heap-independent framing/FIN/ID transitions, bounded copy plan, byte-exact copy predicate, valid-phase preservation, body-fragmentation lemma | Shared by stable Low* and candidate Pulse; verified and extracted on both compilers |
+| `src/transport/DNS.QUIC.StreamModel.Tests.fst` | verify | Shared framing, FIN, terminal/invalid-state, uint32 bounds and copy-plan regressions | Verified on both compilers; not extracted |
+| `migration/DNS.Migration.PulseStream.fst` | candidate-verify+extract | Real reference/array ownership; exact shared-model ingress/FIN result, copied bytes and frame; input and context fields preserved | M2 proofs; M3 checked C extraction and explicit mixed-toolchain ingress/FIN lane |
+| `migration/DNS.Migration.PulseStream.Tests.fst` | candidate-verify | Imperative stack-owned array/context regressions: split prefix, byte copies, FIN/ID, invalid and terminal states | M2 proof tests, not Pulse runtime/C tests |
+| `migration/DNS.Migration.PulseShellBoundary.fst` | candidate-verify | Original reference-based capacity counter; no real DoQ lifecycle | Retained pilot; optional Rust assessment is separate |
+| `migration/DNS.Migration.PulseShellBoundaryValue.fst` | candidate-verify+extract | Original pure value capacity counter; no real DoQ lifecycle | Retained candidate C smoke and optional Rust experiment |
 | `src/transport/DNS.QUIC.Multiplexer.fst` | verify+extract | `slots_owned`, `allocate_stream`, `close_stream`: distinct/disjoint contexts, active-slot preservation and close permutation; ID/table initialization remain caller obligations | M4: Pulse table ownership; retain sequential allocation/close regressions |
-| `src/transport/DNS.QUIC.MsQuicIngress.fst` | verify+extract | Authenticated fragment liveness/length, context-buffer disjointness and mutation bounds; authentication/borrow tokens are unit | M3/M4: port ingress wrapper; do not strengthen claims about trusted MsQuic |
+| `src/transport/DNS.QUIC.MsQuicIngress.fst` | verify+extract | Authenticated fragment liveness/length, context-buffer disjointness and mutation bounds; authentication/borrow tokens are unit | M3 shell bypasses legacy data wrapper via reviewed C ABI; full wrapper port remains M4; no stronger MsQuic claim |
 | `src/transport/DNS.QUIC.MsQuicEgress.fst` | verify+extract | Live response buffer, length bound and send-descriptor handoff; no proof of runtime send completion | M4: Pulse buffer borrow/lifetime specification; preserve descriptor ABI |
 | `src/transport/DNS.QUIC.MsQuicSendCompletion.fst` | verify+extract | Live descriptor and connection/table preconditions; cleanup delegates to close; runtime completion is trusted | M4: port cleanup under serialized ownership |
 | `src/concurrency/DNS.Worker.Minimal.fst` | verify+extract | Bounds/read-write obligations for FORMERR, empty NOERROR and validated question echo; not full DNS policy | M4: Pulse response-buffer operations; retain all linked response fixtures |
-| `src/concurrency/DNS.ShellBoundary.fst` | verify+extract | C-shaped ingress/FIN/worker/reset wrappers; phase code mapping and caller preconditions | M3/M4: preserve ABI or explicitly review a narrow adapter |
+| `src/concurrency/DNS.ShellBoundary.fst` | verify+extract | C-shaped ingress/FIN/worker/reset wrappers; phase code mapping and caller preconditions | M3 preserves public ABI; selected C adapter handles ingress/FIN; remaining operations stay Low* until M4 |
 | `src/concurrency/DNS.ShellResponseBoundary.fst` | verify+extract | Bounded response copy, two-byte DoQ prefix, send/completion wrappers | M4: port buffer operations and send-storage ownership |
 | `src/concurrency/DNS.ShellScheduler.fst` | verify+extract | Per-event liveness and mutation requirements; no scheduler/race-freedom proof | M4: preserve serialized event dispatch and C helper interfaces |
 | `src/concurrency/DNS.Worker.fst` | verify | Parser/serializer-based response construction, bounded copies and send preparation; loop discards descriptor, test-zone default | M4: port buffers, reuse pure models; production extraction is separate work |
@@ -68,6 +78,10 @@ transitively on legacy code and must be checked after splitting those imports.
 The generated dependency report enumerates local callers for every row. These
 external seams require explicit review as each replacement is integrated:
 
+- [x] M3 stream-only C seam: both shell data entry points and FIN select Pulse;
+  explicit phase conversions, unchanged shell context layout/identity, fixed
+  message capacity, separated synchronous input ownership and no retained
+  pointers. See [PULSE_C_ABI.md](PULSE_C_ABI.md). Broader M4 seams below remain open.
 - [ ] `shell/ism_shell.c`, `ism_event_queue.c`, `msquic_adapter.c`,
   `msquic_runtime.c`, and `msquic_connection_runtime.c`: calls into
   `DNS.ShellBoundary` and `DNS.ShellResponseBoundary`, receive/FIN/reset ordering,
@@ -94,15 +108,56 @@ compiler commit, bundled KaRaMeL commit, and bundled Z3 versions. The candidate
 gate selects the bundled Z3 4.13.3 explicitly, validates tool identities, and
 records C compiler/target and OS versions in `toolchain.json`. The baseline
 EverParse v2026.03.21 archive and checksum are recorded separately; it continues
-to run with its own compiler. Its generated C will be checked with candidate C
-boundaries when those are integrated, not by this initial pilot gate.
+to run with its own compiler. Its generated C is linked into the mixed integration
+gate, not the standalone candidate stream/value smoke tests.
 
 The base image and OS packages are not digest/version locked; this is a
 reproducible **proof-tool selection**, not a fully reproducible binary supply
-chain. Both existing pilots verify in the required candidate job. Its C
-compile/link/run gate exercises **only the pure value-state pilot**, with no
-MsQuic integration, reference/buffer extraction, or semantic substitution claim.
-The ref pilot's optional Rust failure is outside that job.
+chain. The shared model, real Pulse stream implementation and their regressions,
+as well as both existing pilots, verify in the required candidate job. Its C
+compile/link/run gates exercise the real reference/array stream implementation
+and the original value-state pilot separately. The stable CI job additionally
+runs `pulse-integration-check`: only the checked C archive crosses toolchains,
+and actual shell receive/FIN selects Pulse. Runtime assumptions still depend on
+two reviewed, unverified marshalers. The ref pilot's optional Rust failure is
+outside these jobs; whole-project candidate compatibility remains M4/M5.
+
+## M2 contract correspondence
+
+`DNS.QUIC.StreamModel` has no Low*/HyperStack/Steel dependency. The stable
+`StreamMapping` retains its public datatype and uses total, round-trip-proved
+conversions to the shared model. Its original phase, context, liveness and
+mutation postconditions remain, with a new byte-exact copying postcondition.
+The model deliberately has a different constructor order: pinned KaRaMeL merges
+enum tag types with identical constructor-name lists, otherwise replacing the
+stable public `StreamMapping_*` names. The C audit smoke guards all six stable
+constructor tags and their one-byte type. Never cast between the two phase
+representations; constructor tags also differ from the shell's 0–4 phase codes.
+The Pulse implementation uses that same transition and copy-plan code, with
+real `Reference.pts_to` and `Array.pts_to` resources. Its loop proves every
+copied byte equals the input slice and all other message bytes remain unchanged.
+It preserves the input, stream ID and message-array identity; FIN leaves all
+message bytes unchanged. No allocation/free or ownership assumptions are added.
+
+Valid phases have body lengths 12–65535, strictly incomplete `ReadingMessage`
+counts, or are prefix/terminal phases. Shared universal lemmas preserve validity
+from valid input, establish terminal `Done`, and retain body-fragmentation
+equivalence. Stable bridge lemmas and the Pulse postconditions establish model
+correspondence for all typed states, not just the regression examples. This
+does **not** add sanitization of all invalid states: historically representable
+`AwaitingFin 0` is still processed by zero-ID FIN. Raw invalid C phase codes
+and ownership establishment by C callers are covered by the M3 adapter review
+and its explicit trusted caller requirements, not an F* proof of the C adapters.
+
+Pulse requires separate, fully owned context, message and input storage;
+read-only shared input borrowing is not implemented. The stable disjointness
+and serialization obligations remain. Rejected fragments may still copy a
+bounded body prefix before becoming `Done`, exactly as in the original code.
+Candidate proof tests call real imperative operations using stack-owned arrays
+and references. These proofs do not establish C integration by themselves; M3
+adds the separate extraction/ABI/runtime gates below. Neither milestone proves
+full-stream fragmentation equivalence, authentication, whole-runtime race
+freedom or full DNS semantics. M4/M5 remain open.
 
 ## M1 validation evidence (2026-09-19)
 
@@ -130,3 +185,83 @@ The ref pilot's optional Rust failure is outside that job.
 - Workflow YAML parses locally; hosted CI and branch-protection settings have
   not been executed or changed from this workspace. Latest-release/Rust checks
   remain optional; they are not evidence for M1 C-path readiness.
+
+## M2 validation evidence (2026-09-20)
+
+- Pinned candidate container: `make candidate-check
+  CANDIDATE_LANE=candidate-v2026.09.13-m2-final` passed using fresh lane output
+  directories. All six roots verified: shared model and regressions, real
+  Pulse stream implementation and imperative regressions, and the two original
+  pilots. The 43-row inventory and strict value-only C compile/link/run passed.
+  Provenance and inventory are under that lane's `dist/` directory.
+- Pulse regressions exercise split prefixes and actual copied bytes, fragmented
+  body/excess-byte bounds, unchanged input and unrelated framed storage, FIN,
+  repeated FIN, zero/nonzero ID, and terminal/invalid body states. The shared
+  pure regressions additionally cover minimum/maximum lengths and uint32
+  overflow rejection. These are proof-checked tests, not extracted Pulse tests.
+- `python3 -m unittest discover -s migration/tests -v`: all 20 guard tests pass,
+  including candidate source omission, build-root coverage, lane isolation and
+  required stream tests. Workflow YAML parses locally; hosted CI was not run.
+- The first stable C link run exposed cross-module enum-tag deduplication.
+  The shared constructor order and explicit conversions now keep its tags
+  distinct from the stable ABI; the C audit smoke checks all stable tag names,
+  values and width. No C adapter, shell behavior or stable tool pin was changed.
+- After that fix, the stable container passed full `make verify` (also required
+  by `make extract`), EverParse generation/verification, `make extract`,
+  `c-compile-smoke`, `c-link-smoke`, and every `msquic-runtime-*-smoke`: compile,
+  link, lifecycle, listener, connection callbacks and live loopback stream.
+  These exercise the stable Low* implementation using the shared model, not
+  the Pulse port. The public `DNS_ShellBoundary.h`, `DNS_ShellResponseBoundary.h`
+  and `DNS_Protocol.h` contents match the pre-refactor generated headers exactly
+  after excluding their generation banners.
+- Existing warning debt remains: ignored binders/checked-cache writes, F*
+  library extraction warning 250, KaRaMeL GC/list warning 15, and redefined
+  `KRML_CHECK_SIZE`. No new source admissions or unverified adapters were added;
+  passing these gates does not close the remaining trusted boundaries.
+
+## M3 validation evidence (2026-09-22)
+
+- Pinned candidate container: `make candidate-check
+  CANDIDATE_LANE=candidate-v2026.09.13-m3-final` passed with fresh candidate
+  directories. All six proof roots and the 43-row verification/extraction
+  inventory pass. Both value-pilot and real reference/array stream C gates pass.
+  Source/product hashes, bundle identities and C target are recorded in that
+  lane's `pulse-stream/stream-manifest.json` alongside the generated C/archive.
+- Real-port C review found only native pointers/integers, bounded copy loops
+  and local context updates: ghost ownership/validity proofs erase, and no heap
+  allocator, GC or missing Pulse runtime primitive is linked. Checked extraction
+  succeeds with cross-module inlining and the bundled Pervasives helper; the
+  executable SizeT casts retain the same proved bounds. No new proof admissions
+  or assumptions were introduced. An ignored-binder warning remains; strict
+  real-port extraction/KaRaMeL and C warning gates pass.
+- Stable container passed `make verify extract c-compile-smoke c-link-smoke`
+  and all six `msquic-runtime-*-smoke` gates with the default Low* implementation.
+  `make pulse-integration-check` then passed both in the default mixed lane and
+  against the fresh `candidate-v2026.09.13-m3-final` archive, with integration
+  outputs set to `dist/pulse-integration-v2026.09.13-m3-final` and the matching
+  `obj/` directory. This includes stable verification, EverParse generation/
+  verification and extraction, archive checks, strict adapter compilation,
+  actual shell-object selection checks, all C/audit and MsQuic gates, callback
+  tests and live loopback with Pulse ingress/FIN selected.
+- The differential executable passes 1071 combinations of typed states,
+  fragment lengths/prefixes and FIN ID bytes, comparing phase/result and all
+  65535 message bytes, including preserved historical invalid-state behavior.
+  Raw unrepresentable states are tested only against the rejecting adapter,
+  not invoked outside the old implementation's contract. Standalone C tests
+  additionally exercise all minimal-message splits, capacity/alias failures,
+  maximum message size, unchanged input and guard bytes.
+- The standalone extracted C plus candidate marshaler passes native Clang
+  AddressSanitizer/UndefinedBehaviorSanitizer tests. The initial GCC sanitizer
+  link could not find the host runtime libraries; Clang's installed runtimes
+  supplied this supplemental check. It is not a sanitizer run of the full server.
+- All 34 migration guard tests pass, including wrong ABI/pins/target, changed
+  source/archive, incomplete manifests, unexpected archive/runtime dependencies
+  and missing Pulse/retained legacy ingress selection. Workflow YAML parses and
+  `git diff --check` passes. Hosted CI and branch protection were not run/changed.
+- Stable public `DNS_ShellBoundary.h`, `DNS_ShellResponseBoundary.h` and
+  `DNS_Protocol.h` bodies remain identical to the pre-refactor ABI (excluding
+  generation banners). Stable extraction warning 250, KaRaMeL GC/list warning
+  15 and `KRML_CHECK_SIZE` redefinition debt remain; no whole-build warning-free
+  claim is made. The two new C marshalers are explicitly recorded in the
+  [trusted inventory](THREAT_MODEL.md) and [ABI contract](PULSE_C_ABI.md).
+  Stable defaults/pins remain unchanged; M4/M5 are not closed.

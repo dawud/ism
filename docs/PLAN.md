@@ -55,7 +55,8 @@ Phase completion gates are recorded in [DECISIONS.md](DECISIONS.md). Keep this r
 
 ### Cross-cutting: Pulse migration and toolchain update
 
-**Status:** M1 implemented (2026-09-19); M2–M5 planned, accepted in DR-0017. Migrate the imperative
+**Status:** M1 implemented (2026-09-19), M2 implemented (2026-09-20),
+M3 implemented (2026-09-22); M4/M5 planned, accepted in DR-0017. Migrate the imperative
 Low* implementation and proofs to **Pulse → KaRaMeL → C**, retaining the C shell,
 MsQuic, and EverParse parser path. Rust extraction remains an independent
 experiment, not a prerequisite or promotion gate for this migration.
@@ -63,7 +64,8 @@ experiment, not a prerequisite or promotion gate for this migration.
 The September 18 evaluation verified the existing pilots on F* `v2026.09.13`,
 but they do not implement the real stream lifecycle or replace a linked
 boundary. No blocking Pulse language feature gap has been identified; C-path
-implementation, proof preservation, and integration still need to be tested.
+implementation and proof preservation were subsequently demonstrated for the
+stream boundary in M2/M3; remaining imperative surfaces still need migration.
 The reference pilot's Rust extraction failure is not evidence of a C blocker.
 
 Execute these milestones in order, keeping the stable build available:
@@ -79,8 +81,8 @@ Execute these milestones in order, keeping the stable build available:
    Exit: a reproducible candidate build and an explicit contract/ABI checklist.
    Implemented by `Containerfile.candidate`, `migration/toolchain.lock`,
    `make candidate-check`, and the checked
-   [source inventory](PULSE_MIGRATION_INVENTORY.md). The C smoke is value-only;
-   it does not close M2/M3. See DR-0018 for exact lane scope and limitations.
+   [source inventory](PULSE_MIGRATION_INVENTORY.md). M1's original C smoke is
+   value-only; M2/M3 expand the gate. See DR-0018 for original scope and limits.
 2. **M2 — Shared semantics and a real Pulse ingress boundary.** Factor the
    stream transition model into Low*-independent F* definitions usable by both
    lanes. Port the actual `DNS.QUIC.StreamMapping` behavior, including split
@@ -91,6 +93,15 @@ Execute these milestones in order, keeping the stable build available:
    body-fragmentation lemma; add the evaluation's invalid/closed-state cases
    to the existing audit regressions. Exit: equivalent written contracts and
    a verified boundary, not merely the existing capacity-counter pilot.
+   Implemented by `DNS.QUIC.StreamModel`, the ABI-preserving stable
+   `StreamMapping` bridge, and `DNS.Migration.PulseStream`. Both lanes prove
+   exact transitions and byte-copy footprints; Pulse uses real reference/array
+   ownership and preserves valid phases. Shared and imperative regressions are
+   required by `make candidate-stream-verify` / `make candidate-check`, with
+   invalid/closed cases retained in the stable audit tests. See DR-0019 and the
+   [contract correspondence](PULSE_MIGRATION_INVENTORY.md#m2-contract-correspondence)
+   for assumptions and deliberately unchanged invalid-state behavior.
+   Pulse C extraction and runtime substitution are covered by M3, not M2 alone.
 3. **M3 — C extraction and shell integration.** Add dedicated Pulse-to-C
    extraction, compile, and link gates. Exercise real references and byte
    buffers; inspect generated C, erased proofs, integer behavior, runtime
@@ -101,6 +112,14 @@ Execute these milestones in order, keeping the stable build available:
    mixed Low*/Pulse build may join independently built components only through
    an explicit C ABI, never by mixing incompatible checked/extraction artifacts.
    Exit: one integrated Pulse/C boundary with unchanged component guarantees.
+   Implemented by checked real-port C extraction, a versioned neutral ABI and
+   two explicit C marshalers. `candidate-check` tests the extracted references/
+   arrays; `pulse-integration-check` checks artifact provenance/selection, 1071
+   differential cases and all existing C/MsQuic smokes with Pulse ingress/FIN.
+   See [DR-0020](DECISIONS.md#dr-0020-integrate-the-pulse-stream-port-through-a-versioned-c-only-boundary)
+   and [PULSE_C_ABI.md](PULSE_C_ABI.md). Marshalers remain trusted C with explicit
+   ownership/lifetime obligations, not a new ownership theorem. Stable defaults
+   and tool pins are unchanged; M4/M5 remain open.
 4. **M4 — Remaining imperative surfaces.** Port stream-table lookup/allocation/
    close, ingress/egress, send completion, minimal worker and shell/scheduler
    boundaries, then parser buffer adapters, full-worker buffers, and sequential

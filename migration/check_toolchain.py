@@ -53,8 +53,8 @@ def check(fstar_home, cc, lock_path):
         "c_target": output(*shlex.split(cc), "-dumpmachine"),
         "host": platform.platform(),
         "os_release": Path("/etc/os-release").read_text(),
-        "everparse": "separate pinned baseline generator; not run by M1 candidate gate",
-        "scope": "pilot verification and value-only C smoke; not a runtime replacement",
+        "everparse": "separate pinned baseline generator; not run by candidate gate",
+        "scope": "shared stream and Pulse proofs; pilots and real stream C extraction/smoke; mixed C integration checked separately; not whole-toolchain promotion",
     }
 
 

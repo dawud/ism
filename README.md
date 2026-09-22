@@ -48,9 +48,14 @@ a claim of fully reproducible builds.
 
 The pinned candidate lane uses `Containerfile.candidate` and
 [`migration/toolchain.lock`](migration/toolchain.lock): F* `v2026.09.13`, its
-bundled KaRaMeL, and Z3 4.13.3. Its blocking CI job currently covers the two
-pilot proofs and **value-only** C extraction/compile/link/run, not a migrated
-server. See the [contract/ABI inventory](docs/PULSE_MIGRATION_INVENTORY.md).
+bundled KaRaMeL, and Z3 4.13.3. Its blocking CI job covers the shared stream
+model, real Pulse ingress/FIN implementation and regressions, the two original
+pilot proofs, and C extraction/compile/link/run of both the real stream port and
+the value pilot. The stable CI job also links the Pulse stream archive into the
+existing shell and runs differential, audit, callback and live MsQuic tests (M3).
+This explicit mixed C lane does not change the default Low* implementation or
+promote the toolchain. See the [C ABI](docs/PULSE_C_ABI.md) and
+[contract inventory](docs/PULSE_MIGRATION_INVENTORY.md).
 The separate `Containerfile.migration` remains an optional latest-release/Rust
 exploration lane; neither replaces the stable development lane.
 
@@ -73,7 +78,7 @@ If the local image is missing, build it from the checked-in `Containerfile`:
 podman build -t localhost/verified-dns-server:latest -f Containerfile .
 ```
 
-To run the pinned M1 candidate checks without changing the stable toolchain:
+To run the pinned M1–M3 candidate checks without changing the stable toolchain:
 
 ```bash
 podman build -t localhost/verified-dns-server:pulse-candidate -f Containerfile.candidate .
@@ -85,22 +90,48 @@ podman run --rm \
 ```
 
 The default command is `make candidate-check`: validate tool identities,
-check the complete source inventory, verify both pilots, extract the value
-pilot to C, and compile/link/run its smoke test using the generated header.
+check the complete source inventory, verify the shared stream model and real
+Pulse implementation/tests plus both pilots, extract the real stream port and
+value pilot to C, and compile/link/run their smoke tests. It records a checked
+C archive and source/product manifest for the mixed integration gate.
 It does not invoke Rust or tolerate failed candidate checks. Artifacts and
 provenance are isolated under `obj/candidate-v2026.09.13/` and
 `dist/candidate-v2026.09.13/`; stable output paths remain unchanged. Use the
 shared SELinux label `:z` when running multiple lanes on the same checkout.
 
+Then run the integrated lane in the **stable** image, on the same checkout:
+
+```bash
+podman run --rm \
+  --userns=keep-id \
+  -v "$(pwd):/workspace:z" \
+  localhost/verified-dns-server:latest make pulse-integration-check
+```
+
+This runs stable extraction (including verification and EverParse), checks the
+candidate archive manifest, compiles the narrow C adapter, and selects Pulse
+for actual shell receive/FIN calls. It compares the implementations and runs
+the existing C and all MsQuic smoke gates. Integrated binaries/objects are under
+`dist/pulse-integration-v2026.09.13/` and `obj/pulse-integration-v2026.09.13/`.
+No candidate generated headers, checked files or `.krml` inputs are consumed by
+the stable compiler. Re-run `candidate-check` after changing its sources or build
+recipe; a stale manifest fails closed. Ordinary stable targets remain Low*.
+
 For a native installation of the locked bundle:
 
 ```bash
 make candidate-check FSTAR_HOME=/path/to/fstar
+# Focused M2 proof gate (no C extraction):
+make candidate-stream-verify FSTAR_HOME=/path/to/fstar
+# Focused M3 candidate C gate (includes verification):
+make candidate-stream-c-smoke FSTAR_HOME=/path/to/fstar
 python3 -m unittest discover -s migration/tests -v
 ```
 
 Full legacy verification on the new compiler is still expected to fail on APIs
-that need migration; a passing M1 pilot gate does not establish compatibility.
+that need migration; the scoped candidate gate does not establish whole-project
+compatibility. The mixed lane establishes tested integration of stream ingress/
+FIN only; remaining imperative modules and stable promotion are M4/M5.
 Base-image/system packages are not fully locked; `toolchain.json` records the
 actual C compiler, target, OS, compiler/extractor identities and solver versions.
 EverParse remains the separately pinned baseline generator.

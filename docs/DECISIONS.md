@@ -412,7 +412,8 @@ parser checks and C/runtime gates. No admissions are introduced by this decision
 
 ## DR-0017: Migrate to Pulse with C Extraction Before Updating the Stable Toolchain
 
-**Status:** Accepted (2026-09-18); M1 implemented in DR-0018, M2–M5 planned;
+**Status:** Accepted (2026-09-18); M1 implemented in DR-0018, M2 in DR-0019,
+M3 in DR-0020; M4/M5 planned;
 stable pins unchanged.
 
 **Context:** The existing migration pilots verify on the evaluated F*
@@ -462,6 +463,10 @@ guarantees. Update the trusted inventory as actual boundaries change.
 
 **Status:** Accepted (2026-09-19).
 
+**Amendment:** DR-0019 and DR-0020 expand the original pilot-only scope below
+with real stream proofs, C extraction and mixed runtime integration. They do not
+promote the stable toolchain or make the optional Rust track a C-path gate.
+
 **Decision:** Keep the stable Containerfile and its F*/KaRaMeL pins unchanged.
 Use `Containerfile.candidate` and `migration/toolchain.lock` for the evaluated
 F* `v2026.09.13` Linux x86_64 bundle, verified by SHA-256. Validate its F* commit,
@@ -496,3 +501,104 @@ ABI review; it is not a proof of contract equivalence. Changing source coverage
 without updating the inventory fails M1. Removed Low*/HyperStack/Steel APIs and
 pure-library compatibility changes, including `Prims.op_Addition` in `DNS.Name`,
 remain explicit porting work. No existing contracts or trusted interfaces change.
+
+## DR-0019: Share Stream Semantics and Prove the Real Pulse Ingress Port
+
+**Status:** Accepted (2026-09-20); M2 implemented. M3's subsequent extraction/
+integration is recorded in DR-0020; M4/M5 and stable promotion remain open.
+
+**Decision:** Factor `DNS.QUIC.StreamModel` as heap-independent F* checked by
+both pinned compilers. Keep the stable `StreamMapping` public datatype/C shape
+and use proved round-trip representation conversions. Preserve its existing
+state, liveness, bounds and mutation contracts, and strengthen ingress/copy
+postconditions to specify every copied byte and unchanged message byte. Share
+the actual transition and bounded-copy plan, not a separate capacity model.
+Use a distinct shared-model constructor order to prevent the pinned KaRaMeL's
+cross-module enum-tag deduplication from renaming the public stable tags.
+Add compile-time C audit guards for all stable constructor values and their
+one-byte tag type. Phase conversions must remain explicit, not raw tag casts;
+the model's representation is not the shell ABI.
+
+Implement `DNS.Migration.PulseStream` over real Pulse reference/array resources.
+Require separated, fully owned context, message and input storage, preserve
+input bytes and context identity fields, and prove exact phase/copy results.
+FIN retains message ownership and content. The copy loop has a decreasing
+counter and byte-exact invariant. No raw allocation/free, assumed ownership,
+new admissions, authentication axiom or concurrency permission is introduced.
+Read-only fractional input borrowing remains possible future work, not a
+current guarantee. C callers do not yet establish these Pulse resources.
+
+**Preservation scope:** Keep split-prefix and body processing, exact declared
+length/FIN/zero-ID behavior, terminal states, excess-byte rejection, mutation
+bounds and the existing body-fragmentation lemma. Define valid phases and prove
+valid-input preservation. Do not silently change historical behavior of invalid
+typed states: for example, zero-ID FIN on `AwaitingFin 0` still returns
+`Processing 0`. Invalid body states reject as before; rejected fragments can
+still copy a bounded body prefix. Raw invalid C phase codes are an M3 adapter
+concern. This is preservation of written component contracts, not a theorem
+of RFC completeness or full-stream fragmentation equivalence.
+
+**Gates:** Add `candidate-stream-verify` to the required candidate check, covering
+the shared model/regressions and real Pulse implementation/imperative proof
+tests. Keep existing audit tests and add closed/invalid-state regressions. The
+checked inventory now includes all migration F* modules, with no mainline root
+removed; transport test modules are verification-only. Stable extraction and
+the C/MsQuic regression gates continue to exercise the Low* implementation.
+Candidate C smoke remains the old value-only pilot: extracting, reviewing and
+integrating the real Pulse stream port is M3. Keep stable pins and trusted C
+interfaces unchanged. See [inventory](PULSE_MIGRATION_INVENTORY.md) for evidence
+and the [trusted boundary](THREAT_MODEL.md) for unresolved caller obligations.
+
+## DR-0020: Integrate the Pulse Stream Port Through a Versioned C-Only Boundary
+
+**Status:** Accepted (2026-09-22); M3 implemented, M4/M5 open.
+
+**Decision:** Extract the real `DNS.Migration.PulseStream` reference/array port
+and shared model with the pinned candidate bundle. Use F*'s checked extraction
+pass (no `--lax`) with default cross-module inlining and the bundle's
+`Pulse.Lib.Pervasives` helper. Do not introduce assumed runtime implementations
+for reference/array primitives. Use executable `SizeT.uint32_to_sizet` conversions
+under the original proved bounds. Review erased proofs, C integer operations,
+loop bounds and dependencies; make extraction warning 250 and KaRaMeL warnings
+2/4/15 fatal for this port. Compile new C components with strict warnings.
+
+Join independently built components through ABI version 1 in
+`migration/c/ism_pulse_stream.h`: fixed-width phase fields, shell result code,
+stream ID and explicit byte pointers/capacities. Compile
+`migration/c/ism_pulse_stream.c` only against candidate headers and
+`shell/pulse_stream_adapter.c` only against stable headers. Convert phases by
+named cases, not generated-layout casts. Assert native layout and require a
+matching C target. No checked files, `.krml` artifacts or generated header types
+cross compiler lanes. Keep the stable public shell/context/response ABI intact.
+
+**Ownership and trust:** These two C marshalers are explicitly unverified TCB
+additions. They validate representable tags/lengths, descriptors, byte-range
+separation and ABI identity, but raw C cannot prove live allocations, truthful
+capacities, authentication or exclusive access. The real receive path copies
+MsQuic input into runtime-owned ingress storage before synchronous dispatch.
+Callers still supply disjoint context/message/input and serialized operations.
+Candidate context storage is stack-local; no allocation or retained pointer is
+introduced. Preserve historical typed invalid-state behavior, including
+`AwaitingFin 0`; raw unrepresentable tags/lengths reject before buffer access.
+See [PULSE_C_ABI.md](PULSE_C_ABI.md) for exact mappings, lifetime and rejection
+rules, and [THREAT_MODEL.md](THREAT_MODEL.md) for unresolved obligations.
+
+**Integration and evidence:** Extend `candidate-check` to require real stream C
+tests separately from the value pilot. Record hashes of source/build inputs and
+C products, tool pins/provenance and target; fail on stale or foreign artifacts
+and unexpected archive/runtime dependencies. The manifest detects accidental
+drift, not malicious provenance. `pulse-integration-check` runs in the stable
+image after candidate extraction, compiles the actual shell with Pulse selected,
+and checks its unresolved symbols to exclude legacy ingress/FIN calls. Use that
+same shell object for the existing C and MsQuic callback/live-loopback tests.
+Compare the stable and Pulse adapters on phase, result and all message bytes.
+Add the mixed gate to blocking CI while retaining the independent candidate job.
+
+**Limits and rollback:** Only ingress/FIN is replaced in the explicit mixed
+lane. Stable defaults, pins, EverParse, table lifecycle, worker, response, reset
+and completion stay unchanged. Restore the Low* path simply by using ordinary
+stable targets without Pulse overrides. Tests and C review supplement the M2
+correspondence proofs; they do not prove the adapters, global ownership,
+authentication, concurrency, full DNS semantics or full-stream fragmentation.
+No new source admissions or ownership axioms are added. Remaining imperative
+ports, warning/resource review and whole-toolchain promotion remain M4/M5.

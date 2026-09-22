@@ -1,4 +1,7 @@
 #include "ism_shell.h"
+#if defined(ISM_USE_PULSE_STREAM) && ISM_USE_PULSE_STREAM
+#include "pulse_stream_adapter.h"
+#endif
 
 #include <stddef.h>
 #include <string.h>
@@ -118,8 +121,12 @@ ism_shell_on_authenticated_stream_fin(ism_shell_connection *conn, uint64_t strea
 {
   DNS_QUIC_StreamMapping_stream_context *stream =
     ism_shell_open_stream(conn, stream_id);
+#if defined(ISM_USE_PULSE_STREAM) && ISM_USE_PULSE_STREAM
+  return stream == NULL ? 3U : ism_pulse_ingress_fin(stream);
+#else
   return stream == NULL ? 3U :
     DNS_ShellBoundary_dispatch_authenticated_stream_fin(stream);
+#endif
 }
 
 uint8_t
@@ -141,6 +148,9 @@ ism_shell_on_authenticated_stream_data(
     );
   }
 
+#if defined(ISM_USE_PULSE_STREAM) && ISM_USE_PULSE_STREAM
+  return ism_pulse_ingress_data(stream, stream_id, data, len);
+#else
   return
     DNS_ShellBoundary_dispatch_authenticated_stream_data(
       stream,
@@ -148,6 +158,7 @@ ism_shell_on_authenticated_stream_data(
       data,
       len
     );
+#endif
 }
 
 uint8_t
@@ -169,6 +180,9 @@ ism_shell_dispatch_authenticated_stream_data(
     );
   }
 
+#if defined(ISM_USE_PULSE_STREAM) && ISM_USE_PULSE_STREAM
+  return ism_pulse_ingress_data(stream, stream_id, data, len);
+#else
   return
     DNS_ShellBoundary_dispatch_authenticated_stream_data_via_scheduler(
       stream,
@@ -176,6 +190,7 @@ ism_shell_dispatch_authenticated_stream_data(
       data,
       len
     );
+#endif
 }
 
 uint32_t

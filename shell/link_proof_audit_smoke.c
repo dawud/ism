@@ -5,6 +5,18 @@
 #include "ism_shell.h"
 #include "DNSProtocolWrapper.h"
 
+/* The shared model must not rename or renumber the stable tagged-union ABI.
+   These constructor tags are distinct from shell_phase_code's 0..4 results. */
+_Static_assert(sizeof(DNS_QUIC_StreamMapping_stream_phase_tags) == 1,
+               "stable stream tag width changed");
+_Static_assert(DNS_QUIC_StreamMapping_ReadingLength == 0 &&
+               DNS_QUIC_StreamMapping_ReadingLengthHigh == 1 &&
+               DNS_QUIC_StreamMapping_ReadingMessage == 2 &&
+               DNS_QUIC_StreamMapping_AwaitingFin == 3 &&
+               DNS_QUIC_StreamMapping_Processing == 4 &&
+               DNS_QUIC_StreamMapping_Done == 5,
+               "stable stream constructor tags changed");
+
 bool ism_smoke_proof_audit(void)
 {
   /* Root IN A query: seventeen DNS bytes, zero DoQ ID. */
