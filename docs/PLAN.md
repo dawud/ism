@@ -56,7 +56,8 @@ Phase completion gates are recorded in [DECISIONS.md](DECISIONS.md). Keep this r
 ### Cross-cutting: Pulse migration and toolchain update
 
 **Status:** M1 implemented (2026-09-19), M2 implemented (2026-09-20),
-M3 implemented (2026-09-22); M4/M5 planned, accepted in DR-0017. Migrate the imperative
+M3 implemented (2026-09-22); M4 in progress (table slice, 2026-10-01), M5 planned.
+Accepted in DR-0017. Migrate the imperative
 Low* implementation and proofs to **Pulse → KaRaMeL → C**, retaining the C shell,
 MsQuic, and EverParse parser path. Rust extraction remains an independent
 experiment, not a prerequisite or promotion gate for this migration.
@@ -131,6 +132,15 @@ Execute these milestones in order, keeping the stable build available:
    Do not obtain a passing build by silently excluding existing proofs or
    adding admissions. Exit: every inventoried module has a reviewed disposition
    and no required mainline module depends on removed Low* APIs.
+   First slice: `DNS.Migration.PulseMultiplexer` proves real pointer-table
+   lookup/allocation/close, exact slot permutation and preservation of other
+   contexts. Shared permutation lemmas remain checked by both compilers;
+   imperative proof regressions and standalone extracted C tests are required
+   by `candidate-check`. See DR-0021 and the
+   [table correspondence](PULSE_MIGRATION_INVENTORY.md#m4-table-contract-correspondence).
+   This is not M4 completion: next integrate table lifecycle through a reviewed
+   C-only ownership/ABI boundary, then port egress/completion and the remaining
+   surfaces above. The mixed runtime gate still selects only Pulse ingress/FIN.
 5. **M5 — Promote the toolchain.** On a clean candidate build, pass `make verify`,
    `make everparse-verify`, `make extract`, `make c-compile-smoke`,
    `make c-link-smoke`, and all existing `msquic-runtime-*-smoke` gates with the

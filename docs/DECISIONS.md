@@ -413,7 +413,7 @@ parser checks and C/runtime gates. No admissions are introduced by this decision
 ## DR-0017: Migrate to Pulse with C Extraction Before Updating the Stable Toolchain
 
 **Status:** Accepted (2026-09-18); M1 implemented in DR-0018, M2 in DR-0019,
-M3 in DR-0020; M4/M5 planned;
+M3 in DR-0020; M4 started in DR-0021, M5 planned;
 stable pins unchanged.
 
 **Context:** The existing migration pilots verify on the evaluated F*
@@ -602,3 +602,48 @@ correspondence proofs; they do not prove the adapters, global ownership,
 authentication, concurrency, full DNS semantics or full-stream fragmentation.
 No new source admissions or ownership axioms are added. Remaining imperative
 ports, warning/resource review and whole-toolchain promotion remain M4/M5.
+
+## DR-0021: Start M4 with an Owned Pulse Stream Table and Standalone C Gate
+
+**Status:** Accepted (2026-10-01); first M4 slice implemented, runtime table
+integration and the remaining M4 modules are still open. Stable pins unchanged.
+
+**Decision:** Port lookup, allocation and close to
+`DNS.Migration.PulseMultiplexer` using real Pulse references and pointer arrays.
+Share ghost slot distinctness/permutation lemmas in `DNS.QUIC.TableModel` with
+the retained stable multiplexer. Track full context ownership using a fixed
+ghost pool and snapshot, separately from the mutable table permutation. Prove
+finite lookup, take/restore and snapshot-update helpers; introduce no assumed
+ownership conversion or choice axiom. Message resources are framed: table
+operations preserve buffer identity and never read, write, allocate or free
+message storage. Here allocation means reserving an existing context slot.
+
+**Contracts and limits:** Lookup returns the first matching active index, or
+the active count on a miss. Allocation returns capacity on duplicate/full
+rejection with no mutation; success resets exactly the first available context's
+ID and phase, retains its buffer and every other context, and increments count.
+Close swaps the first matching pointer with the last active pointer and
+decrements count, preserving every context and the pool permutation; a miss
+changes nothing. All operations require separate, fully owned connection,
+table and distinct pool contexts, even for an empty active prefix. This is
+stronger than the legacy conditional lookup/close preconditions, and the
+index/sentinel API is not its option-pointer ABI. Preserve caller-framed buffer
+liveness explicitly when composing with ingress; neither arbitrary raw C
+pointers nor message ownership are established by these table predicates.
+
+**Gates:** `candidate-check` requires the new shared and imperative proof tests,
+checked C extraction with cross-module inlining, fatal F* warning 250 and
+KaRaMeL warnings 2/4/15, and strict standalone C compile/link/run. Keep artifacts
+in their own `pulse-multiplexer` directory. Test actual pointer permutations,
+empty/full/duplicate/missing cases, retired-slot reuse, context/byte preservation
+and zero/max stream IDs against an integer-index oracle. These finite tests
+supplement the universal contracts; they are not a Low*/Pulse equivalence
+theorem or a verified C caller. No tests or legacy proof roots are removed.
+
+**Integration boundary:** Do not pass candidate generated structs to the stable
+shell or reinterpret stable context pointers. The existing mixed lane still
+selects only Pulse ingress/FIN; stable table lifecycle and completion remain
+unchanged. Next design and review a C-only table seam and its initialization,
+context identity, lifetime and ownership obligations before selecting the new
+table in runtime tests. No new unverified adapter is added by this slice, and
+passing it does not complete M4 or permit M5 toolchain promotion.

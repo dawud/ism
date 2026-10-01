@@ -88,10 +88,19 @@ C/MsQuic shell. Rust is not on this migration's critical path.
   compiled-selection guards prevent stale/legacy test substitution. See
   [PULSE_C_ABI.md](PULSE_C_ABI.md) and DR-0020 for caller/trust obligations.
   Stable defaults and pins remain unchanged; this is not M4/M5 promotion.
-- [ ] **M4: Remaining modules.** Port multiplexer, egress/completion, worker/
+- [/] **M4: Remaining modules.** Port multiplexer, egress/completion, worker/
   shell boundaries, parser buffer adapters, and sequential cache operations.
   Reuse pure models; explicitly port or retire unused legacy interfaces without
   silently dropping proof coverage. Review every inventory entry.
+
+  - [x] First table slice: real Pulse lookup/allocation/close ownership proofs,
+    shared permutation lemmas, imperative proof tests and standalone checked C
+    extraction/tests. Stable table implementation retained. See DR-0021.
+  - [ ] Integrate table lifecycle through a reviewed C-only ABI; establish
+    initialization/lifetime and serialized context/message ownership at callers.
+    Current index/sentinel API is not a drop-in replacement for Low* options.
+  - [ ] Port remaining ingress wrappers, egress/completion, worker/shell/parser
+    buffers and sequential cache; resolve every remaining inventory disposition.
 - [ ] **M5: Stable promotion.** Pass full verification, EverParse, extraction,
   C compile/link, and all MsQuic smoke gates on a clean candidate build. Review
   contract/TCB/warning/resource changes, update stable build pins and docs

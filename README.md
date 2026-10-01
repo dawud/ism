@@ -48,11 +48,12 @@ a claim of fully reproducible builds.
 
 The pinned candidate lane uses `Containerfile.candidate` and
 [`migration/toolchain.lock`](migration/toolchain.lock): F* `v2026.09.13`, its
-bundled KaRaMeL, and Z3 4.13.3. Its blocking CI job covers the shared stream
-model, real Pulse ingress/FIN implementation and regressions, the two original
-pilot proofs, and C extraction/compile/link/run of both the real stream port and
-the value pilot. The stable CI job also links the Pulse stream archive into the
-existing shell and runs differential, audit, callback and live MsQuic tests (M3).
+bundled KaRaMeL, and Z3 4.13.3. Its blocking CI job covers the shared stream/table
+models, real Pulse ingress/FIN and table implementations and regressions, the two
+original pilot proofs, and C extraction/compile/link/run of the stream port,
+standalone table port and value pilot. The stable CI job links the Pulse stream
+archive into the existing shell and runs differential, audit, callback and live
+MsQuic tests (M3).
 This explicit mixed C lane does not change the default Low* implementation or
 promote the toolchain. See the [C ABI](docs/PULSE_C_ABI.md) and
 [contract inventory](docs/PULSE_MIGRATION_INVENTORY.md).
@@ -78,7 +79,7 @@ If the local image is missing, build it from the checked-in `Containerfile`:
 podman build -t localhost/verified-dns-server:latest -f Containerfile .
 ```
 
-To run the pinned M1–M3 candidate checks without changing the stable toolchain:
+To run the pinned candidate checks (M1–M3 and the first M4 table slice):
 
 ```bash
 podman build -t localhost/verified-dns-server:pulse-candidate -f Containerfile.candidate .
@@ -90,10 +91,10 @@ podman run --rm \
 ```
 
 The default command is `make candidate-check`: validate tool identities,
-check the complete source inventory, verify the shared stream model and real
-Pulse implementation/tests plus both pilots, extract the real stream port and
-value pilot to C, and compile/link/run their smoke tests. It records a checked
-C archive and source/product manifest for the mixed integration gate.
+check the complete source inventory, verify the shared stream/table models and
+real Pulse implementations/tests plus both pilots, extract the stream/table
+ports and value pilot to C, and compile/link/run their smoke tests. It records a
+checked stream C archive and source/product manifest for the mixed integration gate.
 It does not invoke Rust or tolerate failed candidate checks. Artifacts and
 provenance are isolated under `obj/candidate-v2026.09.13/` and
 `dist/candidate-v2026.09.13/`; stable output paths remain unchanged. Use the
@@ -125,13 +126,19 @@ make candidate-check FSTAR_HOME=/path/to/fstar
 make candidate-stream-verify FSTAR_HOME=/path/to/fstar
 # Focused M3 candidate C gate (includes verification):
 make candidate-stream-c-smoke FSTAR_HOME=/path/to/fstar
+# Focused M4 standalone table gate (includes stream/table verification):
+make candidate-multiplexer-c-smoke FSTAR_HOME=/path/to/fstar
 python3 -m unittest discover -s migration/tests -v
 ```
 
 Full legacy verification on the new compiler is still expected to fail on APIs
 that need migration; the scoped candidate gate does not establish whole-project
 compatibility. The mixed lane establishes tested integration of stream ingress/
-FIN only; remaining imperative modules and stable promotion are M4/M5.
+FIN only. The M4 table port proves lookup/allocation/close over owned pointer
+arrays and contexts and has standalone C tests, but is not selected by the shell.
+Its index/sentinel API and uniform ownership requirements are documented in the
+[table correspondence](docs/PULSE_MIGRATION_INVENTORY.md#m4-table-contract-correspondence).
+Table integration, remaining imperative modules and stable promotion remain open.
 Base-image/system packages are not fully locked; `toolchain.json` records the
 actual C compiler, target, OS, compiler/extractor identities and solver versions.
 EverParse remains the separately pinned baseline generator.

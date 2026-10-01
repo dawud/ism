@@ -134,7 +134,7 @@ jobs:
             dist/candidate-*/pulse-stream/
 
   pulse-candidate:
-    name: Pinned Pulse candidate (M1–M3 C scope)
+    name: Pinned Pulse candidate (M1–M3 and M4 table slice)
     runs-on: ubuntu-latest
 
     steps:
@@ -147,7 +147,7 @@ jobs:
       - name: Build pinned candidate image
         run: docker build -t localhost/verified-dns-server:pulse-candidate -f Containerfile.candidate .
 
-      - name: Check inventory, verify stream and pilots, extract and test real stream C
+      - name: Check inventory, verify stream/table and pilots, extract and test C
         run: |
           docker run --rm \
             --user "$(id -u):$(id -g)" \

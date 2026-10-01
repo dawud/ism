@@ -10,15 +10,16 @@ open FStar.UInt64
 open DNS.QUIC.StreamMapping
 module S = FStar.Seq
 module SP = FStar.Seq.Properties
+module TM = DNS.QUIC.TableModel
 
 let distinct_slots (slots:S.seq (buffer stream_context)) : Type0 =
-  forall (i:nat) (j:nat). i < S.length slots /\ j < S.length slots /\ i <> j ==>
-    S.index slots i =!= S.index slots j
+  TM.distinct slots
 
 let lemma_swap_preserves_distinct_slots
   (slots:S.seq (buffer stream_context))
   (i:nat{i < S.length slots}) (j:nat{j < S.length slots})
-  : Lemma (distinct_slots slots ==> distinct_slots (SP.swap slots i j)) = ()
+  : Lemma (distinct_slots slots ==> distinct_slots (SP.swap slots i j)) =
+  TM.lemma_swap_distinct slots i j
 
 (* A Connection Context manages multiple streams *)
 noeq

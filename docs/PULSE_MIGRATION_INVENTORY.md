@@ -36,7 +36,11 @@ transitively on legacy code and must be checked after splitting those imports.
 | `migration/DNS.Migration.PulseStream.Tests.fst` | candidate-verify | Imperative stack-owned array/context regressions: split prefix, byte copies, FIN/ID, invalid and terminal states | M2 proof tests, not Pulse runtime/C tests |
 | `migration/DNS.Migration.PulseShellBoundary.fst` | candidate-verify | Original reference-based capacity counter; no real DoQ lifecycle | Retained pilot; optional Rust assessment is separate |
 | `migration/DNS.Migration.PulseShellBoundaryValue.fst` | candidate-verify+extract | Original pure value capacity counter; no real DoQ lifecycle | Retained candidate C smoke and optional Rust experiment |
-| `src/transport/DNS.QUIC.Multiplexer.fst` | verify+extract | `slots_owned`, `allocate_stream`, `close_stream`: distinct/disjoint contexts, active-slot preservation and close permutation; ID/table initialization remain caller obligations | M4: Pulse table ownership; retain sequential allocation/close regressions |
+| `src/transport/DNS.QUIC.Multiplexer.fst` | verify+extract | `slots_owned`, `allocate_stream`, `close_stream`: distinct/disjoint contexts, active-slot preservation and close permutation; ID/table initialization remain caller obligations | M4 first slice shares permutation lemmas with the candidate port; stable/runtime implementation retained |
+| `src/transport/DNS.QUIC.TableModel.fst` | verify+extract | Abstract slot distinctness and swap membership/distinctness preservation | Shared by stable and candidate table proofs; ghost definitions erase |
+| `src/transport/DNS.QUIC.TableModel.Tests.fst` | verify | Removed-slot availability, last-slot identity and duplicate rejection regressions | Stable and candidate proof tests; not extracted |
+| `migration/DNS.Migration.PulseMultiplexer.fst` | candidate-verify+extract | Owned pointer table and context pool; first-match lookup, duplicate/full rejection, exact context update and close permutation; message storage framed | M4 first slice: candidate proof and standalone C port; mixed-shell table substitution remains open |
+| `migration/DNS.Migration.PulseMultiplexer.Tests.fst` | candidate-verify | Real owned-context allocate/close/reopen, failure and byte-preservation regressions | Candidate imperative proof tests; not extracted |
 | `src/transport/DNS.QUIC.MsQuicIngress.fst` | verify+extract | Authenticated fragment liveness/length, context-buffer disjointness and mutation bounds; authentication/borrow tokens are unit | M3 shell bypasses legacy data wrapper via reviewed C ABI; full wrapper port remains M4; no stronger MsQuic claim |
 | `src/transport/DNS.QUIC.MsQuicEgress.fst` | verify+extract | Live response buffer, length bound and send-descriptor handoff; no proof of runtime send completion | M4: Pulse buffer borrow/lifetime specification; preserve descriptor ABI |
 | `src/transport/DNS.QUIC.MsQuicSendCompletion.fst` | verify+extract | Live descriptor and connection/table preconditions; cleanup delegates to close; runtime completion is trusted | M4: port cleanup under serialized ownership |
@@ -113,14 +117,65 @@ gate, not the standalone candidate stream/value smoke tests.
 
 The base image and OS packages are not digest/version locked; this is a
 reproducible **proof-tool selection**, not a fully reproducible binary supply
-chain. The shared model, real Pulse stream implementation and their regressions,
+chain. The shared models, real Pulse stream/table implementations and their regressions,
 as well as both existing pilots, verify in the required candidate job. Its C
 compile/link/run gates exercise the real reference/array stream implementation
-and the original value-state pilot separately. The stable CI job additionally
+and the original value-state pilot separately, plus the standalone M4 table.
+The stable CI job additionally
 runs `pulse-integration-check`: only the checked C archive crosses toolchains,
 and actual shell receive/FIN selects Pulse. Runtime assumptions still depend on
 two reviewed, unverified marshalers. The ref pilot's optional Rust failure is
 outside these jobs; whole-project candidate compatibility remains M4/M5.
+
+## M4 table contract correspondence
+
+`DNS.QUIC.TableModel` supplies distinctness, swap preservation and membership
+lemmas checked by both compilers. The stable multiplexer delegates its existing
+distinctness lemma to this model without changing executable behavior or public
+types. `DNS.Migration.PulseMultiplexer` implements actual reference/pointer-array
+lookup, slot reservation (called allocation) and close, not a value-only pilot.
+
+| Operation | Candidate postcondition and preserved behavior | Difference / remaining obligation |
+| --- | --- | --- |
+| Lookup | First matching active index; count sentinel iff absent; all storage unchanged | Legacy returns an option pointer; caller must map a successful index to its context |
+| Allocation | Capacity sentinel iff duplicate ID or full; rejection changes nothing; success uses the old-count slot, changes only its ID/phase to `ReadingLength`, retains its buffer, increments count, preserves all other contexts | No memory allocator; preallocated slots and their storage remain caller-owned |
+| Close | First matching slot swapped with last active slot, count decremented, all context values unchanged; miss changes nothing; distinctness and membership preserved | Returns bool; legacy wrapper returns unit; removed slot remains available rather than freed |
+| Ownership | Separate connection reference, pointer array and distinct pool context references; fixed ghost pool independent of mutable ordering; exact snapshot preservation | Uniform full ownership, including an empty active prefix, is stronger than legacy lookup/close's conditional liveness requirements |
+| Message storage | Buffer identity preserved; arbitrary compatible message resources are framed and untouched | Table predicates alone do not establish buffer liveness, 65535-byte capacity or separation needed for ingress |
+
+The pool is a ghost finite sequence with a snapshot mapping each reference to
+its value, not a runtime allocation or side table. Recursive take/restore
+proofs transfer a single reference resource and reassemble the pool; finite
+ghost search obtains its index without a new choice or ownership axiom. Lookup
+has a decreasing variant on both hit and miss. Bounds prevent count overflow
+and close underflow; executable indices use the checked UInt32-to-SizeT cast.
+Duplicate IDs on distinct context pointers are permitted on input; lookup and
+close choose the first one, while allocation rejects another copy.
+
+Correspondence here is a reviewed mapping of written contracts on the common
+owned-table domain, not a cross-heap bisimulation theorem or proof of arbitrary
+raw C callers. Candidate tests compose real imperative operations with owned
+stack references/arrays and check allocate, reject, close, reuse, unchanged
+other contexts and message bytes. The C oracle uses integer slot identities
+and checks generated pointer operations independently over permutations and
+mutation sequences. Neither fixture testing nor successful C extraction proves
+ABI compatibility or runtime ownership establishment.
+
+`candidate-multiplexer-verify` and `candidate-multiplexer-c-smoke` are required
+by `candidate-check`. All four new source roots are inventoried; shared test
+lemmas remain verification-only in both lanes. Checked extraction retains
+cross-module inlining and the bundled Pervasives helper, rejects F* warning 250
+and KaRaMeL warnings 2/4/15, and writes only into the lane's
+`pulse-multiplexer/` directory. The generated C contains native pointer/index
+operations; ghost pool/snapshot arguments erase (an unused snapshot typedef
+may remain in the header), with no heap allocator or replacement runtime shim.
+
+No new C adapter or runtime table selection is added. The existing mixed gate
+continues to exercise the stable table with Pulse ingress/FIN only. A neutral
+table ABI and explicit caller initialization/lifetime/serialized ownership
+review are the next M4 work; do not cast stable contexts to candidate generated
+types. Egress/completion, remaining worker/shell/parser/cache/security surfaces
+and M5 promotion remain open. See DR-0021.
 
 ## M2 contract correspondence
 
@@ -265,3 +320,40 @@ freedom or full DNS semantics. M4/M5 remain open.
   claim is made. The two new C marshalers are explicitly recorded in the
   [trusted inventory](THREAT_MODEL.md) and [ABI contract](PULSE_C_ABI.md).
   Stable defaults/pins remain unchanged; M4/M5 are not closed.
+
+## M4 first table slice validation evidence (2026-10-01)
+
+- Pinned candidate container: `make candidate-check
+  CANDIDATE_LANE=candidate-v2026.09.13-m4-final` passed, initially with fresh lane
+  output directories and again after final build-guard edits. All ten proof
+  roots and the 47-file inventory pass. Required C gates cover the original
+  value pilot, real stream ingress/FIN and standalone table port separately.
+- Table proof regressions compose lookup, empty/missing close, successful and
+  rejected allocation, first/last close, slot reuse and preservation of other
+  contexts and framed message bytes. The sequence test uses explicit SMT fuel
+  (`--z3rlimit 100`); it adds no admission or assumption. Shared permutation
+  regressions also verify in the stable lane.
+- Strict table C compilation/link/run passed 15,520 state/byte comparisons
+  covering all four-slot permutations, capacities 0–4, all active prefix
+  lengths, duplicate and distinct IDs, missing IDs, first-match behavior and
+  chained close/reopen operations. Every check includes the whole pointer
+  table, context fields and all four 65535-byte message buffers. Native Clang
+  AddressSanitizer/UndefinedBehaviorSanitizer also passed the same tests; this
+  is supplemental table-only evidence, not a sanitizer run of the full server.
+- Generated table C review found bounded native loops/indexing, context updates
+  and pointer swaps; pool/snapshot/ownership proofs erase. No allocation, GC,
+  assumed Pulse runtime primitive or new unverified adapter is introduced.
+- Stable container: full `make verify`, `make extract` (including EverParse),
+  both C smoke gates and all six `msquic-runtime-*-smoke` targets passed. Public
+  `DNS_ShellBoundary.h`, `DNS_ShellResponseBoundary.h` and `DNS_Protocol.h` bodies
+  match the M3 baseline hashes after excluding generation banners. Existing
+  F* extraction warning 250, KaRaMeL warning 15 and C macro redefinition debt
+  remain; this is not a warning-free whole-project build.
+- Stable-image `make pulse-integration-check
+  CANDIDATE_LANE=candidate-v2026.09.13-m4-final` passed against the final archive:
+  manifest/selection checks, 1071 ingress/FIN differential comparisons, C smoke
+  gates and every MsQuic gate including live loopback. This still selects only
+  Pulse ingress/FIN with the stable table; it is not table integration evidence.
+- All 36 migration guard tests pass, including new required table proof/C gate
+  and verification-only regression coverage checks. Workflow YAML parses and
+  `git diff --check` passes; hosted CI and branch protection were not run/changed.

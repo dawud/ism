@@ -195,6 +195,32 @@ class MakeTests(unittest.TestCase):
         self.assertNotIn("DNS_Migration_PulseStream.c", commands)
         self.assertNotIn("candidate-stream-extract", commands)
 
+    def test_table_proofs_and_standalone_c_are_required(self):
+        commands = self.dry_run("candidate-check", "FSTAR_HOME=/candidate")
+        loop = next(line for line in commands.splitlines()
+                    if line.startswith("for f in src/transport/DNS.QUIC.TableModel.fst"))
+        for name in ("src/transport/DNS.QUIC.TableModel.Tests.fst",
+                     "migration/DNS.Migration.PulseMultiplexer.fst",
+                     "migration/DNS.Migration.PulseMultiplexer.Tests.fst"):
+            self.assertIn(name, loop)
+        self.assertIn("--cache_dir obj/candidate-v2026.09.13/multiplexer", commands)
+        extraction = self.dry_run("candidate-multiplexer-extract", "FSTAR_HOME=/candidate")
+        self.assertNotIn("--no_cmi", extraction)
+        self.assertNotIn("--lax", extraction)
+        self.assertIn("--warn_error +250", extraction)
+        self.assertIn("-warn-error @2@4@15", extraction)
+        self.assertIn("pulse-multiplexer/out.krml", extraction)
+        self.assertIn("migration/c/pulse_multiplexer_smoke.c", commands)
+        self.assertNotIn("DNS_Migration_PulseMultiplexer", self.dry_run("pulse-integration-check"))
+
+    def test_table_model_regressions_stay_verification_only(self):
+        commands = self.dry_run("migration-inventory-check")
+        verified = commands.split("--verified ", 1)[1].split("--extracted", 1)[0]
+        extracted = commands.split("--extracted ", 1)[1].split("--candidate", 1)[0]
+        self.assertIn("src/transport/DNS.QUIC.TableModel.Tests.fst", verified)
+        self.assertNotIn("src/transport/DNS.QUIC.TableModel.Tests.fst", extracted)
+        self.assertIn("src/transport/DNS.QUIC.TableModel.fst", extracted)
+
     def test_stream_regressions_remain_in_stable_verify_not_extraction(self):
         commands = self.dry_run("migration-inventory-check")
         verified = commands.split("--verified ", 1)[1].split("--extracted", 1)[0]

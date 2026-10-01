@@ -22,6 +22,44 @@ CANDIDATE_STREAM_FILES = src/transport/DNS.QUIC.StreamModel.fst \
                          migration/DNS.Migration.PulseStream.fst \
                          migration/DNS.Migration.PulseStream.Tests.fst
 
+CANDIDATE_MULTIPLEXER_FILES = src/transport/DNS.QUIC.TableModel.fst \
+                              src/transport/DNS.QUIC.TableModel.Tests.fst \
+                              migration/DNS.Migration.PulseMultiplexer.fst \
+                              migration/DNS.Migration.PulseMultiplexer.Tests.fst
+CANDIDATE_MULTIPLEXER_C_DIR = $(CANDIDATE_DIST_DIR)/pulse-multiplexer
+CANDIDATE_MULTIPLEXER_MODULES = DNS.QUIC.StreamModel DNS.QUIC.TableModel DNS.Migration.PulseStream DNS.Migration.PulseMultiplexer Pulse.Lib.Pervasives
+
+.PHONY: candidate-multiplexer-verify candidate-multiplexer-extract candidate-multiplexer-c-smoke
+candidate-multiplexer-verify: candidate-stream-verify
+	@mkdir -p $(CANDIDATE_OBJ_DIR)/multiplexer
+	@for f in $(CANDIDATE_MULTIPLEXER_FILES); do \
+	  $(FSTAR_HOME)/bin/fstar.exe $(CANDIDATE_FSTAR_OPTS) \
+	    --odir $(CANDIDATE_OBJ_DIR)/multiplexer --cache_dir $(CANDIDATE_OBJ_DIR)/multiplexer \
+	    --include $(CANDIDATE_OBJ_DIR)/stream --include src/transport \
+	    $(addprefix --include ,$(PULSE_INCLUDE_DIRS)) $$f || exit $$?; \
+	done
+
+candidate-multiplexer-extract: candidate-multiplexer-verify
+	@mkdir -p $(CANDIDATE_MULTIPLEXER_C_DIR)
+	$(FSTAR_HOME)/bin/fstar.exe $(CANDIDATE_FSTAR_OPTS) --warn_error +250 \
+	  --cache_dir $(CANDIDATE_OBJ_DIR)/multiplexer --odir $(CANDIDATE_MULTIPLEXER_C_DIR) \
+	  --include $(CANDIDATE_OBJ_DIR)/stream --include src/transport \
+	  $(addprefix --include ,$(PULSE_INCLUDE_DIRS)) \
+	  --codegen krml --extract '$(CANDIDATE_MULTIPLEXER_MODULES)' migration/DNS.Migration.PulseMultiplexer.fst
+	$(FSTAR_HOME)/bin/krml -tmpdir $(CANDIDATE_MULTIPLEXER_C_DIR) -skip-compilation \
+	  -warn-error @2@4@15 \
+	  -bundle 'DNS.Migration.PulseMultiplexer=DNS.QUIC.StreamModel,DNS.QUIC.TableModel,DNS.Migration.PulseStream,DNS.Migration.PulseMultiplexer,Pulse.Lib.Pervasives' \
+	  $(CANDIDATE_MULTIPLEXER_C_DIR)/out.krml
+	@test -s $(CANDIDATE_MULTIPLEXER_C_DIR)/DNS_Migration_PulseMultiplexer.c
+	@test -s $(CANDIDATE_MULTIPLEXER_C_DIR)/DNS_Migration_PulseMultiplexer.h
+
+# Standalone M4 table contract tests, not yet a mixed-shell table replacement.
+candidate-multiplexer-c-smoke: candidate-multiplexer-extract
+	$(CC) $(CANDIDATE_STREAM_CFLAGS) -I $(CANDIDATE_MULTIPLEXER_C_DIR) \
+	  $(CANDIDATE_MULTIPLEXER_C_DIR)/DNS_Migration_PulseMultiplexer.c \
+	  migration/c/pulse_multiplexer_smoke.c -o $(CANDIDATE_MULTIPLEXER_C_DIR)/pulse-multiplexer-smoke
+	$(CANDIDATE_MULTIPLEXER_C_DIR)/pulse-multiplexer-smoke
+
 candidate-stream-verify: candidate-toolchain-check
 	@mkdir -p $(CANDIDATE_OBJ_DIR)/stream
 	@for f in $(CANDIDATE_STREAM_FILES); do \
@@ -42,14 +80,15 @@ migration-inventory-check:
 	@mkdir -p $(CANDIDATE_DIST_DIR)
 	python3 migration/check_inventory.py --verified $(ALL_FST_FILES) \
 	  --extracted $(EXTRACT_FST_FILES) \
-	  --candidate $(PULSE_PILOT_FST_FILES) $(CANDIDATE_STREAM_FILES) \
+	  --candidate $(PULSE_PILOT_FST_FILES) $(CANDIDATE_STREAM_FILES) $(CANDIDATE_MULTIPLEXER_FILES) \
 	  --candidate-extracted $(PULSE_VALUE_PILOT_FST_FILE) \
 	    src/transport/DNS.QUIC.StreamModel.fst migration/DNS.Migration.PulseStream.fst \
+	    src/transport/DNS.QUIC.TableModel.fst migration/DNS.Migration.PulseMultiplexer.fst \
 	  > $(CANDIDATE_DIST_DIR)/inventory.json.tmp
 	@mv $(CANDIDATE_DIST_DIR)/inventory.json.tmp $(CANDIDATE_DIST_DIR)/inventory.json
 	@echo "Migration inventory checked; see $(CANDIDATE_DIST_DIR)/inventory.json"
 
-candidate-verify: candidate-toolchain-check candidate-stream-verify
+candidate-verify: candidate-toolchain-check candidate-stream-verify candidate-multiplexer-verify
 	$(MAKE) verify-pulse-pilot BUILD_LANE=$(CANDIDATE_LANE) \
 	  PULSE_PILOT_FSTAR_OPTS='--odir $(CANDIDATE_OBJ_DIR)/pulse-pilot \
 	    --cache_dir $(CANDIDATE_OBJ_DIR)/pulse-pilot $(CANDIDATE_FSTAR_OPTS) \
@@ -110,7 +149,7 @@ candidate-stream-c-smoke: candidate-stream-library
 	$(CANDIDATE_STREAM_C_DIR)/pulse-stream-smoke
 	python3 migration/check_stream_artifacts.py record --directory $(CANDIDATE_STREAM_C_DIR) --cc '$(CC)'
 
-candidate-check: migration-inventory-check candidate-c-smoke candidate-stream-c-smoke
+candidate-check: migration-inventory-check candidate-c-smoke candidate-stream-c-smoke candidate-multiplexer-c-smoke
 
 # Run with the STABLE image after candidate-check has produced the archive.
 # Only C objects and the neutral ABI cross this boundary. A manifest rejects
