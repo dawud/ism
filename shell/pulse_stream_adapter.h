@@ -2,6 +2,11 @@
 #define ISM_PULSE_STREAM_ADAPTER_H
 
 #include "ism_shell.h"
+#include "ism_pulse_stream.h"
+
+/* Stable-side named conversions, shared by the stream and table marshalers. */
+ism_pulse_phase ism_pulse_phase_to_wire(DNS_QUIC_StreamMapping_stream_phase in);
+DNS_QUIC_StreamMapping_stream_phase ism_pulse_phase_from_wire(ism_pulse_phase in);
 
 /* Same caller-owned shell context and storage as the Low* ingress boundary;
    calls are serialized, and the message buffer has the fixed shell capacity. */

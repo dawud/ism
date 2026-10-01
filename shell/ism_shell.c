@@ -2,6 +2,9 @@
 #if defined(ISM_USE_PULSE_STREAM) && ISM_USE_PULSE_STREAM
 #include "pulse_stream_adapter.h"
 #endif
+#if defined(ISM_USE_PULSE_TABLE) && ISM_USE_PULSE_TABLE
+#include "pulse_table_adapter.h"
+#endif
 
 #include <stddef.h>
 #include <string.h>
@@ -69,6 +72,9 @@ ism_shell_connection_init(ism_shell_connection *conn)
 DNS_QUIC_StreamMapping_stream_context
 *ism_shell_find_stream(ism_shell_connection *conn, uint64_t stream_id)
 {
+#if defined(ISM_USE_PULSE_TABLE) && ISM_USE_PULSE_TABLE
+  return ism_pulse_table_find(conn, stream_id);
+#else
   for (uint32_t i = 0U; i < conn->ctx.cc_num; i++)
   {
     DNS_QUIC_StreamMapping_stream_context *stream = conn->ctx.cc_active[i];
@@ -79,11 +85,15 @@ DNS_QUIC_StreamMapping_stream_context
   }
 
   return NULL;
+#endif
 }
 
 DNS_QUIC_StreamMapping_stream_context
 *ism_shell_open_stream(ism_shell_connection *conn, uint64_t stream_id)
 {
+#if defined(ISM_USE_PULSE_TABLE) && ISM_USE_PULSE_TABLE
+  return ism_pulse_table_open(conn, stream_id);
+#else
   DNS_QUIC_StreamMapping_stream_context *existing =
     ism_shell_find_stream(conn, stream_id);
   if (existing != NULL)
@@ -114,6 +124,7 @@ DNS_QUIC_StreamMapping_stream_context
   }
 
   return NULL;
+#endif
 }
 
 uint8_t
@@ -358,6 +369,13 @@ ism_shell_complete_response_send(
   bool dropped
 )
 {
+#if defined(ISM_USE_PULSE_TABLE) && ISM_USE_PULSE_TABLE
+  /* Existing completion consumes no response bytes and both outcomes close.
+   * The runtime still owns send-buffer lifetime and callback serialization. */
+  (void)response_buffer; (void)response_len; (void)dropped;
+  uint8_t result = ism_pulse_table_close(conn, stream_id);
+  if (result != 1U) return result;
+#else
   uint8_t result =
     DNS_ShellResponseBoundary_complete_response_send_for_stream(
       &conn->ctx,
@@ -366,6 +384,7 @@ ism_shell_complete_response_send(
       stream_id,
       dropped ? 1U : 0U
     );
+#endif
 
   for (uint32_t i = 0U; i < ISM_SHELL_MAX_STREAMS; i++)
   {
@@ -388,6 +407,11 @@ ism_shell_dispatch_response_send_finished(
   bool dropped
 )
 {
+#if defined(ISM_USE_PULSE_TABLE) && ISM_USE_PULSE_TABLE
+  (void)response_buffer; (void)response_len; (void)dropped;
+  uint8_t result = ism_pulse_table_close(conn, stream_id);
+  if (result != 1U) return result;
+#else
   uint8_t result =
     DNS_ShellBoundary_dispatch_response_send_finished_via_scheduler(
       &conn->ctx,
@@ -396,6 +420,7 @@ ism_shell_dispatch_response_send_finished(
       stream_id,
       dropped ? 1U : 0U
     );
+#endif
 
   for (uint32_t i = 0U; i < ISM_SHELL_MAX_STREAMS; i++)
   {
@@ -415,11 +440,15 @@ ism_shell_dispatch_stream_reset(
   uint64_t stream_id
 )
 {
+#if defined(ISM_USE_PULSE_TABLE) && ISM_USE_PULSE_TABLE
+  uint8_t result = ism_pulse_table_close(conn, stream_id);
+#else
   uint8_t result =
     DNS_ShellBoundary_dispatch_stream_reset_via_scheduler(
       &conn->ctx,
       stream_id
     );
+#endif
 
   if (result == 1U)
   {

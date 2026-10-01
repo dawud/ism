@@ -1,5 +1,6 @@
 #include "ism_pulse_stream.h"
 #include "DNS_Migration_PulseStream.h"
+#include "pulse_phase_decode.h"
 
 #include <stdbool.h>
 
@@ -19,40 +20,6 @@ uint32_t ism_pulse_stream_abi_version(void)
 static ism_pulse_result rejected(void)
 {
   return (ism_pulse_result){ .phase = { .tag = ISM_PULSE_DONE }, .code = 3U };
-}
-
-static bool decode(ism_pulse_phase in, DNS_QUIC_StreamModel_stream_phase *out)
-{
-  *out = (DNS_QUIC_StreamModel_stream_phase){ .tag = DNS_QUIC_StreamModel_Done };
-  switch (in.tag) {
-    case ISM_PULSE_LENGTH:
-      out->tag = DNS_QUIC_StreamModel_ReadingLength;
-      return true;
-    case ISM_PULSE_LENGTH_HIGH:
-      out->tag = DNS_QUIC_StreamModel_ReadingLengthHigh;
-      out->case_ReadingLengthHigh = in.high;
-      return true;
-    case ISM_PULSE_BODY:
-      if (in.expected > ISM_PULSE_MESSAGE_CAPACITY) return false;
-      out->tag = DNS_QUIC_StreamModel_ReadingMessage;
-      out->case_ReadingMessage.expected = in.expected;
-      out->case_ReadingMessage.current = in.current;
-      return true;
-    case ISM_PULSE_AWAITING_FIN:
-      if (in.expected > ISM_PULSE_MESSAGE_CAPACITY) return false;
-      out->tag = DNS_QUIC_StreamModel_AwaitingFin;
-      out->case_AwaitingFin = in.expected;
-      return true;
-    case ISM_PULSE_PROCESSING:
-      if (in.expected > ISM_PULSE_MESSAGE_CAPACITY) return false;
-      out->tag = DNS_QUIC_StreamModel_Processing;
-      out->case_Processing = in.expected;
-      return true;
-    case ISM_PULSE_DONE:
-      return true;
-    default:
-      return false;
-  }
 }
 
 static ism_pulse_result encode(DNS_QUIC_StreamModel_stream_phase in)
@@ -108,7 +75,7 @@ ism_pulse_result ism_pulse_stream_data(
   uint8_t *input, size_t input_capacity, uint32_t len)
 {
   DNS_QUIC_StreamModel_stream_phase decoded;
-  if (!decode(phase, &decoded) || message_capacity < ISM_PULSE_MESSAGE_CAPACITY ||
+  if (!ism_pulse_decode_phase(phase, &decoded) || message_capacity < ISM_PULSE_MESSAGE_CAPACITY ||
       !range_ok(message, message_capacity) || len > input_capacity) return rejected();
   uint8_t empty = 0U;
   if (len == 0U) {
@@ -130,7 +97,7 @@ ism_pulse_result ism_pulse_stream_fin(
   uint8_t *message, size_t message_capacity)
 {
   DNS_QUIC_StreamModel_stream_phase decoded;
-  if (!decode(phase, &decoded) || message_capacity < 2U ||
+  if (!ism_pulse_decode_phase(phase, &decoded) || message_capacity < 2U ||
       !range_ok(message, message_capacity)) return rejected();
   DNS_Migration_PulseStream_stream_context context = {
     .sc_id = stream_id, .sc_phase = decoded, .sc_buf = message

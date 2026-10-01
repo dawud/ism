@@ -109,19 +109,19 @@ jobs:
       - name: Build pinned Pulse image for mixed C integration
         run: docker build -t localhost/verified-dns-server:pulse-candidate -f Containerfile.candidate .
 
-      - name: Verify, extract and test the real Pulse stream archive
+      - name: Verify, extract and test the Pulse stream/table archives
         run: |
           docker run --rm \
             --user "$(id -u):$(id -g)" -e HOME=/tmp \
             -v "${PWD}:/workspace" \
             localhost/verified-dns-server:pulse-candidate
 
-      - name: Test C and live MsQuic with Pulse ingress selected
+      - name: Test C and live MsQuic with Pulse ingress and table lanes
         run: |
           docker run --rm \
             --user "$(id -u):$(id -g)" -e HOME=/tmp \
             -v "${PWD}:/workspace" \
-            localhost/verified-dns-server:latest make pulse-integration-check
+            localhost/verified-dns-server:latest make pulse-integration-check pulse-table-integration-check
 
       - name: Retain mixed Pulse C integration evidence
         if: always()
@@ -131,7 +131,10 @@ jobs:
           path: |
             dist/pulse-integration-*/
             obj/pulse-integration-*/
+            dist/pulse-table-integration-*/
+            obj/pulse-table-integration-*/
             dist/candidate-*/pulse-stream/
+            dist/candidate-*/pulse-multiplexer/
 
   pulse-candidate:
     name: Pinned Pulse candidate (M1–M3 and M4 table slice)

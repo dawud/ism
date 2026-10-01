@@ -51,11 +51,11 @@ The pinned candidate lane uses `Containerfile.candidate` and
 bundled KaRaMeL, and Z3 4.13.3. Its blocking CI job covers the shared stream/table
 models, real Pulse ingress/FIN and table implementations and regressions, the two
 original pilot proofs, and C extraction/compile/link/run of the stream port,
-standalone table port and value pilot. The stable CI job links the Pulse stream
-archive into the existing shell and runs differential, audit, callback and live
-MsQuic tests (M3).
-This explicit mixed C lane does not change the default Low* implementation or
-promote the toolchain. See the [C ABI](docs/PULSE_C_ABI.md) and
+table port/ABI and value pilot. The stable CI job runs both the M3 ingress-only
+lane and the M4 table-enabled lane with differential, audit, callback and live
+MsQuic tests. These explicit mixed C lanes do not change the default Low*
+implementation or promote the toolchain. See the [stream ABI](docs/PULSE_C_ABI.md),
+[table ABI](docs/PULSE_TABLE_C_ABI.md) and
 [contract inventory](docs/PULSE_MIGRATION_INVENTORY.md).
 The separate `Containerfile.migration` remains an optional latest-release/Rust
 exploration lane; neither replaces the stable development lane.
@@ -79,7 +79,7 @@ If the local image is missing, build it from the checked-in `Containerfile`:
 podman build -t localhost/verified-dns-server:latest -f Containerfile .
 ```
 
-To run the pinned candidate checks (M1–M3 and the first M4 table slice):
+To run the pinned candidate checks (M1–M3 and M4 table scope):
 
 ```bash
 podman build -t localhost/verified-dns-server:pulse-candidate -f Containerfile.candidate .
@@ -94,7 +94,7 @@ The default command is `make candidate-check`: validate tool identities,
 check the complete source inventory, verify the shared stream/table models and
 real Pulse implementations/tests plus both pilots, extract the stream/table
 ports and value pilot to C, and compile/link/run their smoke tests. It records a
-checked stream C archive and source/product manifest for the mixed integration gate.
+checked stream/table C archives and source/product manifests for the mixed gates.
 It does not invoke Rust or tolerate failed candidate checks. Artifacts and
 provenance are isolated under `obj/candidate-v2026.09.13/` and
 `dist/candidate-v2026.09.13/`; stable output paths remain unchanged. Use the
@@ -118,6 +118,21 @@ No candidate generated headers, checked files or `.krml` inputs are consumed by
 the stable compiler. Re-run `candidate-check` after changing its sources or build
 recipe; a stale manifest fails closed. Ordinary stable targets remain Low*.
 
+To additionally select Pulse for shell table lookup/open and reset/completion
+cleanup, run the separate M4 lane in the stable image:
+
+```bash
+podman run --rm --userns=keep-id -v "$(pwd):/workspace:z" \
+  localhost/verified-dns-server:latest make pulse-table-integration-check
+```
+
+This checks both archives and actual table selection, compares against an
+independent compilation of the baseline shell, and runs the same C/MsQuic gates.
+Outputs use `dist/pulse-table-integration-v2026.09.13/` and the matching `obj/`
+directory. The fixed four-slot ABI preserves embedded context identity and
+message storage. Its two C adapters remain trusted; see the
+[ownership and lifetime review](docs/PULSE_TABLE_C_ABI.md).
+
 For a native installation of the locked bundle:
 
 ```bash
@@ -126,19 +141,20 @@ make candidate-check FSTAR_HOME=/path/to/fstar
 make candidate-stream-verify FSTAR_HOME=/path/to/fstar
 # Focused M3 candidate C gate (includes verification):
 make candidate-stream-c-smoke FSTAR_HOME=/path/to/fstar
-# Focused M4 standalone table gate (includes stream/table verification):
+# Focused M4 direct-table and ABI gates (includes stream/table verification):
 make candidate-multiplexer-c-smoke FSTAR_HOME=/path/to/fstar
 python3 -m unittest discover -s migration/tests -v
 ```
 
 Full legacy verification on the new compiler is still expected to fail on APIs
 that need migration; the scoped candidate gate does not establish whole-project
-compatibility. The mixed lane establishes tested integration of stream ingress/
-FIN only. The M4 table port proves lookup/allocation/close over owned pointer
-arrays and contexts and has standalone C tests, but is not selected by the shell.
-Its index/sentinel API and uniform ownership requirements are documented in the
+compatibility. The M3 mixed lane selects ingress/FIN only; the separate M4 lane
+also selects shell table lifecycle. The port proves lookup/allocation/close over
+owned pointer arrays and contexts. Its index/sentinel API and uniform ownership
+requirements are documented in the
 [table correspondence](docs/PULSE_MIGRATION_INVENTORY.md#m4-table-contract-correspondence).
-Table integration, remaining imperative modules and stable promotion remain open.
+Worker wrappers still perform internal read-only Low* lookups; egress/completion
+ownership proofs, other remaining imperative modules and stable promotion remain open.
 Base-image/system packages are not fully locked; `toolchain.json` records the
 actual C compiler, target, OS, compiler/extractor identities and solver versions.
 EverParse remains the separately pinned baseline generator.

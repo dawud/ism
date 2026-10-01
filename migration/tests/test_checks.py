@@ -10,6 +10,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from check_inventory import inventory, without_comments
 from check_toolchain import check, read_lock
 from check_stream_artifacts import SOURCES, PRODUCTS, digest, validate, check_selection, check_archive
+import check_table_artifacts as table_checks
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -221,6 +222,21 @@ class MakeTests(unittest.TestCase):
         self.assertNotIn("src/transport/DNS.QUIC.TableModel.Tests.fst", extracted)
         self.assertIn("src/transport/DNS.QUIC.TableModel.fst", extracted)
 
+    def test_table_abi_and_integrated_selection_are_required(self):
+        candidate = self.dry_run("candidate-check", "FSTAR_HOME=/candidate")
+        self.assertIn("pulse_table_abi_smoke.c", candidate)
+        self.assertIn("check_table_artifacts.py record", candidate)
+        commands = self.dry_run("pulse-table-integration-check")
+        for expected in ("check_table_artifacts.py check", "check_table_artifacts.py selection",
+                         "-DISM_USE_PULSE_TABLE=1", "shell/pulse_table_adapter.c",
+                         "pulse_table_differential.c", "legacy_shell_oracle.c",
+                         "libism_pulse_table.a", "msquic-runtime-stream-smoke",
+                         "SMOKE_DIR=dist/pulse-table-integration-v2026.09.13"):
+            self.assertIn(expected, commands)
+        self.assertNotIn("DNS_Migration_PulseMultiplexer.c", commands)
+        self.assertNotIn("candidate-multiplexer-extract", commands)
+        self.assertNotIn("-DISM_USE_PULSE_TABLE=1", self.dry_run("pulse-integration-check"))
+
     def test_stream_regressions_remain_in_stable_verify_not_extraction(self):
         commands = self.dry_run("migration-inventory-check")
         verified = commands.split("--verified ", 1)[1].split("--extracted", 1)[0]
@@ -332,6 +348,80 @@ class HandoffTests(unittest.TestCase):
                 patch("check_stream_artifacts.undefined_symbols", return_value={"Pulse_Lib_Reference_op_Bang"}):
             with self.assertRaisesRegex(ValueError, "runtime dependencies"):
                 check_archive(self.output)
+
+
+class TableHandoffTests(unittest.TestCase):
+    def setUp(self):
+        import json
+        self.temp = tempfile.TemporaryDirectory(prefix="ism-table-handoff-test-")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.output = self.root / "output"
+        self.output.mkdir()
+        for name in table_checks.SOURCES:
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("test source")
+        (self.root / "migration/toolchain.lock").write_text(LOCK.read_text())
+        for name in table_checks.PRODUCTS:
+            (self.output / name).write_text("test product")
+        self.report = dict(abi=1, c_target="test-target", lock=read_lock(LOCK),
+            sources={name: digest(self.root / name) for name in table_checks.SOURCES},
+            products={name: digest(self.output / name) for name in table_checks.PRODUCTS})
+        self.manifest = self.output / table_checks.MANIFEST
+        self.manifest.write_text(json.dumps(self.report))
+
+    def run_check(self, target="test-target"):
+        with patch("check_table_artifacts.check_archive"):
+            return validate(self.root, self.output, target, **table_checks.options())
+
+    def test_matching_table_manifest_passes(self):
+        self.assertEqual(self.run_check()["abi"], 1)
+
+    def test_changed_table_abi_source_or_archive_fails(self):
+        for path in (self.root / "migration/c/ism_pulse_table.h",
+                     self.output / "libism_pulse_table.a"):
+            with self.subTest(path=path):
+                before = path.read_text()
+                path.write_text("changed")
+                with self.assertRaisesRegex(ValueError, "Stale or changed"):
+                    self.run_check()
+                path.write_text(before)
+
+    def test_wrong_table_target_or_missing_product_fails(self):
+        import json
+        with self.assertRaisesRegex(ValueError, "target mismatch"):
+            self.run_check("foreign-target")
+        del self.report["products"][table_checks.PRODUCTS[0]]
+        self.manifest.write_text(json.dumps(self.report))
+        with self.assertRaisesRegex(ValueError, "Incomplete"):
+            self.run_check()
+
+    def test_table_selection_rejects_missing_pulse_or_legacy_cleanup(self):
+        shell = {"ism_pulse_table_find", "ism_pulse_table_open", "ism_pulse_table_close"}
+        adapter = {"ism_pulse_table_apply", "ism_pulse_table_abi_version"}
+        table_checks.check_selection(shell, adapter)
+        for name in shell:
+            with self.assertRaisesRegex(ValueError, "selecting Pulse"):
+                table_checks.check_selection(shell - {name}, adapter)
+        for name in ("DNS_ShellBoundary_dispatch_stream_reset_via_scheduler",
+                     "DNS_ShellBoundary_dispatch_response_send_finished_via_scheduler",
+                     "DNS_ShellResponseBoundary_complete_response_send_for_stream",
+                     "DNS_QUIC_Multiplexer_close_stream"):
+            with self.assertRaisesRegex(ValueError, "selecting Pulse"):
+                table_checks.check_selection(shell | {name}, adapter)
+        with self.assertRaisesRegex(ValueError, "candidate ABI"):
+            table_checks.check_selection(shell, set())
+
+    def test_table_archive_rejects_extra_members_and_runtime_shims(self):
+        with patch("check_table_artifacts.subprocess.check_output", return_value="mock_runtime.o\n"):
+            with self.assertRaisesRegex(ValueError, "archive members"):
+                table_checks.check_archive(self.output)
+        members = "DNS_Migration_PulseMultiplexer.o\nism_pulse_table.o\n"
+        with patch("check_table_artifacts.subprocess.check_output", return_value=members), \
+             patch("check_stream_artifacts.undefined_symbols", return_value={"Pulse_Lib_Reference_op_Bang"}):
+            with self.assertRaisesRegex(ValueError, "runtime dependencies"):
+                table_checks.check_archive(self.output)
 
 
 if __name__ == "__main__":

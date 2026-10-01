@@ -54,7 +54,7 @@ def check(fstar_home, cc, lock_path):
         "host": platform.platform(),
         "os_release": Path("/etc/os-release").read_text(),
         "everparse": "separate pinned baseline generator; not run by candidate gate",
-        "scope": "shared stream/table and Pulse proofs; pilots, real stream and standalone table C extraction/smoke; mixed stream-only C integration checked separately; not whole-toolchain promotion",
+        "scope": "shared stream/table and Pulse proofs; pilots and real stream/table C extraction/ABI smokes; mixed ingress-only and table lifecycle integration checked separately; not whole-toolchain promotion",
     }
 
 

@@ -6,6 +6,10 @@ reset and completion paths remain unchanged. `make pulse-integration-check`
 selects Pulse for both shell data entry points and FIN; ordinary stable targets
 remain Low*. See [DR-0020](DECISIONS.md#dr-0020-integrate-the-pulse-stream-port-through-a-versioned-c-only-boundary).
 
+M4 adds a separate `pulse-table-integration-check` lane that also selects table
+lifecycle through [PULSE_TABLE_C_ABI.md](PULSE_TABLE_C_ABI.md). The stream-only
+scope described here remains available and separately tested.
+
 ## Artifact and call boundaries
 
 The candidate bundle verifies the shared model and real Pulse implementation,

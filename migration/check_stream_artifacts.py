@@ -23,6 +23,7 @@ SOURCES = (
     "migration/DNS.Migration.PulseStream.Tests.fst",
     "migration/c/ism_pulse_stream.h",
     "migration/c/ism_pulse_stream.c",
+    "migration/c/pulse_phase_decode.h",
     "migration/c/pulse_stream_smoke.c",
     "migration/candidate.mk",
     "migration/check_stream_artifacts.py",
@@ -71,35 +72,37 @@ def target(cc):
     return subprocess.check_output([*shlex.split(cc), "-dumpmachine"], text=True).strip()
 
 
-def validate(root, directory, cc_target):
-    report = json.loads((directory / MANIFEST).read_text())
+def validate(root, directory, cc_target, *, sources=SOURCES, products=PRODUCTS,
+             manifest=MANIFEST, archive_check=None):
+    report = json.loads((directory / manifest).read_text())
     if report.get("abi") != 1 or report.get("c_target") != cc_target:
         raise ValueError("Pulse ABI version or C target mismatch")
     if report.get("lock") != read_lock(root / "migration/toolchain.lock"):
         raise ValueError("Pulse toolchain lock mismatch")
-    for key, base, names in (("sources", root, SOURCES), ("products", directory, PRODUCTS)):
+    for key, base, names in (("sources", root, sources), ("products", directory, products)):
         if set(report.get(key, {})) != set(names):
             raise ValueError("Incomplete Pulse manifest " + key)
         for name in names:
             if report[key][name] != digest(base / name):
                 raise ValueError("Stale or changed Pulse artifact: " + name)
-    check_archive(directory)
+    (archive_check or check_archive)(directory)
     return report
 
 
-def record(root, directory, cc_target):
+def record(root, directory, cc_target, *, sources=SOURCES, products=PRODUCTS,
+           manifest=MANIFEST, archive_check=None):
     provenance = json.loads((directory.parent / "toolchain.json").read_text())
     lock = read_lock(root / "migration/toolchain.lock")
     if provenance["lock"] != lock or provenance["c_target"] != cc_target:
         raise ValueError("Candidate provenance does not match the current build")
-    check_archive(directory)
+    (archive_check or check_archive)(directory)
     report = dict(abi=1, c_target=cc_target, lock=lock,
-                  sources={name: digest(root / name) for name in SOURCES},
-                  products={name: digest(directory / name) for name in PRODUCTS},
+                  sources={name: digest(root / name) for name in sources},
+                  products={name: digest(directory / name) for name in products},
                   provenance=provenance)
-    temporary = directory / (MANIFEST + ".tmp")
+    temporary = directory / (manifest + ".tmp")
     temporary.write_text(json.dumps(report, indent=2) + "\n")
-    temporary.replace(directory / MANIFEST)
+    temporary.replace(directory / manifest)
 
 
 def main():

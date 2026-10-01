@@ -608,6 +608,9 @@ ports, warning/resource review and whole-toolchain promotion remain M4/M5.
 **Status:** Accepted (2026-10-01); first M4 slice implemented, runtime table
 integration and the remaining M4 modules are still open. Stable pins unchanged.
 
+**Amendment:** DR-0022 subsequently adds the separate table-enabled runtime lane;
+the first-slice scope below records the original standalone proof/C milestone.
+
 **Decision:** Port lookup, allocation and close to
 `DNS.Migration.PulseMultiplexer` using real Pulse references and pointer arrays.
 Share ghost slot distinctness/permutation lemmas in `DNS.QUIC.TableModel` with
@@ -647,3 +650,49 @@ unchanged. Next design and review a C-only table seam and its initialization,
 context identity, lifetime and ownership obligations before selecting the new
 table in runtime tests. No new unverified adapter is added by this slice, and
 passing it does not complete M4 or permit M5 toolchain promotion.
+
+## DR-0022: Integrate Pulse Table Lifecycle Through Bounded C Snapshots
+
+**Status:** Accepted (2026-10-01); M4 table integration slice. Remaining imperative
+proof ports and stable toolchain promotion remain open. This extends DR-0021's
+standalone scope without replacing the default table or the M3-only lane.
+
+**Decision:** Add the versioned C-only boundary in `ism_pulse_table.h`, with four
+physical slot identities and an active/available permutation matching the current
+shell capacity. Snapshot IDs, explicit neutral phases and message descriptors;
+materialize real separate candidate references/pointer arrays locally; invoke the
+verified table operations; map results back to the original embedded shell slots.
+Never cast generated context types across compilers, relocate message storage or
+retain candidate pointers. Share named phase conversions with the M3 adapters.
+
+**Behavior:** Preserve shell idempotent open by finding before allocating. Route
+shell find/open and reset/direct-completion/dispatched-completion close through
+Pulse in `pulse-table-integration-check`. Preserve the legacy return 1 for a
+missing close and the existing active-flag/retired-slot synchronization. Both send
+outcomes still close without accessing response bytes. Reject malformed metadata,
+permutations, phase encodings, capacities and alias ranges before writeback.
+Full shell initialization, embedded buffer identity and active-prefix consistency
+are required; this is not support for arbitrary foreign context pools.
+
+**Trust:** The two new C table adapters and selected cleanup dispatch are unverified
+trusted code. The candidate proof owns the local materialized heap; snapshot and
+persistent-shell writeback correspondence are supported by review and differential
+tests, not a new theorem. Live allocations, truthful capacities, response lifetimes,
+exclusive access and callback serialization remain caller/runtime obligations.
+There is no new F* admission, assumed Pulse primitive or concurrency permission.
+The stricter boundary is documented in [PULSE_TABLE_C_ABI.md](PULSE_TABLE_C_ABI.md).
+
+**Gates:** Retain standalone tests and add ABI rejection tests and a checked table
+C archive/manifest. Check compiled shell and adapter symbols for actual selection
+and absence of old cleanup entry points. Compare the selected shell against an
+independent compilation of the actual baseline, including pointer identity,
+permutation/count, flags, phases, bytes and close/reopen/ingress composition. Run
+all existing C/MsQuic tests on that same shell object. Keep default, M3-only and
+table-enabled lanes separate and required in CI; no candidate generated headers,
+checked files or `.krml` inputs enter stable compilation.
+
+**Remaining work:** Worker/response wrappers retain their internal read-only Low*
+lookups and sequential proofs; egress and send-buffer/completion ownership proofs
+are not migrated here. Port those boundaries next, followed by the remaining
+worker/parser/cache/security inventory. No API or proof is silently retired.
+Use the normal stable build, or M3-only integration, to roll back table selection.

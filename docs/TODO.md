@@ -96,9 +96,11 @@ C/MsQuic shell. Rust is not on this migration's critical path.
   - [x] First table slice: real Pulse lookup/allocation/close ownership proofs,
     shared permutation lemmas, imperative proof tests and standalone checked C
     extraction/tests. Stable table implementation retained. See DR-0021.
-  - [ ] Integrate table lifecycle through a reviewed C-only ABI; establish
-    initialization/lifetime and serialized context/message ownership at callers.
-    Current index/sentinel API is not a drop-in replacement for Low* options.
+  - [x] Integrate shell table lifecycle through a reviewed C-only ABI in the
+    separate table-enabled lane. Preserve embedded identity, idempotent open,
+    reset/completion bookkeeping and byte storage; validate caller descriptors
+    and document live/exclusive storage and serialization obligations. The new
+    adapters are trusted, not a proof of raw-pointer ownership. See DR-0022.
   - [ ] Port remaining ingress wrappers, egress/completion, worker/shell/parser
     buffers and sequential cache; resolve every remaining inventory disposition.
 - [ ] **M5: Stable promotion.** Pass full verification, EverParse, extraction,

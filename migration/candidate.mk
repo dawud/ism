@@ -27,6 +27,7 @@ CANDIDATE_MULTIPLEXER_FILES = src/transport/DNS.QUIC.TableModel.fst \
                               migration/DNS.Migration.PulseMultiplexer.fst \
                               migration/DNS.Migration.PulseMultiplexer.Tests.fst
 CANDIDATE_MULTIPLEXER_C_DIR = $(CANDIDATE_DIST_DIR)/pulse-multiplexer
+CANDIDATE_TABLE_ARCHIVE = $(CANDIDATE_MULTIPLEXER_C_DIR)/libism_pulse_table.a
 CANDIDATE_MULTIPLEXER_MODULES = DNS.QUIC.StreamModel DNS.QUIC.TableModel DNS.Migration.PulseStream DNS.Migration.PulseMultiplexer Pulse.Lib.Pervasives
 
 .PHONY: candidate-multiplexer-verify candidate-multiplexer-extract candidate-multiplexer-c-smoke
@@ -53,12 +54,26 @@ candidate-multiplexer-extract: candidate-multiplexer-verify
 	@test -s $(CANDIDATE_MULTIPLEXER_C_DIR)/DNS_Migration_PulseMultiplexer.c
 	@test -s $(CANDIDATE_MULTIPLEXER_C_DIR)/DNS_Migration_PulseMultiplexer.h
 
-# Standalone M4 table contract tests, not yet a mixed-shell table replacement.
-candidate-multiplexer-c-smoke: candidate-multiplexer-extract
+.PHONY: candidate-table-library
+candidate-table-library: candidate-multiplexer-extract
+	$(CC) $(CANDIDATE_STREAM_CFLAGS) -I $(CANDIDATE_MULTIPLEXER_C_DIR) \
+	  -c $(CANDIDATE_MULTIPLEXER_C_DIR)/DNS_Migration_PulseMultiplexer.c \
+	  -o $(CANDIDATE_MULTIPLEXER_C_DIR)/DNS_Migration_PulseMultiplexer.o
+	$(CC) $(CANDIDATE_STREAM_CFLAGS) -I $(CANDIDATE_MULTIPLEXER_C_DIR) \
+	  -c migration/c/ism_pulse_table.c -o $(CANDIDATE_MULTIPLEXER_C_DIR)/ism_pulse_table.o
+	$(AR) rcs $(CANDIDATE_TABLE_ARCHIVE) \
+	  $(CANDIDATE_MULTIPLEXER_C_DIR)/DNS_Migration_PulseMultiplexer.o $(CANDIDATE_MULTIPLEXER_C_DIR)/ism_pulse_table.o
+
+# Direct generated API plus neutral ABI; runtime selection is checked separately.
+candidate-multiplexer-c-smoke: candidate-table-library
 	$(CC) $(CANDIDATE_STREAM_CFLAGS) -I $(CANDIDATE_MULTIPLEXER_C_DIR) \
 	  $(CANDIDATE_MULTIPLEXER_C_DIR)/DNS_Migration_PulseMultiplexer.c \
 	  migration/c/pulse_multiplexer_smoke.c -o $(CANDIDATE_MULTIPLEXER_C_DIR)/pulse-multiplexer-smoke
 	$(CANDIDATE_MULTIPLEXER_C_DIR)/pulse-multiplexer-smoke
+	$(CC) $(CANDIDATE_STREAM_CFLAGS) migration/c/pulse_table_abi_smoke.c \
+	  $(CANDIDATE_TABLE_ARCHIVE) -o $(CANDIDATE_MULTIPLEXER_C_DIR)/pulse-table-abi-smoke
+	$(CANDIDATE_MULTIPLEXER_C_DIR)/pulse-table-abi-smoke
+	python3 migration/check_table_artifacts.py record --directory $(CANDIDATE_MULTIPLEXER_C_DIR) --cc '$(CC)'
 
 candidate-stream-verify: candidate-toolchain-check
 	@mkdir -p $(CANDIDATE_OBJ_DIR)/stream
@@ -154,17 +169,34 @@ candidate-check: migration-inventory-check candidate-c-smoke candidate-stream-c-
 # Run with the STABLE image after candidate-check has produced the archive.
 # Only C objects and the neutral ABI cross this boundary. A manifest rejects
 # stale sources/objects, wrong pins, foreign C targets or missing runtime pieces.
-PULSE_INTEGRATION_DIR = dist/pulse-integration-$(FSTAR_VERSION)
-PULSE_INTEGRATION_OBJ_DIR = obj/pulse-integration-$(FSTAR_VERSION)
-PULSE_SHELL_FLAGS = -DISM_USE_PULSE_STREAM=1 -I migration/c
-PULSE_SHELL_OBJECTS = $(PULSE_INTEGRATION_OBJ_DIR)/pulse_stream_adapter.o $(CANDIDATE_STREAM_ARCHIVE)
+PULSE_TABLE_ENABLED ?= 0
+PULSE_INTEGRATION_DIR = dist/pulse$(if $(filter 1,$(PULSE_TABLE_ENABLED)),-table)-integration-$(FSTAR_VERSION)
+PULSE_INTEGRATION_OBJ_DIR = obj/pulse$(if $(filter 1,$(PULSE_TABLE_ENABLED)),-table)-integration-$(FSTAR_VERSION)
+PULSE_SHELL_FLAGS = -DISM_USE_PULSE_STREAM=1 -I migration/c $(if $(filter 1,$(PULSE_TABLE_ENABLED)),-DISM_USE_PULSE_TABLE=1)
+PULSE_SHELL_OBJECTS = $(PULSE_INTEGRATION_OBJ_DIR)/pulse_stream_adapter.o $(CANDIDATE_STREAM_ARCHIVE) \
+                     $(if $(filter 1,$(PULSE_TABLE_ENABLED)),$(PULSE_INTEGRATION_OBJ_DIR)/pulse_table_adapter.o $(CANDIDATE_TABLE_ARCHIVE))
 
 .PHONY: pulse-stream-artifacts-check pulse-integration-check
 pulse-stream-artifacts-check:
 	python3 migration/check_stream_artifacts.py check --directory $(CANDIDATE_STREAM_C_DIR) --cc '$(CC)'
 
+.PHONY: pulse-table-artifacts-check pulse-table-integration-check
+pulse-table-artifacts-check:
+	python3 migration/check_table_artifacts.py check --directory $(CANDIDATE_MULTIPLEXER_C_DIR) --cc '$(CC)'
+
+pulse-table-integration-check: extract pulse-table-artifacts-check
+	$(MAKE) -o extract pulse-integration-check PULSE_TABLE_ENABLED=1
+
 pulse-integration-check: extract pulse-stream-artifacts-check
 	@mkdir -p $(PULSE_INTEGRATION_DIR) $(PULSE_INTEGRATION_OBJ_DIR)
+ifeq ($(PULSE_TABLE_ENABLED),1)
+	python3 migration/check_table_artifacts.py check --directory $(CANDIDATE_MULTIPLEXER_C_DIR) --cc '$(CC)'
+	KRML_INCLUDEDIR="$$($(KRML_HOME)/krml -locate-include)"; \
+	KRML_LIBDIR="$$($(KRML_HOME)/krml -locate-krmllib)"; \
+	$(CC) $(C_SMOKE_CFLAGS) $(PULSE_SHELL_FLAGS) -O2 -Wall -Wextra -Werror \
+	  -I "$$KRML_INCLUDEDIR" -I "$$KRML_LIBDIR/dist/minimal" \
+	  -c shell/pulse_table_adapter.c -o $(PULSE_INTEGRATION_OBJ_DIR)/pulse_table_adapter.o
+endif
 	KRML_INCLUDEDIR="$$($(KRML_HOME)/krml -locate-include)"; \
 	KRML_LIBDIR="$$($(KRML_HOME)/krml -locate-krmllib)"; \
 	$(CC) $(C_SMOKE_CFLAGS) $(PULSE_SHELL_FLAGS) -O2 -Wall -Wextra -Werror \
@@ -174,6 +206,18 @@ pulse-integration-check: extract pulse-stream-artifacts-check
 	  -I "$$KRML_INCLUDEDIR" -I "$$KRML_LIBDIR/dist/minimal" \
 	  -c shell/ism_shell.c -o $(PULSE_INTEGRATION_OBJ_DIR)/ism_shell.o
 	python3 migration/check_stream_artifacts.py selection --object $(PULSE_INTEGRATION_OBJ_DIR)/ism_shell.o
+ifeq ($(PULSE_TABLE_ENABLED),1)
+	python3 migration/check_table_artifacts.py selection --object $(PULSE_INTEGRATION_OBJ_DIR)/ism_shell.o \
+	  --adapter $(PULSE_INTEGRATION_OBJ_DIR)/pulse_table_adapter.o
+	KRML_INCLUDEDIR="$$($(KRML_HOME)/krml -locate-include)"; \
+	KRML_LIBDIR="$$($(KRML_HOME)/krml -locate-krmllib)"; \
+	$(CC) $(C_SMOKE_CFLAGS) -I migration/c -I shell \
+	  -I "$$KRML_INCLUDEDIR" -I "$$KRML_LIBDIR/dist/minimal" \
+	  migration/c/pulse_table_differential.c migration/c/legacy_shell_oracle.c \
+	  shell/link_krml_compat_stubs.c shell/link_everparse_smoke.c \
+	  $(C_COMPILE_SMOKE_SOURCES) $(PULSE_INTEGRATION_OBJ_DIR)/ism_shell.o $(PULSE_SHELL_OBJECTS) \
+	  -o $(PULSE_INTEGRATION_DIR)/table-differential && $(PULSE_INTEGRATION_DIR)/table-differential
+endif
 	KRML_INCLUDEDIR="$$($(KRML_HOME)/krml -locate-include)"; \
 	KRML_LIBDIR="$$($(KRML_HOME)/krml -locate-krmllib)"; \
 	$(CC) $(C_SMOKE_CFLAGS) -I migration/c -I shell \

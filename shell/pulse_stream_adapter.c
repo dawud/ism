@@ -8,7 +8,7 @@ _Static_assert(sizeof(ism_pulse_phase) == 12 && offsetof(ism_pulse_phase, tag) =
 _Static_assert(sizeof(ism_pulse_result) == 16 && offsetof(ism_pulse_result, code) == 12,
                "unexpected neutral result ABI");
 
-static ism_pulse_phase to_wire(DNS_QUIC_StreamMapping_stream_phase in)
+ism_pulse_phase ism_pulse_phase_to_wire(DNS_QUIC_StreamMapping_stream_phase in)
 {
   ism_pulse_phase out = { .tag = UINT8_MAX };
   switch (in.tag) {
@@ -41,7 +41,7 @@ static ism_pulse_phase to_wire(DNS_QUIC_StreamMapping_stream_phase in)
   return out;
 }
 
-static DNS_QUIC_StreamMapping_stream_phase from_wire(ism_pulse_phase in)
+DNS_QUIC_StreamMapping_stream_phase ism_pulse_phase_from_wire(ism_pulse_phase in)
 {
   DNS_QUIC_StreamMapping_stream_phase out = { .tag = DNS_QUIC_StreamMapping_Done };
   switch (in.tag) {
@@ -83,9 +83,9 @@ uint8_t ism_pulse_ingress_data(DNS_QUIC_StreamMapping_stream_context *stream,
 {
   if (stream == NULL || stream->sc_id != stream_id ||
       ism_pulse_stream_abi_version() != ISM_PULSE_STREAM_ABI_VERSION) return reject(stream);
-  ism_pulse_result result = ism_pulse_stream_data(to_wire(stream->sc_phase), stream_id,
+  ism_pulse_result result = ism_pulse_stream_data(ism_pulse_phase_to_wire(stream->sc_phase), stream_id,
     stream->sc_buf, ISM_SHELL_STREAM_BUFFER_SIZE, data, len, len);
-  stream->sc_phase = from_wire(result.phase);
+  stream->sc_phase = ism_pulse_phase_from_wire(result.phase);
   return result.code;
 }
 
@@ -93,8 +93,8 @@ uint8_t ism_pulse_ingress_fin(DNS_QUIC_StreamMapping_stream_context *stream)
 {
   if (stream == NULL || ism_pulse_stream_abi_version() != ISM_PULSE_STREAM_ABI_VERSION)
     return reject(stream);
-  ism_pulse_result result = ism_pulse_stream_fin(to_wire(stream->sc_phase), stream->sc_id,
+  ism_pulse_result result = ism_pulse_stream_fin(ism_pulse_phase_to_wire(stream->sc_phase), stream->sc_id,
     stream->sc_buf, ISM_SHELL_STREAM_BUFFER_SIZE);
-  stream->sc_phase = from_wire(result.phase);
+  stream->sc_phase = ism_pulse_phase_from_wire(result.phase);
   return result.code;
 }

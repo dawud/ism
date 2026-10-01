@@ -138,9 +138,13 @@ Execute these milestones in order, keeping the stable build available:
    imperative proof regressions and standalone extracted C tests are required
    by `candidate-check`. See DR-0021 and the
    [table correspondence](PULSE_MIGRATION_INVENTORY.md#m4-table-contract-correspondence).
-   This is not M4 completion: next integrate table lifecycle through a reviewed
-   C-only ownership/ABI boundary, then port egress/completion and the remaining
-   surfaces above. The mixed runtime gate still selects only Pulse ingress/FIN.
+   Table lifecycle is now integrated in the separate `pulse-table-integration-check`
+   lane through a bounded C-only snapshot ABI (DR-0022); it selects shell
+   find/open/reset/completion alongside Pulse ingress/FIN. The M3-only lane and
+   stable defaults remain available. The adapters remain trusted C, and worker
+   wrappers still contain read-only Low* lookups. Next port egress/completion
+   ownership and worker/shell boundaries, then the remaining surfaces above;
+   this is not M4 completion.
 5. **M5 — Promote the toolchain.** On a clean candidate build, pass `make verify`,
    `make everparse-verify`, `make extract`, `make c-compile-smoke`,
    `make c-link-smoke`, and all existing `msquic-runtime-*-smoke` gates with the
