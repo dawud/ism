@@ -696,3 +696,82 @@ lookups and sequential proofs; egress and send-buffer/completion ownership proof
 are not migrated here. Port those boundaries next, followed by the remaining
 worker/parser/cache/security inventory. No API or proof is silently retired.
 Use the normal stable build, or M3-only integration, to roll back table selection.
+
+## DR-0023: Prove Response Framing Against a Shared Byte-Level Model First
+
+**Status:** Accepted (2026-10-02); bounded M4 response proof slice. Candidate
+response C extraction/integration, descriptor/completion ownership and M5 remain
+open. Stable pins and runtime response selection are unchanged.
+
+**Decision:** Share `DNS.QUIC.ResponseModel` between the stable response boundary
+and `DNS.Migration.PulseResponse`. Prove exact two-byte big-endian framing,
+prefix decode round trip, payload copying, source preservation and unchanged
+destination tail. Oversized payloads and insufficient capacity return zero
+without writes; check the 65535-byte bound before addition. Retain the existing
+zero-length behavior (two zero prefix bytes), not a new DNS validation policy.
+
+**Contracts:** Strengthen the stable wrapper's postcondition, preserving all
+existing preconditions, context contents and public signatures. The recursive
+legacy copy helper still accepts aliased buffers; its new snapshot-copy/source
+preservation postcondition is conditional on disjointness rather than imposing
+a stronger precondition. The wrapper already requires that separation.
+Pulse framing uses real separately owned arrays with truthful source length and
+destination capacity, preserving compatible caller-framed resources. Reuse the
+verified Pulse copy loop. Do not introduce an assumed primitive, ownership
+conversion or platform-width axiom. Large imperative test fixtures take actual
+representable `SizeT` lengths; they do not assume every target is at least 32-bit.
+
+**Gates:** Require shared and imperative response proof regressions in
+`candidate-check`, with the focused `candidate-response-verify` target and an
+isolated response proof cache. Mark all candidate response roots proof-only in
+the checked inventory; stable extraction includes the shared executable helpers
+but excludes proof tests. Retain all previous proof/C/runtime gates. Add stable
+generated-C framing regressions covering exact/short capacities, empty and
+maximum lengths, prefix byte boundaries, every input/output byte, context and
+guard preservation. These C tests do not exercise the Pulse response port.
+
+**Limits and next gate:** This proves synchronous framing, not construction of
+a semantically correct DNS response, FIN/descriptor correspondence, immutable
+borrow until asynchronous completion, callback serialization or safe buffer
+recycling. Existing unit egress/borrow tokens remain explicit trust debt. No
+adapter or trusted interface is added. Next extract and review the Pulse framing
+code and integrate it through a C-only seam with explicit caller obligations;
+then migrate descriptor/completion ownership and the remaining M4 surfaces.
+
+## DR-0024: Integrate Pulse Framing While Retaining the Stable Descriptor Handoff
+
+**Status:** Accepted (2026-10-02); M4 response framing C integration slice.
+This extends DR-0023's proof-only milestone, not asynchronous send ownership or
+whole-toolchain promotion. Stable pins and default selection are unchanged.
+
+**Decision:** Extract `DNS.Migration.PulseResponse` with checked candidate F*
+extraction, cross-module inlining and the bundled Pulse library. Make extraction
+warning 250 and KaRaMeL warnings 2/4/15 fatal and compile the generated C and new
+adapters with strict warnings. Keep the shared byte-level proofs and all prior
+proof roots. Require standalone direct/ABI C tests and a checked response archive
+manifest in `candidate-check`.
+
+**Boundary:** Use ABI version 1 in `ism_pulse_response.h`, passing only byte
+pointers, native capacities and uint32 lengths. Separate candidate and stable
+translation units; no generated types, checked files or `.krml` cross lanes.
+Validate capacities, address overflow, alias ranges and context separation.
+Do not add an assumed ownership bridge. Preserve zero-length framing, no-write
+rejection, source/tail/context contents and public shell signatures. Keep the
+stable descriptor handoff with the same context, framed length and FIN code
+after the Pulse copy; raw unframed sends are unchanged.
+
+**Trust and scope:** Two C response adapters and native range checks are new
+unverified TCB. Callers still establish real liveness, truthful sizes, exclusive
+access and serialization. The shell API exposes only the used source prefix;
+the adapter borrows that prefix and never reads or writes the unused tail.
+No allocation or retained pointer is introduced. No F* contract is weakened,
+admission added, or send-lifetime theorem claimed. See the
+[response ABI review](PULSE_RESPONSE_C_ABI.md) and trusted inventory.
+
+**Runtime gate and rollback:** Add a separate `pulse-response-integration-check`
+lane selecting ingress/FIN, table lifecycle and response framing. Check compiled
+selection and retained descriptor handoff; compare the actual selected shell
+against independently compiled baseline code, then run all existing C/MsQuic
+gates on the same shell object. Keep default, M3-only and table-only lanes
+required and available for rollback. Descriptor/completion ownership, worker/
+parser/cache/security ports, warning/resource review and M5 remain open.

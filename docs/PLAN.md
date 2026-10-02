@@ -142,9 +142,16 @@ Execute these milestones in order, keeping the stable build available:
    lane through a bounded C-only snapshot ABI (DR-0022); it selects shell
    find/open/reset/completion alongside Pulse ingress/FIN. The M3-only lane and
    stable defaults remain available. The adapters remain trusted C, and worker
-   wrappers still contain read-only Low* lookups. Next port egress/completion
-   ownership and worker/shell boundaries, then the remaining surfaces above;
-   this is not M4 completion.
+   wrappers still contain read-only Low* lookups. The first response slice
+   (DR-0023) adds shared byte-exact framing semantics, a stronger stable wrapper
+   postcondition without new preconditions, and real Pulse array framing proofs
+   and regressions required by `candidate-check`. DR-0024 adds strict checked C
+   extraction and the separate `pulse-response-integration-check` lane, selecting
+   framing alongside ingress/FIN and table lifecycle through a reviewed C-only
+   boundary. Its two response adapters remain trusted, and the stable descriptor
+   handoff is retained. Default and older mixed lanes are unchanged. Next port
+   send-descriptor/completion ownership and worker/shell boundaries,
+   followed by the remaining surfaces above; this is not M4 completion.
 5. **M5 — Promote the toolchain.** On a clean candidate build, pass `make verify`,
    `make everparse-verify`, `make extract`, `make c-compile-smoke`,
    `make c-link-smoke`, and all existing `msquic-runtime-*-smoke` gates with the

@@ -101,8 +101,18 @@ C/MsQuic shell. Rust is not on this migration's critical path.
     reset/completion bookkeeping and byte storage; validate caller descriptors
     and document live/exclusive storage and serialization obligations. The new
     adapters are trusted, not a proof of raw-pointer ownership. See DR-0022.
-  - [ ] Port remaining ingress wrappers, egress/completion, worker/shell/parser
-    buffers and sequential cache; resolve every remaining inventory disposition.
+  - [x] First response slice: shared exact prefix/payload/tail and rejection
+    semantics; stable wrapper strengthened without new preconditions; real
+    Pulse array framing and proof regressions required by the candidate gate.
+    No new assumptions or adapters in that slice. See DR-0023.
+  - [x] Extract and integrate Pulse response framing through a reviewed C-only
+    seam, preserving the public response ABI and caller ownership requirements.
+    Required candidate C gates and separate response-enabled integration lane;
+    stable descriptor handoff retained, two new C adapters explicitly trusted.
+    See DR-0024 and [PULSE_RESPONSE_C_ABI.md](PULSE_RESPONSE_C_ABI.md).
+  - [ ] Port send-descriptor/completion ownership and remaining ingress wrappers,
+    worker/shell/parser buffers and sequential cache; resolve every remaining
+    inventory disposition.
 - [ ] **M5: Stable promotion.** Pass full verification, EverParse, extraction,
   C compile/link, and all MsQuic smoke gates on a clean candidate build. Review
   contract/TCB/warning/resource changes, update stable build pins and docs

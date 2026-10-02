@@ -7,7 +7,8 @@ module COMPLETE = DNS.QUIC.MsQuicSendCompletion
 module EGRESS = DNS.QUIC.MsQuicEgress
 module MUX = DNS.QUIC.Multiplexer
 module STREAM = DNS.QUIC.StreamMapping
-module CAST = FStar.Int.Cast
+module MODEL = DNS.QUIC.ResponseModel
+module BYTES = DNS.QUIC.StreamModel
 
 (* C-facing response boundary for the unverified shell. The shell provides a
    response buffer already filled by verified response construction and receives
@@ -55,7 +56,12 @@ val copy_response_bytes_with_prefix :
       FStar.UInt32.v response_len + 2 <= LowStar.Buffer.length stream_buffer))
     (ensures (fun h0 _ h1 ->
       modifies (loc_buffer stream_buffer) h0 h1 /\
-      live h1 stream_buffer))
+      live h1 stream_buffer /\
+      (loc_disjoint (loc_buffer response_buffer) (loc_buffer stream_buffer) ==>
+        live h1 response_buffer /\ as_seq h1 response_buffer == as_seq h0 response_buffer /\
+        BYTES.copied_bytes (as_seq h0 stream_buffer) (as_seq h0 response_buffer)
+          (as_seq h1 stream_buffer) (FStar.UInt32.v idx) (2 + FStar.UInt32.v idx)
+          (FStar.UInt32.v response_len - FStar.UInt32.v idx))))
     (decreases (FStar.UInt32.v response_len - FStar.UInt32.v idx))
 
 let rec copy_response_bytes_with_prefix response_buffer stream_buffer response_len idx =
@@ -97,9 +103,14 @@ val prepare_doq_response_send_for_stream :
       loc_disjoint (loc_buffer response_buffer) (loc_buffer stream_buffer) /\
       (let ctx = FStar.Seq.index (LowStar.Buffer.as_seq h0 ctx_ptr) 0 in
        live h0 ctx.STREAM.sc_buf)))
-    (ensures (fun h0 _ h1 ->
+    (ensures (fun h0 result h1 ->
       modifies (loc_buffer stream_buffer) h0 h1 /\
-      live h1 stream_buffer))
+      live h1 stream_buffer /\ live h1 response_buffer /\ live h1 ctx_ptr /\
+      as_seq h1 response_buffer == as_seq h0 response_buffer /\
+      as_seq h1 ctx_ptr == as_seq h0 ctx_ptr /\
+      MODEL.framing_result (as_seq h0 stream_buffer) (as_seq h0 response_buffer)
+        (as_seq h1 stream_buffer) response_len stream_capacity result /\
+      (FStar.UInt32.v result = 0 ==> modifies_none h0 h1)))
 
 let prepare_doq_response_send_for_stream
   ctx_ptr
@@ -108,38 +119,42 @@ let prepare_doq_response_send_for_stream
   stream_buffer
   stream_capacity
   fin_code =
-  if FStar.UInt32.gt response_len 65535ul then
+  let h0 = FStar.HyperStack.ST.get () in
+  let framed_len = MODEL.framed_length response_len stream_capacity in
+  if FStar.UInt32.eq framed_len 0ul then
     0ul
   else
     begin
       assert (FStar.UInt32.v response_len <= 65535);
       assert (FStar.UInt32.v response_len + 2 < 4294967296);
-      let framed_len = FStar.UInt32.add response_len 2ul in
-      if FStar.UInt32.lt stream_capacity framed_len then
-        0ul
-      else
-        begin
-          assert (FStar.UInt32.v framed_len <= FStar.UInt32.v stream_capacity);
-          assert (FStar.UInt32.v framed_len <= LowStar.Buffer.length stream_buffer);
-          assert (2 <= LowStar.Buffer.length stream_buffer);
-          assert (0 < LowStar.Buffer.length stream_buffer);
-          assert (1 < LowStar.Buffer.length stream_buffer);
-          let s = LowStar.Buffer.index ctx_ptr 0ul in
-          let hi32 = FStar.UInt32.shift_right response_len 8ul in
-          let len_hi = CAST.uint32_to_uint8 hi32 in
-          let len_lo = CAST.uint32_to_uint8 response_len in
-          LowStar.Buffer.upd stream_buffer 0ul len_hi;
-          LowStar.Buffer.upd stream_buffer 1ul len_lo;
-          copy_response_bytes_with_prefix response_buffer stream_buffer response_len 0ul;
-          let response = {
-            EGRESS.msrf_stream_id = s.STREAM.sc_id;
-            EGRESS.msrf_data = stream_buffer;
-            EGRESS.msrf_len = framed_len;
-            EGRESS.msrf_fin = not (FStar.UInt8.eq fin_code 0uy);
-          } in
-          let descriptor = EGRESS.prepare_response_send () ctx_ptr response in
-          descriptor.EGRESS.mssd_len
-        end
+      assert (FStar.UInt32.v framed_len <= FStar.UInt32.v stream_capacity);
+      assert (FStar.UInt32.v framed_len <= LowStar.Buffer.length stream_buffer);
+      assert (2 <= LowStar.Buffer.length stream_buffer);
+      assert (0 < LowStar.Buffer.length stream_buffer);
+      assert (1 < LowStar.Buffer.length stream_buffer);
+      let s = LowStar.Buffer.index ctx_ptr 0ul in
+      let len_hi = MODEL.prefix_hi response_len in
+      let len_lo = MODEL.prefix_lo response_len in
+      LowStar.Buffer.upd stream_buffer 0ul len_hi;
+      LowStar.Buffer.upd stream_buffer 1ul len_lo;
+      let hprefix = FStar.HyperStack.ST.get () in
+      assert (as_seq hprefix response_buffer == as_seq h0 response_buffer);
+      assert (as_seq hprefix stream_buffer == FStar.Seq.upd
+        (FStar.Seq.upd (as_seq h0 stream_buffer) 0 len_hi) 1 len_lo);
+      copy_response_bytes_with_prefix response_buffer stream_buffer response_len 0ul;
+      let hframed = FStar.HyperStack.ST.get () in
+      assert (BYTES.copied_bytes (as_seq hprefix stream_buffer) (as_seq hprefix response_buffer)
+        (as_seq hframed stream_buffer) 0 2 (FStar.UInt32.v response_len));
+      MODEL.lemma_frame_from_copy (as_seq h0 stream_buffer) (as_seq h0 response_buffer)
+        (as_seq hprefix stream_buffer) (as_seq hframed stream_buffer) response_len;
+      let response = {
+        EGRESS.msrf_stream_id = s.STREAM.sc_id;
+        EGRESS.msrf_data = stream_buffer;
+        EGRESS.msrf_len = framed_len;
+        EGRESS.msrf_fin = not (FStar.UInt8.eq fin_code 0uy);
+      } in
+      let descriptor = EGRESS.prepare_response_send () ctx_ptr response in
+      descriptor.EGRESS.mssd_len
     end
 
 val send_outcome_of_code :

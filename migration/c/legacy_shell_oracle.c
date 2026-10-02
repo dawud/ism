@@ -2,6 +2,7 @@
  * lifecycle algorithm and no Pulse feature flags are allowed in this oracle. */
 #undef ISM_USE_PULSE_STREAM
 #undef ISM_USE_PULSE_TABLE
+#undef ISM_USE_PULSE_RESPONSE
 #define ism_shell_connection_init legacy_ism_shell_connection_init
 #define ism_shell_find_stream legacy_ism_shell_find_stream
 #define ism_shell_open_stream legacy_ism_shell_open_stream

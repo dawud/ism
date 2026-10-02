@@ -41,12 +41,16 @@ transitively on legacy code and must be checked after splitting those imports.
 | `src/transport/DNS.QUIC.TableModel.Tests.fst` | verify | Removed-slot availability, last-slot identity and duplicate rejection regressions | Stable and candidate proof tests; not extracted |
 | `migration/DNS.Migration.PulseMultiplexer.fst` | candidate-verify+extract | Owned pointer table and context pool; first-match lookup, duplicate/full rejection, exact context update and close permutation; message storage framed | M4 proof/C port; table-enabled shell lifecycle via reviewed C-only snapshot ABI; adapters remain trusted |
 | `migration/DNS.Migration.PulseMultiplexer.Tests.fst` | candidate-verify | Real owned-context allocate/close/reopen, failure and byte-preservation regressions | Candidate imperative proof tests; not extracted |
+| `src/transport/DNS.QUIC.ResponseModel.fst` | verify+extract | Exact framed length/rejection, big-endian prefix round trip, byte-exact payload and unchanged tail | Shared stable/Pulse framing specification; checked extraction on both compilers |
+| `src/transport/DNS.QUIC.ResponseModel.Tests.fst` | verify | Zero/max length, exact/short capacity, uint32 rejection and prefix byte boundaries | Stable and candidate verification-only regressions |
+| `migration/DNS.Migration.PulseResponse.fst` | candidate-verify+extract | Real separated source/destination ownership; exact framing, source preservation and no writes on rejection | M4 framing proof/C port and response-enabled integration lane; descriptor/completion ownership remains open |
+| `migration/DNS.Migration.PulseResponse.Tests.fst` | candidate-verify | Owned-array framing, failure, input/tail preservation, maximum length and unrelated frame regressions | Candidate imperative proof tests; not extracted |
 | `src/transport/DNS.QUIC.MsQuicIngress.fst` | verify+extract | Authenticated fragment liveness/length, context-buffer disjointness and mutation bounds; authentication/borrow tokens are unit | M3 shell bypasses legacy data wrapper via reviewed C ABI; full wrapper port remains M4; no stronger MsQuic claim |
 | `src/transport/DNS.QUIC.MsQuicEgress.fst` | verify+extract | Live response buffer, length bound and send-descriptor handoff; no proof of runtime send completion | M4: Pulse buffer borrow/lifetime specification; preserve descriptor ABI |
 | `src/transport/DNS.QUIC.MsQuicSendCompletion.fst` | verify+extract | Live descriptor and connection/table preconditions; cleanup delegates to close; runtime completion is trusted | M4 table-enabled shell delegates cleanup to Pulse close through trusted C; descriptor/ownership proof port remains open |
 | `src/concurrency/DNS.Worker.Minimal.fst` | verify+extract | Bounds/read-write obligations for FORMERR, empty NOERROR and validated question echo; not full DNS policy | M4: Pulse response-buffer operations; retain all linked response fixtures |
 | `src/concurrency/DNS.ShellBoundary.fst` | verify+extract | C-shaped ingress/FIN/worker/reset wrappers; phase code mapping and caller preconditions | Public ABI retained; selected C handles ingress/FIN and M4 table cleanup; worker wrappers/internal read-only lookups still Low* |
-| `src/concurrency/DNS.ShellResponseBoundary.fst` | verify+extract | Bounded response copy, two-byte DoQ prefix, send/completion wrappers | M4: port buffer operations and send-storage ownership |
+| `src/concurrency/DNS.ShellResponseBoundary.fst` | verify+extract | Exact shared-model framing, byte-copy/tail/source/context preservation and no-write rejection; send/completion wrappers | Stable fallback and response oracle; response-enabled shell replaces framing only, retaining stable descriptor handoff; lifetime proofs remain M4 |
 | `src/concurrency/DNS.ShellScheduler.fst` | verify+extract | Per-event liveness and mutation requirements; no scheduler/race-freedom proof | M4: preserve serialized event dispatch and C helper interfaces |
 | `src/concurrency/DNS.Worker.fst` | verify | Parser/serializer-based response construction, bounded copies and send preparation; loop discards descriptor, test-zone default | M4: port buffers, reuse pure models; production extraction is separate work |
 | `src/concurrency/DNS.Cache.Sharded.fst` | verify | First-shard sequential delegation; live tables; unit permission, weak wrapper postconditions and no locks | M4: preserve sequential preconditions; real sharding/concurrency remains separate |
@@ -90,6 +94,11 @@ external seams require explicit review as each replacement is integrated:
   reset/completion close and immediate flag synchronization; no generated context
   casts or moved buffers. See [PULSE_TABLE_C_ABI.md](PULSE_TABLE_C_ABI.md). The C
   adapters are trusted; this is not a full response-lifetime/ownership proof.
+- [x] M4 synchronous response framing seam: neutral byte pointers/capacities,
+  source/destination/context separation, no retained pointer, exact byte/rejection
+  comparisons and stable descriptor/FIN handoff retained. See
+  [PULSE_RESPONSE_C_ABI.md](PULSE_RESPONSE_C_ABI.md). Asynchronous storage ownership
+  below remains open; two C adapters are explicitly trusted.
 - [ ] `shell/ism_shell.c`, `ism_event_queue.c`, `msquic_adapter.c`,
   `msquic_runtime.c`, and `msquic_connection_runtime.c`: calls into
   `DNS.ShellBoundary` and `DNS.ShellResponseBoundary`, receive/FIN/reset ordering,
@@ -121,16 +130,48 @@ gate, not the standalone candidate stream/value smoke tests.
 
 The base image and OS packages are not digest/version locked; this is a
 reproducible **proof-tool selection**, not a fully reproducible binary supply
-chain. The shared models, real Pulse stream/table implementations and their regressions,
-as well as both existing pilots, verify in the required candidate job. Its C
-compile/link/run gates exercise the real reference/array stream implementation
-and the original value-state pilot separately, plus the standalone M4 table.
-The stable CI job runs `pulse-integration-check` and the separate
-`pulse-table-integration-check`: only checked C archives cross toolchains.
-The former selects ingress/FIN; the latter adds shell find/open/reset/completion
-table lifecycle. Runtime assumptions depend on the stream and table C marshalers,
+chain. The shared models, real Pulse stream/table/response implementations and
+their regressions, as well as both existing pilots, verify in the required
+candidate job. Its C compile/link/run gates exercise the real reference/array
+stream implementation and the original value-state pilot separately, plus the
+M4 table and response framing ports/ABIs.
+The stable CI job runs `pulse-integration-check`, `pulse-table-integration-check`
+and `pulse-response-integration-check`: only checked C archives cross toolchains.
+They successively select ingress/FIN, shell find/open/reset/completion table
+lifecycle, then response framing. Default and older lanes retain stable framing.
+Runtime assumptions depend on the stream, table and response C adapters,
 all reviewed/tested but unverified. The ref pilot's optional Rust failure is
 outside these jobs; whole-project candidate compatibility remains M4/M5.
+
+## M4 response framing contract correspondence
+
+DR-0023 establishes shared response framing proofs; DR-0024 extracts and selects
+that framing in a separate runtime lane. Neither replaces the descriptor/
+completion ownership proofs or the runtime's asynchronous lifetime obligations.
+
+| Obligation | Stable boundary | Pulse response port |
+| --- | --- | --- |
+| Input ownership | Live buffers, bounded source length and destination capacity; destination disjoint from source/context | Separate fully owned source/destination arrays with bounded length/capacity; compatible resources may be framed |
+| Success | `prepare_doq_response_send_for_stream` satisfies shared `framing_result`; exact big-endian prefix and payload, unchanged input/context/tail | `frame_response` satisfies the same byte-level result and preserves source ownership/content |
+| Rejection | Length above 65535 or capacity below length + 2 returns zero with no heap mutation | Same result, both arrays unchanged; bound checked before addition |
+| Empty response | Returns two with a zero prefix when capacity permits | Identical; neither contract validates DNS response semantics |
+| Copy helper aliasing | Existing helper preconditions retained; new snapshot-copy/source-preservation facts apply only when disjoint | Copy primitive requires separated array ownership; no aliased-call equivalence claimed |
+| Egress/completion | Existing context/FIN/descriptor and cleanup code retained | No descriptor or asynchronous borrow/completion API yet; framing is synchronous only |
+| Extraction/runtime | Shared helpers extracted with the stable response wrapper; default and earlier mixed lanes retain it | Checked response archive and C-only adapters select framing in the response-enabled lane; stable descriptor handoff retained |
+
+`lemma_prefix_roundtrip` relates the emitted prefix to the shared ingress
+decoder for every representable protocol length; it does not prove a full
+send/receive lifecycle. Pure regressions include uint32 maximum rejection;
+imperative tests cover short capacity, empty/maximum payloads, exact copies,
+unchanged input/tail and an unrelated owned reference. Large array fixtures take
+`SizeT` values refined to their real sizes: this avoids assuming wider-than-16-bit
+`SizeT` support and makes those fixtures conditional on representable sizes.
+The proof slice adds no admission or platform axiom. DR-0024 adds two unverified
+C adapters with explicit caller obligations, range checks, artifact/selection
+guards and differential tests; see [response ABI review](PULSE_RESPONSE_C_ABI.md).
+Source and destination must remain live and exclusively owned for the call;
+immutable response storage until completion remains a separate runtime/proof
+obligation. Array proofs do not prove that raw C callers establish ownership.
 
 ## M4 table contract correspondence
 
@@ -401,3 +442,92 @@ freedom or full DNS semantics. M4/M5 remain open.
   in the trusted inventory and table ABI review. No ownership theorem for raw C
   or new completion-lifetime proof is claimed. Default and M3-only behavior/pins
   remain available; the remaining M4 surfaces and M5 promotion are still open.
+
+## M4 response framing proof validation evidence (2026-10-02)
+
+- Pinned candidate `make candidate-check
+  CANDIDATE_LANE=candidate-v2026.09.13-response-proof` passed from a fresh lane:
+  51 inventoried files, 14 candidate proof roots, and all existing pilot/stream/
+  table C gates. Response model/implementation/tests are explicitly candidate
+  proof-only, not extracted or runtime-selected. The table gate still passes
+  15,520 direct comparisons and neutral ABI checks.
+- Shared proof regressions cover empty/max protocol length, short/exact capacity,
+  prefix byte boundaries and uint32 overflow rejection. Real Pulse array tests
+  check source/tail preservation, no-write rejection and an unrelated owned
+  reference. Maximum-size fixtures use actual representable `SizeT` arguments,
+  not a new target-width assumption. The universal framing and prefix round-trip
+  contracts verify without new admissions or additional SMT resource overrides.
+- Stable `make verify extract`, both C smoke gates and all six
+  `msquic-runtime-*-smoke` targets passed, including EverParse verification and
+  live loopback. The strengthened stable framing wrapper retains every original
+  precondition. Its C smoke now checks 120 combinations of payload length,
+  capacity and FIN code, comparing all source/output bytes, guards and context
+  fields, including 65535-byte success and 65536-byte rejection. These are
+  stable generated-C tests, not tests of extracted Pulse response code.
+- Stable-image `pulse-integration-check` and `pulse-table-integration-check`
+  passed against the new lane's checked archives/manifests. Both passed 1071
+  stream differential comparisons and every C/MsQuic gate; the table-enabled
+  lane also passed 32,832 baseline shell comparisons. Both retain stable response
+  framing. No new runtime selection macro, archive or adapter is introduced.
+- Public `DNS_ShellBoundary.h`, `DNS_ShellResponseBoundary.h` and `DNS_Protocol.h`
+  body hashes are unchanged (generation banners excluded). C review confirms
+  the shared rejection/shift/cast helpers and erased proof snapshots; existing
+  recursive stable copying and descriptor construction remain. New helper
+  declarations are internal to the stable bundle. Existing stable extraction
+  warning 250/15 and C macro redefinition debt remain.
+- All 44 migration guard tests pass, including required response proof roots,
+  isolated caches, stable model extraction and verification-only candidate
+  response coverage. Workflow YAML parses and `git diff --check` passes. Hosted
+  CI/branch protection were not run or changed. DR-0023 and the trusted inventory
+  distinguish synchronous framing from the still-open descriptor/completion
+  lifetime proof; M4/M5 and stable toolchain promotion remain open.
+
+## M4 response framing C integration evidence (2026-10-02)
+
+- Pinned candidate `make candidate-check
+  CANDIDATE_LANE=candidate-v2026.09.13-response-integration` passed from a fresh
+  lane and again after the final gate edits. All 51 inventoried files, 14 proof
+  roots and existing pilot/stream/table C gates remain covered. Shared response
+  semantics and `PulseResponse` now have checked C extraction coverage; proof
+  tests remain verification-only. All three archives have current manifests.
+- Strict response C compilation and direct/neutral-ABI smoke passed 240 complete
+  byte comparisons: empty, byte-boundary, near-maximum and maximum payloads,
+  short/exact/extra capacity and multiple input patterns. Descriptor checks cover
+  null/nonempty input, length/capacity mismatch, overlapping and wrapped address
+  ranges, valid adjacent slices and a null empty source. Invalid descriptors are
+  never passed directly to generated code outside its verified preconditions.
+- Native Clang AddressSanitizer/UndefinedBehaviorSanitizer passed the generated
+  response code and candidate adapter tests. The first run encountered the
+  sandbox tracing restriction on LeakSanitizer; the same binary passed outside
+  the sandbox. This is response/neutral-adapter evidence, not a sanitizer run of
+  the stable adapter, mixed runtime or full server.
+- Generated C review confirms bound-before-addition rejection, correct shift/
+  truncation, a bounded native copy loop, erased proofs and no allocation or
+  assumed Pulse runtime shim. The response archive has exactly the generated
+  object and neutral adapter, with only the expected generated framing symbol
+  as an unresolved cross-object dependency. No new F* precondition or admission.
+- Stable `make verify extract`, EverParse, both C smoke gates and all six MsQuic
+  gates passed. Public stable shell, response and protocol header body hashes
+  remain identical, excluding generation banners. Existing stable extraction
+  warning 250/15 and C macro redefinition debt remain.
+- Stable-image `pulse-integration-check`, `pulse-table-integration-check` and
+  `pulse-response-integration-check` passed against the candidate archives.
+  The response lane passed 1,440 comparisons against independently compiled
+  baseline shell code: all six phases, zero/max/missing IDs, both FIN values,
+  empty/max/oversized payloads and short/exact capacities, all source/output
+  bytes, guards and complete connection preservation. Invalid descriptor and
+  context-overlap rejection is tested only on the new adapter, not outside the
+  baseline's preconditions. Every mixed lane passes 1071 stream comparisons;
+  table/response lanes also pass 32,832 table comparisons and all C/MsQuic gates,
+  including real callback/live-loopback response submission and completion.
+- The required isolated handoff smoke passes against the actual adapter and
+  extracted archive: exact context/pointer/framed length, FIN codes 0/1/255,
+  empty/nonempty success and no handoff on rejection. Its test-only descriptor
+  observer is never linked into the real differential or MsQuic gates.
+- All 51 migration guard tests pass, including strict response extraction,
+  separate older lanes, manifest source/product drift and ABI/target/pin checks,
+  archive/runtime-shim rejection and actual Pulse selection with the stable
+  descriptor handoff retained. Workflow YAML parses and `git diff --check`
+  passes; hosted CI and branch protection were not run/changed. DR-0024 and the
+  trusted inventory record the two new C adapters and the still-open descriptor/
+  completion ownership proof. Stable defaults/pins are unchanged; M4/M5 remain open.

@@ -109,19 +109,19 @@ jobs:
       - name: Build pinned Pulse image for mixed C integration
         run: docker build -t localhost/verified-dns-server:pulse-candidate -f Containerfile.candidate .
 
-      - name: Verify, extract and test the Pulse stream/table archives
+      - name: Verify Pulse proofs and extract/test stream/table/response archives
         run: |
           docker run --rm \
             --user "$(id -u):$(id -g)" -e HOME=/tmp \
             -v "${PWD}:/workspace" \
             localhost/verified-dns-server:pulse-candidate
 
-      - name: Test C and live MsQuic with Pulse ingress and table lanes
+      - name: Test C and live MsQuic with Pulse ingress, table and response lanes
         run: |
           docker run --rm \
             --user "$(id -u):$(id -g)" -e HOME=/tmp \
             -v "${PWD}:/workspace" \
-            localhost/verified-dns-server:latest make pulse-integration-check pulse-table-integration-check
+            localhost/verified-dns-server:latest make pulse-integration-check pulse-table-integration-check pulse-response-integration-check
 
       - name: Retain mixed Pulse C integration evidence
         if: always()
@@ -133,11 +133,14 @@ jobs:
             obj/pulse-integration-*/
             dist/pulse-table-integration-*/
             obj/pulse-table-integration-*/
+            dist/pulse-response-integration-*/
+            obj/pulse-response-integration-*/
             dist/candidate-*/pulse-stream/
             dist/candidate-*/pulse-multiplexer/
+            dist/candidate-*/pulse-response/
 
   pulse-candidate:
-    name: Pinned Pulse candidate (M1–M3 and M4 table slice)
+    name: Pinned Pulse candidate (M1–M3, M4 table and response framing)
     runs-on: ubuntu-latest
 
     steps:
@@ -150,7 +153,7 @@ jobs:
       - name: Build pinned candidate image
         run: docker build -t localhost/verified-dns-server:pulse-candidate -f Containerfile.candidate .
 
-      - name: Check inventory, verify stream/table and pilots, extract and test C
+      - name: Check inventory, verify stream/table/response and pilots, test extracted C
         run: |
           docker run --rm \
             --user "$(id -u):$(id -g)" \

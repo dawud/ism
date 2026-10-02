@@ -22,6 +22,56 @@ CANDIDATE_STREAM_FILES = src/transport/DNS.QUIC.StreamModel.fst \
                          migration/DNS.Migration.PulseStream.fst \
                          migration/DNS.Migration.PulseStream.Tests.fst
 
+CANDIDATE_RESPONSE_FILES = src/transport/DNS.QUIC.ResponseModel.fst \
+                           src/transport/DNS.QUIC.ResponseModel.Tests.fst \
+                           migration/DNS.Migration.PulseResponse.fst \
+                           migration/DNS.Migration.PulseResponse.Tests.fst
+
+CANDIDATE_RESPONSE_C_DIR = $(CANDIDATE_DIST_DIR)/pulse-response
+CANDIDATE_RESPONSE_ARCHIVE = $(CANDIDATE_RESPONSE_C_DIR)/libism_pulse_response.a
+CANDIDATE_RESPONSE_MODULES = DNS.QUIC.StreamModel DNS.QUIC.ResponseModel DNS.Migration.PulseStream DNS.Migration.PulseResponse Pulse.Lib.Pervasives
+
+.PHONY: candidate-response-verify
+candidate-response-verify: candidate-stream-verify
+	@mkdir -p $(CANDIDATE_OBJ_DIR)/response
+	@for f in $(CANDIDATE_RESPONSE_FILES); do \
+	  $(FSTAR_HOME)/bin/fstar.exe $(CANDIDATE_FSTAR_OPTS) \
+	    --odir $(CANDIDATE_OBJ_DIR)/response --cache_dir $(CANDIDATE_OBJ_DIR)/response \
+	    --include $(CANDIDATE_OBJ_DIR)/stream --include src/transport \
+	    $(addprefix --include ,$(PULSE_INCLUDE_DIRS)) $$f || exit $$?; \
+	done
+
+.PHONY: candidate-response-extract candidate-response-library candidate-response-c-smoke
+candidate-response-extract: candidate-response-verify
+	@mkdir -p $(CANDIDATE_RESPONSE_C_DIR)
+	$(FSTAR_HOME)/bin/fstar.exe $(CANDIDATE_FSTAR_OPTS) --warn_error +250 \
+	  --cache_dir $(CANDIDATE_OBJ_DIR)/response --odir $(CANDIDATE_RESPONSE_C_DIR) \
+	  --include $(CANDIDATE_OBJ_DIR)/stream --include src/transport \
+	  $(addprefix --include ,$(PULSE_INCLUDE_DIRS)) \
+	  --codegen krml --extract '$(CANDIDATE_RESPONSE_MODULES)' migration/DNS.Migration.PulseResponse.fst
+	$(FSTAR_HOME)/bin/krml -tmpdir $(CANDIDATE_RESPONSE_C_DIR) -skip-compilation \
+	  -warn-error @2@4@15 \
+	  -bundle 'DNS.Migration.PulseResponse=DNS.QUIC.StreamModel,DNS.QUIC.ResponseModel,DNS.Migration.PulseStream,DNS.Migration.PulseResponse,Pulse.Lib.Pervasives' \
+	  $(CANDIDATE_RESPONSE_C_DIR)/out.krml
+	@test -s $(CANDIDATE_RESPONSE_C_DIR)/DNS_Migration_PulseResponse.c
+	@test -s $(CANDIDATE_RESPONSE_C_DIR)/DNS_Migration_PulseResponse.h
+
+candidate-response-library: candidate-response-extract
+	$(CC) $(CANDIDATE_STREAM_CFLAGS) -I $(CANDIDATE_RESPONSE_C_DIR) \
+	  -c $(CANDIDATE_RESPONSE_C_DIR)/DNS_Migration_PulseResponse.c \
+	  -o $(CANDIDATE_RESPONSE_C_DIR)/DNS_Migration_PulseResponse.o
+	$(CC) $(CANDIDATE_STREAM_CFLAGS) -I $(CANDIDATE_RESPONSE_C_DIR) \
+	  -c migration/c/ism_pulse_response.c -o $(CANDIDATE_RESPONSE_C_DIR)/ism_pulse_response.o
+	$(AR) rcs $(CANDIDATE_RESPONSE_ARCHIVE) \
+	  $(CANDIDATE_RESPONSE_C_DIR)/DNS_Migration_PulseResponse.o $(CANDIDATE_RESPONSE_C_DIR)/ism_pulse_response.o
+
+candidate-response-c-smoke: candidate-response-library
+	$(CC) $(CANDIDATE_STREAM_CFLAGS) -I $(CANDIDATE_RESPONSE_C_DIR) \
+	  migration/c/pulse_response_smoke.c $(CANDIDATE_RESPONSE_ARCHIVE) \
+	  -o $(CANDIDATE_RESPONSE_C_DIR)/pulse-response-smoke
+	$(CANDIDATE_RESPONSE_C_DIR)/pulse-response-smoke
+	python3 migration/check_response_artifacts.py record --directory $(CANDIDATE_RESPONSE_C_DIR) --cc '$(CC)'
+
 CANDIDATE_MULTIPLEXER_FILES = src/transport/DNS.QUIC.TableModel.fst \
                               src/transport/DNS.QUIC.TableModel.Tests.fst \
                               migration/DNS.Migration.PulseMultiplexer.fst \
@@ -95,15 +145,16 @@ migration-inventory-check:
 	@mkdir -p $(CANDIDATE_DIST_DIR)
 	python3 migration/check_inventory.py --verified $(ALL_FST_FILES) \
 	  --extracted $(EXTRACT_FST_FILES) \
-	  --candidate $(PULSE_PILOT_FST_FILES) $(CANDIDATE_STREAM_FILES) $(CANDIDATE_MULTIPLEXER_FILES) \
+	  --candidate $(PULSE_PILOT_FST_FILES) $(CANDIDATE_STREAM_FILES) $(CANDIDATE_MULTIPLEXER_FILES) $(CANDIDATE_RESPONSE_FILES) \
 	  --candidate-extracted $(PULSE_VALUE_PILOT_FST_FILE) \
 	    src/transport/DNS.QUIC.StreamModel.fst migration/DNS.Migration.PulseStream.fst \
 	    src/transport/DNS.QUIC.TableModel.fst migration/DNS.Migration.PulseMultiplexer.fst \
+	    src/transport/DNS.QUIC.ResponseModel.fst migration/DNS.Migration.PulseResponse.fst \
 	  > $(CANDIDATE_DIST_DIR)/inventory.json.tmp
 	@mv $(CANDIDATE_DIST_DIR)/inventory.json.tmp $(CANDIDATE_DIST_DIR)/inventory.json
 	@echo "Migration inventory checked; see $(CANDIDATE_DIST_DIR)/inventory.json"
 
-candidate-verify: candidate-toolchain-check candidate-stream-verify candidate-multiplexer-verify
+candidate-verify: candidate-toolchain-check candidate-stream-verify candidate-multiplexer-verify candidate-response-verify
 	$(MAKE) verify-pulse-pilot BUILD_LANE=$(CANDIDATE_LANE) \
 	  PULSE_PILOT_FSTAR_OPTS='--odir $(CANDIDATE_OBJ_DIR)/pulse-pilot \
 	    --cache_dir $(CANDIDATE_OBJ_DIR)/pulse-pilot $(CANDIDATE_FSTAR_OPTS) \
@@ -164,17 +215,21 @@ candidate-stream-c-smoke: candidate-stream-library
 	$(CANDIDATE_STREAM_C_DIR)/pulse-stream-smoke
 	python3 migration/check_stream_artifacts.py record --directory $(CANDIDATE_STREAM_C_DIR) --cc '$(CC)'
 
-candidate-check: migration-inventory-check candidate-c-smoke candidate-stream-c-smoke candidate-multiplexer-c-smoke
+candidate-check: migration-inventory-check candidate-c-smoke candidate-stream-c-smoke candidate-multiplexer-c-smoke candidate-response-c-smoke
 
 # Run with the STABLE image after candidate-check has produced the archive.
 # Only C objects and the neutral ABI cross this boundary. A manifest rejects
 # stale sources/objects, wrong pins, foreign C targets or missing runtime pieces.
 PULSE_TABLE_ENABLED ?= 0
-PULSE_INTEGRATION_DIR = dist/pulse$(if $(filter 1,$(PULSE_TABLE_ENABLED)),-table)-integration-$(FSTAR_VERSION)
-PULSE_INTEGRATION_OBJ_DIR = obj/pulse$(if $(filter 1,$(PULSE_TABLE_ENABLED)),-table)-integration-$(FSTAR_VERSION)
-PULSE_SHELL_FLAGS = -DISM_USE_PULSE_STREAM=1 -I migration/c $(if $(filter 1,$(PULSE_TABLE_ENABLED)),-DISM_USE_PULSE_TABLE=1)
+PULSE_RESPONSE_ENABLED ?= 0
+PULSE_INTEGRATION_KIND = $(if $(filter 1,$(PULSE_RESPONSE_ENABLED)),-response,$(if $(filter 1,$(PULSE_TABLE_ENABLED)),-table))
+PULSE_INTEGRATION_DIR = dist/pulse$(PULSE_INTEGRATION_KIND)-integration-$(FSTAR_VERSION)
+PULSE_INTEGRATION_OBJ_DIR = obj/pulse$(PULSE_INTEGRATION_KIND)-integration-$(FSTAR_VERSION)
+PULSE_SHELL_FLAGS = -DISM_USE_PULSE_STREAM=1 -I migration/c $(if $(filter 1,$(PULSE_TABLE_ENABLED)),-DISM_USE_PULSE_TABLE=1) \
+                    $(if $(filter 1,$(PULSE_RESPONSE_ENABLED)),-DISM_USE_PULSE_RESPONSE=1)
 PULSE_SHELL_OBJECTS = $(PULSE_INTEGRATION_OBJ_DIR)/pulse_stream_adapter.o $(CANDIDATE_STREAM_ARCHIVE) \
-                     $(if $(filter 1,$(PULSE_TABLE_ENABLED)),$(PULSE_INTEGRATION_OBJ_DIR)/pulse_table_adapter.o $(CANDIDATE_TABLE_ARCHIVE))
+                     $(if $(filter 1,$(PULSE_TABLE_ENABLED)),$(PULSE_INTEGRATION_OBJ_DIR)/pulse_table_adapter.o $(CANDIDATE_TABLE_ARCHIVE)) \
+                     $(if $(filter 1,$(PULSE_RESPONSE_ENABLED)),$(PULSE_INTEGRATION_OBJ_DIR)/pulse_response_adapter.o $(CANDIDATE_RESPONSE_ARCHIVE))
 
 .PHONY: pulse-stream-artifacts-check pulse-integration-check
 pulse-stream-artifacts-check:
@@ -187,8 +242,23 @@ pulse-table-artifacts-check:
 pulse-table-integration-check: extract pulse-table-artifacts-check
 	$(MAKE) -o extract pulse-integration-check PULSE_TABLE_ENABLED=1
 
+.PHONY: pulse-response-artifacts-check pulse-response-integration-check
+pulse-response-artifacts-check:
+	python3 migration/check_response_artifacts.py check --directory $(CANDIDATE_RESPONSE_C_DIR) --cc '$(CC)'
+
+pulse-response-integration-check: extract pulse-response-artifacts-check
+	$(MAKE) -o extract pulse-integration-check PULSE_TABLE_ENABLED=1 PULSE_RESPONSE_ENABLED=1
+
 pulse-integration-check: extract pulse-stream-artifacts-check
 	@mkdir -p $(PULSE_INTEGRATION_DIR) $(PULSE_INTEGRATION_OBJ_DIR)
+ifeq ($(PULSE_RESPONSE_ENABLED),1)
+	python3 migration/check_response_artifacts.py check --directory $(CANDIDATE_RESPONSE_C_DIR) --cc '$(CC)'
+	KRML_INCLUDEDIR="$$($(KRML_HOME)/krml -locate-include)"; \
+	KRML_LIBDIR="$$($(KRML_HOME)/krml -locate-krmllib)"; \
+	$(CC) $(C_SMOKE_CFLAGS) $(PULSE_SHELL_FLAGS) -O2 -Wall -Wextra -Werror \
+	  -I "$$KRML_INCLUDEDIR" -I "$$KRML_LIBDIR/dist/minimal" \
+	  -c shell/pulse_response_adapter.c -o $(PULSE_INTEGRATION_OBJ_DIR)/pulse_response_adapter.o
+endif
 ifeq ($(PULSE_TABLE_ENABLED),1)
 	python3 migration/check_table_artifacts.py check --directory $(CANDIDATE_MULTIPLEXER_C_DIR) --cc '$(CC)'
 	KRML_INCLUDEDIR="$$($(KRML_HOME)/krml -locate-include)"; \
@@ -206,6 +276,25 @@ endif
 	  -I "$$KRML_INCLUDEDIR" -I "$$KRML_LIBDIR/dist/minimal" \
 	  -c shell/ism_shell.c -o $(PULSE_INTEGRATION_OBJ_DIR)/ism_shell.o
 	python3 migration/check_stream_artifacts.py selection --object $(PULSE_INTEGRATION_OBJ_DIR)/ism_shell.o
+ifeq ($(PULSE_RESPONSE_ENABLED),1)
+	python3 migration/check_response_artifacts.py selection --object $(PULSE_INTEGRATION_OBJ_DIR)/ism_shell.o \
+	  --adapter $(PULSE_INTEGRATION_OBJ_DIR)/pulse_response_adapter.o
+	KRML_INCLUDEDIR="$$($(KRML_HOME)/krml -locate-include)"; \
+	KRML_LIBDIR="$$($(KRML_HOME)/krml -locate-krmllib)"; \
+	$(CC) $(C_SMOKE_CFLAGS) -I migration/c -I shell -Wall -Wextra -Werror \
+	  -I "$$KRML_INCLUDEDIR" -I "$$KRML_LIBDIR/dist/minimal" \
+	  migration/c/pulse_response_handoff_smoke.c $(PULSE_INTEGRATION_OBJ_DIR)/pulse_response_adapter.o \
+	  $(CANDIDATE_RESPONSE_ARCHIVE) -o $(PULSE_INTEGRATION_DIR)/response-handoff-smoke && \
+	$(PULSE_INTEGRATION_DIR)/response-handoff-smoke
+	KRML_INCLUDEDIR="$$($(KRML_HOME)/krml -locate-include)"; \
+	KRML_LIBDIR="$$($(KRML_HOME)/krml -locate-krmllib)"; \
+	$(CC) $(C_SMOKE_CFLAGS) -I migration/c -I shell \
+	  -I "$$KRML_INCLUDEDIR" -I "$$KRML_LIBDIR/dist/minimal" \
+	  migration/c/pulse_response_differential.c migration/c/legacy_shell_oracle.c \
+	  shell/link_krml_compat_stubs.c shell/link_everparse_smoke.c \
+	  $(C_COMPILE_SMOKE_SOURCES) $(PULSE_INTEGRATION_OBJ_DIR)/ism_shell.o $(PULSE_SHELL_OBJECTS) \
+	  -o $(PULSE_INTEGRATION_DIR)/response-differential && $(PULSE_INTEGRATION_DIR)/response-differential
+endif
 ifeq ($(PULSE_TABLE_ENABLED),1)
 	python3 migration/check_table_artifacts.py selection --object $(PULSE_INTEGRATION_OBJ_DIR)/ism_shell.o \
 	  --adapter $(PULSE_INTEGRATION_OBJ_DIR)/pulse_table_adapter.o

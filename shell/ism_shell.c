@@ -1,4 +1,7 @@
 #include "ism_shell.h"
+#if defined(ISM_USE_PULSE_RESPONSE) && ISM_USE_PULSE_RESPONSE
+#include "pulse_response_adapter.h"
+#endif
 #if defined(ISM_USE_PULSE_STREAM) && ISM_USE_PULSE_STREAM
 #include "pulse_stream_adapter.h"
 #endif
@@ -248,7 +251,11 @@ ism_shell_prepare_doq_response_send(
   }
 
   return
+#if defined(ISM_USE_PULSE_RESPONSE) && ISM_USE_PULSE_RESPONSE
+    ism_pulse_prepare_doq_response(
+#else
     DNS_ShellResponseBoundary_prepare_doq_response_send_for_stream(
+#endif
       stream,
       response_buffer,
       response_len,

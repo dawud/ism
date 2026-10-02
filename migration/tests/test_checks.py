@@ -11,6 +11,7 @@ from check_inventory import inventory, without_comments
 from check_toolchain import check, read_lock
 from check_stream_artifacts import SOURCES, PRODUCTS, digest, validate, check_selection, check_archive
 import check_table_artifacts as table_checks
+import check_response_artifacts as response_checks
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -237,6 +238,67 @@ class MakeTests(unittest.TestCase):
         self.assertNotIn("candidate-multiplexer-extract", commands)
         self.assertNotIn("-DISM_USE_PULSE_TABLE=1", self.dry_run("pulse-integration-check"))
 
+    def test_response_proofs_are_required_and_focused_gate_remains_proof_only(self):
+        commands = self.dry_run("candidate-check", "FSTAR_HOME=/candidate")
+        loop = next(line for line in commands.splitlines()
+                    if line.startswith("for f in src/transport/DNS.QUIC.ResponseModel.fst"))
+        for name in ("src/transport/DNS.QUIC.ResponseModel.Tests.fst",
+                     "migration/DNS.Migration.PulseResponse.fst",
+                     "migration/DNS.Migration.PulseResponse.Tests.fst"):
+            self.assertIn(name, loop)
+        proofs = self.dry_run("candidate-response-verify", "FSTAR_HOME=/candidate")
+        self.assertIn("--cache_dir obj/candidate-v2026.09.13/response", proofs)
+        self.assertIn("--include obj/candidate-v2026.09.13/stream", proofs)
+        self.assertNotIn("--codegen", proofs)
+        self.assertNotIn("--lax", proofs)
+        self.assertNotIn("rustc", proofs)
+
+    def test_response_inventory_distinguishes_stable_and_candidate_extraction(self):
+        commands = self.dry_run("migration-inventory-check")
+        verified = commands.split("--verified ", 1)[1].split("--extracted", 1)[0]
+        extracted = commands.split("--extracted ", 1)[1].split("--candidate", 1)[0]
+        candidate = commands.split("--candidate ", 1)[1].split("--candidate-extracted", 1)[0]
+        candidate_extracted = commands.split("--candidate-extracted ", 1)[1]
+        self.assertIn("src/transport/DNS.QUIC.ResponseModel.Tests.fst", verified)
+        self.assertNotIn("src/transport/DNS.QUIC.ResponseModel.Tests.fst", extracted)
+        self.assertIn("src/transport/DNS.QUIC.ResponseModel.fst", extracted)
+        for name in ("src/transport/DNS.QUIC.ResponseModel.fst",
+                     "src/transport/DNS.QUIC.ResponseModel.Tests.fst",
+                     "migration/DNS.Migration.PulseResponse.fst",
+                     "migration/DNS.Migration.PulseResponse.Tests.fst"):
+            self.assertIn(name, candidate)
+            if name.endswith(".Tests.fst"):
+                self.assertNotIn(name, candidate_extracted)
+            else:
+                self.assertIn(name, candidate_extracted)
+
+    def test_response_checked_extraction_and_abi_smoke_are_required(self):
+        commands = self.dry_run("candidate-check", "FSTAR_HOME=/candidate")
+        for expected in ("pulse_response_smoke.c", "check_response_artifacts.py record",
+                         "pulse-response/libism_pulse_response.a"):
+            self.assertIn(expected, commands)
+        extraction = self.dry_run("candidate-response-extract", "FSTAR_HOME=/candidate")
+        for expected in ("--warn_error +250", "-warn-error @2@4@15", "--codegen krml",
+                         "pulse-response/out.krml"):
+            self.assertIn(expected, extraction)
+        self.assertNotIn("--lax", extraction)
+        self.assertNotIn("--no_cmi", extraction)
+
+    def test_response_mixed_gate_preserves_separate_older_lanes(self):
+        commands = self.dry_run("pulse-response-integration-check")
+        for expected in ("-DISM_USE_PULSE_STREAM=1", "-DISM_USE_PULSE_TABLE=1",
+                         "-DISM_USE_PULSE_RESPONSE=1", "shell/pulse_response_adapter.c",
+                         "check_response_artifacts.py check", "check_response_artifacts.py selection",
+                         "pulse_response_differential.c", "legacy_shell_oracle.c",
+                         "pulse_response_handoff_smoke.c", "response-handoff-smoke",
+                         "libism_pulse_response.a", "msquic-runtime-stream-smoke",
+                         "SHELL_IMPL_SOURCE=obj/pulse-response-integration-v2026.09.13/ism_shell.o"):
+            self.assertIn(expected, commands)
+        self.assertNotIn("DNS_Migration_PulseResponse.c", commands)
+        self.assertNotIn("candidate-response-extract", commands)
+        for target in ("pulse-integration-check", "pulse-table-integration-check"):
+            self.assertNotIn("-DISM_USE_PULSE_RESPONSE=1", self.dry_run(target))
+
     def test_stream_regressions_remain_in_stable_verify_not_extraction(self):
         commands = self.dry_run("migration-inventory-check")
         verified = commands.split("--verified ", 1)[1].split("--extracted", 1)[0]
@@ -422,6 +484,92 @@ class TableHandoffTests(unittest.TestCase):
              patch("check_stream_artifacts.undefined_symbols", return_value={"Pulse_Lib_Reference_op_Bang"}):
             with self.assertRaisesRegex(ValueError, "runtime dependencies"):
                 table_checks.check_archive(self.output)
+
+
+class ResponseHandoffTests(unittest.TestCase):
+    def setUp(self):
+        import json
+        self.temp = tempfile.TemporaryDirectory(prefix="ism-response-handoff-test-")
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.output = self.root / "output"
+        self.output.mkdir()
+        for name in response_checks.SOURCES:
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("test source")
+        (self.root / "migration/toolchain.lock").write_text(LOCK.read_text())
+        for name in response_checks.PRODUCTS:
+            (self.output / name).write_text("test product")
+        self.report = dict(abi=1, c_target="test-target", lock=read_lock(LOCK),
+            sources={name: digest(self.root / name) for name in response_checks.SOURCES},
+            products={name: digest(self.output / name) for name in response_checks.PRODUCTS})
+        self.manifest = self.output / response_checks.MANIFEST
+        self.manifest.write_text(json.dumps(self.report))
+
+    def run_check(self, target="test-target"):
+        with patch("check_response_artifacts.check_archive"):
+            return validate(self.root, self.output, target, **response_checks.options())
+
+    def test_matching_response_manifest_passes(self):
+        self.assertEqual(self.run_check()["abi"], 1)
+
+    def test_changed_response_sources_or_archive_fail(self):
+        for path in (self.root / "migration/c/ism_pulse_response.h",
+                     self.root / "migration/c/pulse_response_ranges.h",
+                     self.root / "migration/DNS.Migration.PulseResponse.fst",
+                     self.output / "libism_pulse_response.a"):
+            with self.subTest(path=path):
+                before = path.read_text()
+                path.write_text("changed")
+                with self.assertRaisesRegex(ValueError, "Stale or changed"):
+                    self.run_check()
+                path.write_text(before)
+
+    def test_wrong_target_abi_lock_or_missing_product_fails(self):
+        import copy
+        import json
+        with self.assertRaisesRegex(ValueError, "target mismatch"):
+            self.run_check("foreign-target")
+        for change, message in (("abi", "ABI version"), ("lock", "lock mismatch"),
+                                ("products", "Incomplete")):
+            report = copy.deepcopy(self.report)
+            if change == "abi":
+                report["abi"] = 2
+            elif change == "lock":
+                report["lock"]["FSTAR_COMMIT"] = "wrong"
+            else:
+                del report["products"][response_checks.PRODUCTS[0]]
+            self.manifest.write_text(json.dumps(report))
+            with self.assertRaisesRegex(ValueError, message):
+                self.run_check()
+
+    def test_selection_requires_pulse_and_preserved_descriptor_handoff(self):
+        shell = {"ism_pulse_prepare_doq_response"}
+        adapter = {"ism_pulse_response_frame", "ism_pulse_response_abi_version",
+                   "DNS_ShellResponseBoundary_prepare_response_send_for_stream"}
+        response_checks.check_selection(shell, adapter)
+        with self.assertRaisesRegex(ValueError, "selecting Pulse"):
+            response_checks.check_selection(set(), adapter)
+        for name in adapter:
+            with self.assertRaisesRegex(ValueError, "candidate ABI"):
+                response_checks.check_selection(shell, adapter - {name})
+        for name in ("DNS_ShellResponseBoundary_prepare_doq_response_send_for_stream",
+                     "DNS_ShellResponseBoundary_copy_response_bytes_with_prefix"):
+            with self.assertRaisesRegex(ValueError, "selecting Pulse"):
+                response_checks.check_selection(shell | {name}, adapter)
+            with self.assertRaisesRegex(ValueError, "candidate ABI"):
+                response_checks.check_selection(shell, adapter | {name})
+
+    def test_archive_rejects_extra_members_and_runtime_shims(self):
+        with patch("check_response_artifacts.subprocess.check_output", return_value="mock_runtime.o\n"):
+            with self.assertRaisesRegex(ValueError, "archive members"):
+                response_checks.check_archive(self.output)
+        members = "DNS_Migration_PulseResponse.o\nism_pulse_response.o\n"
+        with patch("check_response_artifacts.subprocess.check_output", return_value=members), \
+             patch("check_stream_artifacts.undefined_symbols", return_value={"Pulse_Lib_Array_op_Array_Access"}):
+            with self.assertRaisesRegex(ValueError, "runtime dependencies"):
+                response_checks.check_archive(self.output)
 
 
 if __name__ == "__main__":
