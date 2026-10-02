@@ -775,3 +775,41 @@ against independently compiled baseline code, then run all existing C/MsQuic
 gates on the same shell object. Keep default, M3-only and table-only lanes
 required and available for rollback. Descriptor/completion ownership, worker/
 parser/cache/security ports, warning/resource review and M5 remain open.
+
+## DR-0025: Seal Pending Send Ownership in a Proof-Only Pulse API
+
+**Status:** Accepted (2026-10-02); bounded M4 proof slice, not runtime migration.
+
+**Decision:** Add `DNS.Migration.PulseSend` with a checked interface and
+implementation. An idle slot owns the response array and connection/table/context
+pool. Beginning a send rejects a missing stream without mutation, or records the
+exact buffer, stream ID, length and FIN and seals those resources in `pending`.
+Inspection preserves that resource. Mismatched modeled completion retains it;
+matching completion or drop closes the first matching active slot, preserves all
+context values and bytes, and returns the idle slot and writable response storage.
+Also expose exact pointer equality in the stable egress postcondition, without
+changing its preconditions, implementation or ABI.
+
+**Conservative domain:** The existing table operations require the complete
+context pool, so this first API reserves the entire connection/table/pool until
+completion. Other independently owned storage can be framed, but unrelated
+streams in that connection cannot be operated on through this API while pending.
+This is a stronger ownership requirement than the runtime and is not a drop-in
+contract-equivalent replacement. Refine the reservation before integration.
+
+**Trust:** The abstract predicate is implemented by real reference/array
+ownership; the gate checks its implementation before clients. It is not a unit
+token or an assumed ownership axiom. A matching ID is only a modeled notification,
+not evidence of MsQuic quiescence. Truthful completion/drop after transport release,
+serialized callbacks, raw-pointer lifetime and same-ID replay/generation handling
+remain external obligations. The existing runtime and its unit borrow tokens are
+unchanged. No C adapter or new runtime assumption is introduced by this slice.
+
+**Gates and follow-up:** Require `candidate-send-verify` in `candidate-check`,
+with an isolated proof cache and no send extraction. Test framing-to-send,
+descriptor fields, mismatch preservation, both outcomes and recovered ownership;
+four expected resource-error clients reject early writes/close, double begin and
+completion without pending ownership. These negative tests are not admissions.
+Then refine per-stream reservations and notification identity, extract/review a
+C-only ownership boundary, and integrate with existing C/MsQuic tests. M4/M5 and
+end-to-end asynchronous lifetime guarantees remain open.

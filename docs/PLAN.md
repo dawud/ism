@@ -149,8 +149,12 @@ Execute these milestones in order, keeping the stable build available:
    extraction and the separate `pulse-response-integration-check` lane, selecting
    framing alongside ingress/FIN and table lifecycle through a reviewed C-only
    boundary. Its two response adapters remain trusted, and the stable descriptor
-   handoff is retained. Default and older mixed lanes are unchanged. Next port
-   send-descriptor/completion ownership and worker/shell boundaries,
+   handoff is retained. Default and older mixed lanes are unchanged. DR-0025 adds
+   a proof-only sealed pending-send API: exact descriptor, mismatch retention,
+   matching completion/drop close and ownership return. It conservatively reserves
+   the whole connection/table/context pool; truthful transport release remains
+   trusted. Next refine per-stream reservations and notification identity before
+   send C extraction/integration, then port worker/shell boundaries,
    followed by the remaining surfaces above; this is not M4 completion.
 5. **M5 — Promote the toolchain.** On a clean candidate build, pass `make verify`,
    `make everparse-verify`, `make extract`, `make c-compile-smoke`,

@@ -31,6 +31,22 @@ CANDIDATE_RESPONSE_C_DIR = $(CANDIDATE_DIST_DIR)/pulse-response
 CANDIDATE_RESPONSE_ARCHIVE = $(CANDIDATE_RESPONSE_C_DIR)/libism_pulse_response.a
 CANDIDATE_RESPONSE_MODULES = DNS.QUIC.StreamModel DNS.QUIC.ResponseModel DNS.Migration.PulseStream DNS.Migration.PulseResponse Pulse.Lib.Pervasives
 
+# Descriptor/lifetime API is proof-only; its abstract interface must be backed
+# by a checked implementation before checking clients. No send C archive yet.
+CANDIDATE_SEND_FILES = migration/DNS.Migration.PulseSend.fsti \
+                       migration/DNS.Migration.PulseSend.fst \
+                       migration/DNS.Migration.PulseSend.Tests.fst
+.PHONY: candidate-send-verify
+candidate-send-verify: candidate-multiplexer-verify candidate-response-verify
+	@mkdir -p $(CANDIDATE_OBJ_DIR)/send
+	@for f in $(CANDIDATE_SEND_FILES); do \
+	  $(FSTAR_HOME)/bin/fstar.exe $(CANDIDATE_FSTAR_OPTS) \
+	    --odir $(CANDIDATE_OBJ_DIR)/send --cache_dir $(CANDIDATE_OBJ_DIR)/send \
+	    --include $(CANDIDATE_OBJ_DIR)/multiplexer --include $(CANDIDATE_OBJ_DIR)/response \
+	    --include $(CANDIDATE_OBJ_DIR)/stream --include src/transport \
+	    $(addprefix --include ,$(PULSE_INCLUDE_DIRS)) $$f || exit $$?; \
+	done
+
 .PHONY: candidate-response-verify
 candidate-response-verify: candidate-stream-verify
 	@mkdir -p $(CANDIDATE_OBJ_DIR)/response
@@ -145,7 +161,7 @@ migration-inventory-check:
 	@mkdir -p $(CANDIDATE_DIST_DIR)
 	python3 migration/check_inventory.py --verified $(ALL_FST_FILES) \
 	  --extracted $(EXTRACT_FST_FILES) \
-	  --candidate $(PULSE_PILOT_FST_FILES) $(CANDIDATE_STREAM_FILES) $(CANDIDATE_MULTIPLEXER_FILES) $(CANDIDATE_RESPONSE_FILES) \
+	  --candidate $(PULSE_PILOT_FST_FILES) $(CANDIDATE_STREAM_FILES) $(CANDIDATE_MULTIPLEXER_FILES) $(CANDIDATE_RESPONSE_FILES) $(CANDIDATE_SEND_FILES) \
 	  --candidate-extracted $(PULSE_VALUE_PILOT_FST_FILE) \
 	    src/transport/DNS.QUIC.StreamModel.fst migration/DNS.Migration.PulseStream.fst \
 	    src/transport/DNS.QUIC.TableModel.fst migration/DNS.Migration.PulseMultiplexer.fst \
@@ -154,7 +170,7 @@ migration-inventory-check:
 	@mv $(CANDIDATE_DIST_DIR)/inventory.json.tmp $(CANDIDATE_DIST_DIR)/inventory.json
 	@echo "Migration inventory checked; see $(CANDIDATE_DIST_DIR)/inventory.json"
 
-candidate-verify: candidate-toolchain-check candidate-stream-verify candidate-multiplexer-verify candidate-response-verify
+candidate-verify: candidate-toolchain-check candidate-stream-verify candidate-multiplexer-verify candidate-response-verify candidate-send-verify
 	$(MAKE) verify-pulse-pilot BUILD_LANE=$(CANDIDATE_LANE) \
 	  PULSE_PILOT_FSTAR_OPTS='--odir $(CANDIDATE_OBJ_DIR)/pulse-pilot \
 	    --cache_dir $(CANDIDATE_OBJ_DIR)/pulse-pilot $(CANDIDATE_FSTAR_OPTS) \

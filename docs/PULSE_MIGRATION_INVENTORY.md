@@ -45,8 +45,11 @@ transitively on legacy code and must be checked after splitting those imports.
 | `src/transport/DNS.QUIC.ResponseModel.Tests.fst` | verify | Zero/max length, exact/short capacity, uint32 rejection and prefix byte boundaries | Stable and candidate verification-only regressions |
 | `migration/DNS.Migration.PulseResponse.fst` | candidate-verify+extract | Real separated source/destination ownership; exact framing, source preservation and no writes on rejection | M4 framing proof/C port and response-enabled integration lane; descriptor/completion ownership remains open |
 | `migration/DNS.Migration.PulseResponse.Tests.fst` | candidate-verify | Owned-array framing, failure, input/tail preservation, maximum length and unrelated frame regressions | Candidate imperative proof tests; not extracted |
+| `migration/DNS.Migration.PulseSend.fsti` | candidate-verify | Sealed pending resource, exact descriptor fields, mismatch preservation and matching close/release contract | M4 proof-only interface backed by the required checked implementation; not a trusted axiom |
+| `migration/DNS.Migration.PulseSend.fst` | candidate-verify | Real slot/buffer/table/context ownership; missing-ID rejection, first-match close, exact bytes and all context values preserved | M4 conservative whole-connection reservation; external quiescence and serialized callbacks remain trusted; not extracted or integrated |
+| `migration/DNS.Migration.PulseSend.Tests.fst` | candidate-verify | Framing-to-send, mismatch, completion/drop and ownership reuse regressions | Candidate proof-only clients of the sealed interface |
 | `src/transport/DNS.QUIC.MsQuicIngress.fst` | verify+extract | Authenticated fragment liveness/length, context-buffer disjointness and mutation bounds; authentication/borrow tokens are unit | M3 shell bypasses legacy data wrapper via reviewed C ABI; full wrapper port remains M4; no stronger MsQuic claim |
-| `src/transport/DNS.QUIC.MsQuicEgress.fst` | verify+extract | Live response buffer, length bound and send-descriptor handoff; no proof of runtime send completion | M4: Pulse buffer borrow/lifetime specification; preserve descriptor ABI |
+| `src/transport/DNS.QUIC.MsQuicEgress.fst` | verify+extract | Live response buffer, length bound and exact descriptor pointer/ID/length/FIN; no proof of runtime send completion | Stable ABI retained; Pulse send proof slice is not selected at runtime |
 | `src/transport/DNS.QUIC.MsQuicSendCompletion.fst` | verify+extract | Live descriptor and connection/table preconditions; cleanup delegates to close; runtime completion is trusted | M4 table-enabled shell delegates cleanup to Pulse close through trusted C; descriptor/ownership proof port remains open |
 | `src/concurrency/DNS.Worker.Minimal.fst` | verify+extract | Bounds/read-write obligations for FORMERR, empty NOERROR and validated question echo; not full DNS policy | M4: Pulse response-buffer operations; retain all linked response fixtures |
 | `src/concurrency/DNS.ShellBoundary.fst` | verify+extract | C-shaped ingress/FIN/worker/reset wrappers; phase code mapping and caller preconditions | Public ABI retained; selected C handles ingress/FIN and M4 table cleanup; worker wrappers/internal read-only lookups still Low* |
@@ -130,8 +133,8 @@ gate, not the standalone candidate stream/value smoke tests.
 
 The base image and OS packages are not digest/version locked; this is a
 reproducible **proof-tool selection**, not a fully reproducible binary supply
-chain. The shared models, real Pulse stream/table/response implementations and
-their regressions, as well as both existing pilots, verify in the required
+chain. The shared models, real Pulse stream/table/response implementations,
+proof-only send ownership API and their regressions, as well as both existing pilots, verify in the required
 candidate job. Its C compile/link/run gates exercise the real reference/array
 stream implementation and the original value-state pilot separately, plus the
 M4 table and response framing ports/ABIs.
@@ -142,6 +145,31 @@ lifecycle, then response framing. Default and older lanes retain stable framing.
 Runtime assumptions depend on the stream, table and response C adapters,
 all reviewed/tested but unverified. The ref pilot's optional Rust failure is
 outside these jobs; whole-project candidate compatibility remains M4/M5.
+
+## M4 send ownership contract correspondence (proof-only)
+
+DR-0025 adds a checked sealed interface, not a selected C implementation.
+`candidate-send-verify` checks the interface, its implementation, then client
+regressions; `candidate-check` requires it. These three roots are never extracted.
+
+| Obligation | Stable/runtime boundary | Pulse send proof API |
+| --- | --- | --- |
+| Descriptor | Stable egress now states exact pointer, ID, length and FIN; code/preconditions unchanged | `begin_send` returns those exact fields and seals real ownership; missing ID leaves resources unchanged |
+| Pending storage | Unit borrow tokens do not enforce immutability; shell/runtime responsible | Abstract implemented `pending` retains full response ownership, slot and whole connection/table/context pool; inspection does not release it |
+| Mismatch | Tested C single-slot rejection; no new runtime theorem | Returns false with exactly the same pending resource |
+| Completion/drop | Stable completion has a weak postcondition; external callback trusted | Matching modeled ID closes first matching active context, returns bytes/slot/table ownership, preserves every context value and applies the table close permutation |
+| Concurrency/domain | Serialized runtime supports other stream events subject to shell rules | Entire connection is reserved while pending; no compatibility claim for unrelated stream operations yet |
+| External release | Truthful MsQuic notification and no premature recycling required | Still required: matching ID is not quiescence evidence, and no same-ID replay/generation protection is proved |
+
+Positive regressions compose framing with exact descriptor inspection, missing-ID
+and mismatched-completion rejection, both outcomes, table permutation, unchanged
+contexts/input/tail, unrelated framed storage, and writable response reuse.
+Expected-error clients check that direct response writes, table close and a
+second begin cannot consume sealed resources, and that idle resources cannot
+complete another send. These are test-only negative checks, not admissions.
+No new runtime adapter or axiom is introduced; stable/mixed runtime paths remain
+unchanged. Refine per-stream reservations and notification identity before send
+C extraction/integration and asynchronous lifetime claims.
 
 ## M4 response framing contract correspondence
 
@@ -156,7 +184,7 @@ completion ownership proofs or the runtime's asynchronous lifetime obligations.
 | Rejection | Length above 65535 or capacity below length + 2 returns zero with no heap mutation | Same result, both arrays unchanged; bound checked before addition |
 | Empty response | Returns two with a zero prefix when capacity permits | Identical; neither contract validates DNS response semantics |
 | Copy helper aliasing | Existing helper preconditions retained; new snapshot-copy/source-preservation facts apply only when disjoint | Copy primitive requires separated array ownership; no aliased-call equivalence claimed |
-| Egress/completion | Existing context/FIN/descriptor and cleanup code retained | No descriptor or asynchronous borrow/completion API yet; framing is synchronous only |
+| Egress/completion | Existing context/FIN/descriptor and cleanup code retained | Framing is synchronous; the separate proof-only send API below is not selected by this runtime lane |
 | Extraction/runtime | Shared helpers extracted with the stable response wrapper; default and earlier mixed lanes retain it | Checked response archive and C-only adapters select framing in the response-enabled lane; stable descriptor handoff retained |
 
 `lemma_prefix_roundtrip` relates the emitted prefix to the shared ingress
@@ -531,3 +559,47 @@ freedom or full DNS semantics. M4/M5 remain open.
   passes; hosted CI and branch protection were not run/changed. DR-0024 and the
   trusted inventory record the two new C adapters and the still-open descriptor/
   completion ownership proof. Stable defaults/pins are unchanged; M4/M5 remain open.
+
+## M4 send ownership proof evidence (2026-10-02)
+
+- `candidate-send-verify` passed on the locked native candidate bundle in
+  `candidate-v2026.09.13-send-proof`. The interface and its real implementation
+  are checked before the client tests. The three new roots are proof-only;
+  inventory coverage is now 54 files and 17 candidate proof roots.
+- Full pinned-container `make candidate-check
+  CANDIDATE_LANE=candidate-v2026.09.13-send-final` also passed from a fresh
+  artifact directory: all proof roots and existing pilot/stream/table/response
+  extraction and C smokes, including 15,520 direct table comparisons and 240
+  response byte comparisons. All three C archive manifests were regenerated.
+- All three stable-image mixed integration targets passed against those archives,
+  reusing the stable extraction already checked above: 1,071 stream comparisons
+  in each lane, 32,832 table comparisons in the table/response lanes, 1,440
+  response comparisons and the descriptor handoff spy in the response lane,
+  plus both C gates and all six MsQuic gates in each lane. These tests continue
+  to select stable send handoff/completion; they do not exercise a Pulse send ABI.
+- The positive client composes response framing with missing-ID rejection,
+  exact pointer/ID/length/FIN inspection, unchanged pending state on a mismatched
+  completion, first-match table close, unchanged input/tail/context values,
+  preserved unrelated resources, writable response recovery and a second send
+  with zero length and FIN false. Both completion and drop outcomes are checked.
+  Chained exact snapshots use the same SMT resource limit of 100 as the existing
+  table sequence regressions; production send proofs use the default limit.
+- Four expected-error clients require Pulse resource error 228 for writing a
+  pending buffer, closing the reserved table, beginning a second pending send,
+  and completing from idle ownership. Their diagnostic state dumps are expected;
+  successful verification of any of these bad clients fails the test gate.
+  No expected-failure definition is extracted or used as a production lemma.
+- Stable `make verify extract`, EverParse generation/verification, both C smoke
+  gates and all six MsQuic gates passed, including real loopback send/completion.
+  The shell, response and protocol public header bodies are unchanged, excluding
+  generation banners. Existing extraction warning 250/15 and macro redefinition
+  debt remains; the stable egress change only strengthens pointer correspondence.
+- All 53 migration guard tests pass, including required implementation-before-
+  client checking, isolated proof caches and exclusion of send roots from both
+  extraction lanes. Workflow YAML parses and `git diff --check` passes. Hosted
+  CI/branch protection was not run/changed; CI job identities are retained.
+- DR-0025 and the trusted inventory record the conservative whole-connection
+  reservation, unproved external quiescence and same-ID replay obligations.
+  No send C code or adapter is selected, and runtime unit borrow tokens are not
+  replaced. Per-stream reservation refinement and runtime integration remain next;
+  M4/M5 and end-to-end asynchronous lifetime guarantees are not complete.

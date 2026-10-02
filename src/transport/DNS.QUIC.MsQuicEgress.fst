@@ -56,6 +56,7 @@ val prepare_response_send :
     (ensures (fun h0 r h1 ->
       modifies_none h0 h1 /\
       r.mssd_stream_id = response.msrf_stream_id /\
+      r.mssd_data == response.msrf_data /\
       r.mssd_len = response.msrf_len /\
       r.mssd_fin = response.msrf_fin))
 

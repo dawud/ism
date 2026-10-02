@@ -110,7 +110,15 @@ C/MsQuic shell. Rust is not on this migration's critical path.
     Required candidate C gates and separate response-enabled integration lane;
     stable descriptor handoff retained, two new C adapters explicitly trusted.
     See DR-0024 and [PULSE_RESPONSE_C_ABI.md](PULSE_RESPONSE_C_ABI.md).
-  - [ ] Port send-descriptor/completion ownership and remaining ingress wrappers,
+  - [x] First send ownership proof slice: sealed real buffer/table/context
+    resources, exact descriptor fields, mismatch preservation and matching
+    completion/drop close/release, required by `candidate-check`. Proof-only;
+    whole-connection reservation and truthful transport release documented in
+    DR-0025. Runtime unit borrow tokens remain unchanged.
+  - [ ] Refine send ownership to permit unrelated stream operations while pending,
+    address notification identity/replay obligations, then extract/integrate the
+    send API through a reviewed C-only boundary and all C/MsQuic gates.
+  - [ ] Port remaining ingress wrappers,
     worker/shell/parser buffers and sequential cache; resolve every remaining
     inventory disposition.
 - [ ] **M5: Stable promotion.** Pass full verification, EverParse, extraction,

@@ -49,7 +49,8 @@ a claim of fully reproducible builds.
 The pinned candidate lane uses `Containerfile.candidate` and
 [`migration/toolchain.lock`](migration/toolchain.lock): F* `v2026.09.13`, its
 bundled KaRaMeL, and Z3 4.13.3. Its blocking CI job covers the shared stream/table/
-response models, real Pulse ingress/FIN, table and response-framing proofs and
+response models, real Pulse ingress/FIN, table, response-framing and proof-only
+sealed pending-send ownership proofs and
 regressions, the two original pilot proofs, and C extraction/compile/link/run of
 the stream, table and response ports/ABIs and value pilot. The stable CI job runs
 the M3 ingress-only, M4 table-enabled and M4 response-enabled lanes with
@@ -99,7 +100,9 @@ stream/table/response ports and value pilot to C, and compile/link/run their
 smoke tests. It records checked C archives and source/product manifests for
 the mixed gates.
 Response framing now has required extraction and an explicit runtime lane;
-asynchronous descriptor/completion ownership remains separate work.
+the send API has separate proof-only ownership checks. It conservatively reserves
+the whole connection while pending; transport quiescence and runtime integration
+remain open (see [DR-0025](docs/DECISIONS.md#dr-0025-seal-pending-send-ownership-in-a-proof-only-pulse-api)).
 It does not invoke Rust or tolerate failed candidate checks. Artifacts and
 provenance are isolated under `obj/candidate-v2026.09.13/` and
 `dist/candidate-v2026.09.13/`; stable output paths remain unchanged. Use the
@@ -165,6 +168,8 @@ make candidate-stream-c-smoke FSTAR_HOME=/path/to/fstar
 make candidate-multiplexer-c-smoke FSTAR_HOME=/path/to/fstar
 # Focused M4 response-framing proofs (includes stream proofs; no C extraction):
 make candidate-response-verify FSTAR_HOME=/path/to/fstar
+# Focused M4 sealed send/completion ownership proofs (no send extraction):
+make candidate-send-verify FSTAR_HOME=/path/to/fstar
 # Focused M4 response extraction, direct generated-C and neutral ABI tests:
 make candidate-response-c-smoke FSTAR_HOME=/path/to/fstar
 python3 -m unittest discover -s migration/tests -v
@@ -180,7 +185,9 @@ requirements are documented in the
 Response framing now has a shared byte-exact specification, checked by both the
 stable wrapper and the real Pulse array implementation. The explicit response
 lane uses extracted Pulse framing; default and older mixed lanes retain stable
-framing. Send-descriptor/completion lifetime proofs remain open. Worker wrappers still
+framing. The proof-only send API checks exact descriptors, retained ownership on
+mismatch and matching completion/drop cleanup; it does not prove external
+transport quiescence or replace runtime send lifetime handling. Worker wrappers still
 perform internal read-only Low* lookups. Other remaining imperative modules and
 stable promotion also remain open.
 Base-image/system packages are not fully locked; `toolchain.json` records the

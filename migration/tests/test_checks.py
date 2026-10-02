@@ -253,6 +253,29 @@ class MakeTests(unittest.TestCase):
         self.assertNotIn("--lax", proofs)
         self.assertNotIn("rustc", proofs)
 
+    def test_send_interface_is_backed_by_checked_implementation_before_clients(self):
+        commands = self.dry_run("candidate-check", "FSTAR_HOME=/candidate")
+        loop = next(line for line in commands.splitlines()
+                    if line.startswith("for f in migration/DNS.Migration.PulseSend.fsti"))
+        self.assertIn("PulseSend.fsti migration/DNS.Migration.PulseSend.fst "
+                      "migration/DNS.Migration.PulseSend.Tests.fst", loop)
+        proofs = self.dry_run("candidate-send-verify", "FSTAR_HOME=/candidate")
+        self.assertIn("--cache_dir obj/candidate-v2026.09.13/send", proofs)
+        for dependency in ("multiplexer", "response", "stream"):
+            self.assertIn(f"--include obj/candidate-v2026.09.13/{dependency}", proofs)
+        self.assertNotIn("--codegen", proofs)
+        self.assertNotIn("--lax", proofs)
+        self.assertNotIn("rustc", proofs)
+
+    def test_send_roots_are_candidate_proof_only(self):
+        commands = self.dry_run("migration-inventory-check")
+        candidate = commands.split("--candidate ", 1)[1].split("--candidate-extracted", 1)[0]
+        other_roots = commands.split("--candidate ", 1)[0] + commands.split("--candidate-extracted", 1)[1]
+        for suffix in ("fsti", "fst", "Tests.fst"):
+            name = f"migration/DNS.Migration.PulseSend.{suffix}"
+            self.assertIn(name, candidate)
+            self.assertNotIn(name, other_roots)
+
     def test_response_inventory_distinguishes_stable_and_candidate_extraction(self):
         commands = self.dry_run("migration-inventory-check")
         verified = commands.split("--verified ", 1)[1].split("--extracted", 1)[0]
