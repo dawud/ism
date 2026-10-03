@@ -813,3 +813,45 @@ completion without pending ownership. These negative tests are not admissions.
 Then refine per-stream reservations and notification identity, extract/review a
 C-only ownership boundary, and integrate with existing C/MsQuic tests. M4/M5 and
 end-to-end asynchronous lifetime guarantees remain open.
+
+## DR-0026: Permit Serialized Table Operations During a Pending Send
+
+**Status:** Accepted (2026-10-03); proof-only M4 reservation refinement. This
+supersedes DR-0025's whole-connection freeze, not its external transport limits.
+
+**Decision:** Split sealed response storage (`pending`) from an independent
+`reserved_connection` resource. The latter still encapsulates the connection,
+table, context pool and send-control slot; it exposes guarded lookup, allocation
+and close operations, not raw writable references. Those operations require no
+response ownership, so the response token can be framed separately. Allocation
+retains duplicate/full rejection and preserves active contexts. Close rejects
+the reserved stream ID without mutation, and otherwise closes the first match.
+This permits unrelated lifecycle operations, not arbitrary context mutation or
+parallel access. One send remains pending per guarded connection; this is not
+multi-send support. Existing ingress/worker operations are not newly exposed here.
+
+**Identity through compaction:** The proof-only descriptor also records the
+reserved context reference. An internal cursor is related to that reference by
+the guarded invariant and updated when compaction moves the reserved context.
+Matching modeled completion/drop uses the current cursor to remove exactly that
+context and preserves every current context value, including unrelated updates
+made since send preparation. It does not repeat a first-ID lookup: duplicate IDs
+are allowed by the existing table preconditions, and a duplicate can move ahead
+of the reserved context. No new unique-ID precondition is introduced. Closing by
+the reserved ID is conservatively rejected even when another context shares it.
+
+**Trust and compatibility:** Both resource predicates have checked implementations
+using real reference/array ownership. No admission, assumed ownership primitive,
+pointer-equality runtime shim or new adapter is added. The existing extracted
+multiplexer, stable/mixed runtime selection, public C ABI and pins are unchanged.
+These are serialized local-heap proofs, not synchronization or a raw-pointer
+lifetime theorem. Matching an ID still does not prove transport release or
+prevent replay after same-ID reuse; notification identity and truthful MsQuic
+quiescence remain separate obligations before send C integration.
+
+**Gates:** Retain framing/send and negative ownership regressions, add required
+reservation interleavings for movement, close/reopen, guard failures and duplicate
+IDs ahead of the reservation, and test both completion outcomes. Verify that raw
+context mutation and direct reservation-slot writes are rejected. Keep all send
+roots proof-only, with implementation verification before clients. M4/M5 remain
+open; next address notification identity/replay before C extraction/integration.

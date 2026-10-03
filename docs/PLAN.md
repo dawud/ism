@@ -151,9 +151,12 @@ Execute these milestones in order, keeping the stable build available:
    boundary. Its two response adapters remain trusted, and the stable descriptor
    handoff is retained. Default and older mixed lanes are unchanged. DR-0025 adds
    a proof-only sealed pending-send API: exact descriptor, mismatch retention,
-   matching completion/drop close and ownership return. It conservatively reserves
-   the whole connection/table/context pool; truthful transport release remains
-   trusted. Next refine per-stream reservations and notification identity before
+   matching completion/drop close and ownership return. DR-0026 separates sealed
+   response storage from a guarded connection resource, permitting unrelated
+   lookup/open/close and tracking the reserved context through compaction.
+   Completion removes that context even if a duplicate ID moves ahead of it;
+   truthful transport release remains trusted. Next address notification identity
+   and replay obligations before
    send C extraction/integration, then port worker/shell boundaries,
    followed by the remaining surfaces above; this is not M4 completion.
 5. **M5 — Promote the toolchain.** On a clean candidate build, pass `make verify`,

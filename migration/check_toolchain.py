@@ -54,7 +54,7 @@ def check(fstar_home, cc, lock_path):
         "host": platform.platform(),
         "os_release": Path("/etc/os-release").read_text(),
         "everparse": "separate pinned baseline generator; not run by candidate gate",
-        "scope": "shared stream/table/response and Pulse proofs, including proof-only sealed pending-send ownership; pilots and real stream/table/response C extraction/ABI smokes; mixed ingress, table and response integration checked separately; send runtime integration and whole-toolchain promotion remain open",
+        "scope": "shared stream/table/response and Pulse proofs, including proof-only per-stream send reservations and guarded table interleavings; pilots and real stream/table/response C extraction/ABI smokes; mixed ingress, table and response integration checked separately; send notification identity, runtime integration and whole-toolchain promotion remain open",
     }
 
 

@@ -258,7 +258,8 @@ class MakeTests(unittest.TestCase):
         loop = next(line for line in commands.splitlines()
                     if line.startswith("for f in migration/DNS.Migration.PulseSend.fsti"))
         self.assertIn("PulseSend.fsti migration/DNS.Migration.PulseSend.fst "
-                      "migration/DNS.Migration.PulseSend.Tests.fst", loop)
+                      "migration/DNS.Migration.PulseSend.Tests.fst "
+                      "migration/DNS.Migration.PulseSend.Reservation.Tests.fst", loop)
         proofs = self.dry_run("candidate-send-verify", "FSTAR_HOME=/candidate")
         self.assertIn("--cache_dir obj/candidate-v2026.09.13/send", proofs)
         for dependency in ("multiplexer", "response", "stream"):
@@ -271,7 +272,7 @@ class MakeTests(unittest.TestCase):
         commands = self.dry_run("migration-inventory-check")
         candidate = commands.split("--candidate ", 1)[1].split("--candidate-extracted", 1)[0]
         other_roots = commands.split("--candidate ", 1)[0] + commands.split("--candidate-extracted", 1)[1]
-        for suffix in ("fsti", "fst", "Tests.fst"):
+        for suffix in ("fsti", "fst", "Tests.fst", "Reservation.Tests.fst"):
             name = f"migration/DNS.Migration.PulseSend.{suffix}"
             self.assertIn(name, candidate)
             self.assertNotIn(name, other_roots)

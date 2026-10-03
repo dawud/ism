@@ -24,9 +24,9 @@ fn cannot_write_pending (slot:E.send_slot) (cp:R.ref M.connection_context)
   (d:E.descriptor) (#bytes:G.erased (S.seq FStar.UInt8.t))
   (#c:G.erased M.connection_context) (#slots #pool:G.erased (S.seq M.slot))
   (#state:G.erased M.snapshot)
-requires E.pending slot cp d bytes c slots pool state
+requires E.pending slot d bytes ** E.reserved_connection slot cp d ((G.reveal state) d.E.context) c slots pool state
 requires pure (S.length bytes > 0)
-ensures E.pending slot cp d bytes c slots pool state
+ensures E.pending slot d bytes ** E.reserved_connection slot cp d ((G.reveal state) d.E.context) c slots pool state
 {
   d.E.data.(0sz) <- 0uy;
 }
@@ -36,8 +36,8 @@ fn cannot_close_pending (slot:E.send_slot) (cp:R.ref M.connection_context)
   (d:E.descriptor) (#bytes:G.erased (S.seq FStar.UInt8.t))
   (#c:G.erased M.connection_context) (#slots #pool:G.erased (S.seq M.slot))
   (#state:G.erased M.snapshot)
-requires E.pending slot cp d bytes c slots pool state
-ensures E.pending slot cp d bytes c slots pool state
+requires E.pending slot d bytes ** E.reserved_connection slot cp d ((G.reveal state) d.E.context) c slots pool state
+ensures E.pending slot d bytes ** E.reserved_connection slot cp d ((G.reveal state) d.E.context) c slots pool state
 {
   let closed = M.close_stream cp d.E.stream_id;
   ()
@@ -48,8 +48,8 @@ fn cannot_begin_while_pending (slot:E.send_slot) (cp:R.ref M.connection_context)
   (d:E.descriptor) (#bytes:G.erased (S.seq FStar.UInt8.t))
   (#c:G.erased M.connection_context) (#slots #pool:G.erased (S.seq M.slot))
   (#state:G.erased M.snapshot)
-requires E.pending slot cp d bytes c slots pool state
-ensures E.pending slot cp d bytes c slots pool state
+requires E.pending slot d bytes ** E.reserved_connection slot cp d ((G.reveal state) d.E.context) c slots pool state
+ensures E.pending slot d bytes ** E.reserved_connection slot cp d ((G.reveal state) d.E.context) c slots pool state
 {
   let second = E.begin_send slot cp d.E.data d.E.length d.E.stream_id d.E.fin;
   ()
@@ -80,7 +80,7 @@ ensures emp
   table.(1sz) <- b;
   T.own_pair a b;
   let mut conn = {M.cc_active = table; M.cc_num = 2ul; M.cc_capacity = 2ul};
-  let mut slot : option E.descriptor = None;
+  let mut slot : option E.reservation = None;
   let mut query = [| 0x17uy; 12sz |];
   let mut response = [| 0x79uy; 20sz |];
   let mut unrelated = 42ul;

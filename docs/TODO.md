@@ -115,8 +115,11 @@ C/MsQuic shell. Rust is not on this migration's critical path.
     completion/drop close/release, required by `candidate-check`. Proof-only;
     whole-connection reservation and truthful transport release documented in
     DR-0025. Runtime unit borrow tokens remain unchanged.
-  - [ ] Refine send ownership to permit unrelated stream operations while pending,
-    address notification identity/replay obligations, then extract/integrate the
+  - [x] Refine send ownership to permit unrelated serialized lookup/open/close
+    while pending, with sealed response ownership and a guarded table invariant
+    tracking the exact reserved context through compaction. Verify interleavings,
+    duplicate-ID reordering and reserved context/control guards. See DR-0026.
+  - [ ] Address notification identity/replay obligations, then extract/integrate the
     send API through a reviewed C-only boundary and all C/MsQuic gates.
   - [ ] Port remaining ingress wrappers,
     worker/shell/parser buffers and sequential cache; resolve every remaining

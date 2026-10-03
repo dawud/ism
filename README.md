@@ -82,7 +82,7 @@ If the local image is missing, build it from the checked-in `Containerfile`:
 podman build -t localhost/verified-dns-server:latest -f Containerfile .
 ```
 
-To run the pinned candidate checks (M1–M3, M4 table and response-framing scope):
+To run the pinned candidate checks (M1–M3, M4 table/framing/send proof scope):
 
 ```bash
 podman build -t localhost/verified-dns-server:pulse-candidate -f Containerfile.candidate .
@@ -100,9 +100,11 @@ stream/table/response ports and value pilot to C, and compile/link/run their
 smoke tests. It records checked C archives and source/product manifests for
 the mixed gates.
 Response framing now has required extraction and an explicit runtime lane;
-the send API has separate proof-only ownership checks. It conservatively reserves
-the whole connection while pending; transport quiescence and runtime integration
-remain open (see [DR-0025](docs/DECISIONS.md#dr-0025-seal-pending-send-ownership-in-a-proof-only-pulse-api)).
+the send API has separate proof-only ownership checks. Its guarded connection
+permits unrelated lookup/open/close while protecting the pending response and
+reserved context through table compaction. Transport quiescence, notification
+replay and runtime integration remain open (see
+[DR-0026](docs/DECISIONS.md#dr-0026-permit-serialized-table-operations-during-a-pending-send)).
 It does not invoke Rust or tolerate failed candidate checks. Artifacts and
 provenance are isolated under `obj/candidate-v2026.09.13/` and
 `dist/candidate-v2026.09.13/`; stable output paths remain unchanged. Use the
@@ -185,8 +187,9 @@ requirements are documented in the
 Response framing now has a shared byte-exact specification, checked by both the
 stable wrapper and the real Pulse array implementation. The explicit response
 lane uses extracted Pulse framing; default and older mixed lanes retain stable
-framing. The proof-only send API checks exact descriptors, retained ownership on
-mismatch and matching completion/drop cleanup; it does not prove external
+framing. The proof-only send API checks exact descriptors, unrelated table
+interleavings, retained ownership on mismatch and reserved-context completion/
+drop cleanup; it does not prove external
 transport quiescence or replace runtime send lifetime handling. Worker wrappers still
 perform internal read-only Low* lookups. Other remaining imperative modules and
 stable promotion also remain open.

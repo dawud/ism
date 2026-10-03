@@ -45,9 +45,10 @@ transitively on legacy code and must be checked after splitting those imports.
 | `src/transport/DNS.QUIC.ResponseModel.Tests.fst` | verify | Zero/max length, exact/short capacity, uint32 rejection and prefix byte boundaries | Stable and candidate verification-only regressions |
 | `migration/DNS.Migration.PulseResponse.fst` | candidate-verify+extract | Real separated source/destination ownership; exact framing, source preservation and no writes on rejection | M4 framing proof/C port and response-enabled integration lane; descriptor/completion ownership remains open |
 | `migration/DNS.Migration.PulseResponse.Tests.fst` | candidate-verify | Owned-array framing, failure, input/tail preservation, maximum length and unrelated frame regressions | Candidate imperative proof tests; not extracted |
-| `migration/DNS.Migration.PulseSend.fsti` | candidate-verify | Sealed pending resource, exact descriptor fields, mismatch preservation and matching close/release contract | M4 proof-only interface backed by the required checked implementation; not a trusted axiom |
-| `migration/DNS.Migration.PulseSend.fst` | candidate-verify | Real slot/buffer/table/context ownership; missing-ID rejection, first-match close, exact bytes and all context values preserved | M4 conservative whole-connection reservation; external quiescence and serialized callbacks remain trusted; not extracted or integrated |
+| `migration/DNS.Migration.PulseSend.fsti` | candidate-verify | Separate sealed buffer and guarded connection resources; exact descriptor/context identity, unrelated table operations, mismatch preservation and exact reserved-context completion | M4 proof-only interface backed by the required checked implementation; not a trusted axiom |
+| `migration/DNS.Migration.PulseSend.fst` | candidate-verify | Real slot/buffer/table/context ownership; first-match begin, guarded lookup/open/close, cursor preservation through compaction, exact reserved-context removal and current snapshot preservation | M4 serialized per-stream reservation; external quiescence and notification replay remain trusted/unproved; not extracted or integrated |
 | `migration/DNS.Migration.PulseSend.Tests.fst` | candidate-verify | Framing-to-send, mismatch, completion/drop and ownership reuse regressions | Candidate proof-only clients of the sealed interface |
+| `migration/DNS.Migration.PulseSend.Reservation.Tests.fst` | candidate-verify | Unrelated close/reopen during send, reservation guards, moved cursor, duplicate-ID identity and negative context/control ownership regressions | Candidate proof-only interleaving tests; not concurrent execution or C tests |
 | `src/transport/DNS.QUIC.MsQuicIngress.fst` | verify+extract | Authenticated fragment liveness/length, context-buffer disjointness and mutation bounds; authentication/borrow tokens are unit | M3 shell bypasses legacy data wrapper via reviewed C ABI; full wrapper port remains M4; no stronger MsQuic claim |
 | `src/transport/DNS.QUIC.MsQuicEgress.fst` | verify+extract | Live response buffer, length bound and exact descriptor pointer/ID/length/FIN; no proof of runtime send completion | Stable ABI retained; Pulse send proof slice is not selected at runtime |
 | `src/transport/DNS.QUIC.MsQuicSendCompletion.fst` | verify+extract | Live descriptor and connection/table preconditions; cleanup delegates to close; runtime completion is trusted | M4 table-enabled shell delegates cleanup to Pulse close through trusted C; descriptor/ownership proof port remains open |
@@ -148,27 +149,33 @@ outside these jobs; whole-project candidate compatibility remains M4/M5.
 
 ## M4 send ownership contract correspondence (proof-only)
 
-DR-0025 adds a checked sealed interface, not a selected C implementation.
+DR-0025 adds a checked sealed interface; DR-0026 refines it to allow guarded
+serialized table operations during a send. Neither selects a C implementation.
 `candidate-send-verify` checks the interface, its implementation, then client
-regressions; `candidate-check` requires it. These three roots are never extracted.
+regressions; `candidate-check` requires it. These four roots are never extracted.
 
 | Obligation | Stable/runtime boundary | Pulse send proof API |
 | --- | --- | --- |
-| Descriptor | Stable egress now states exact pointer, ID, length and FIN; code/preconditions unchanged | `begin_send` returns those exact fields and seals real ownership; missing ID leaves resources unchanged |
-| Pending storage | Unit borrow tokens do not enforce immutability; shell/runtime responsible | Abstract implemented `pending` retains full response ownership, slot and whole connection/table/context pool; inspection does not release it |
-| Mismatch | Tested C single-slot rejection; no new runtime theorem | Returns false with exactly the same pending resource |
-| Completion/drop | Stable completion has a weak postcondition; external callback trusted | Matching modeled ID closes first matching active context, returns bytes/slot/table ownership, preserves every context value and applies the table close permutation |
-| Concurrency/domain | Serialized runtime supports other stream events subject to shell rules | Entire connection is reserved while pending; no compatibility claim for unrelated stream operations yet |
+| Descriptor | Stable egress states exact pointer, ID, length and FIN; code/preconditions unchanged | `begin_send` returns those exact fields plus the first matching context reference; missing ID leaves resources unchanged |
+| Pending storage | Unit borrow tokens do not enforce immutability; shell/runtime responsible | Abstract implemented `pending` owns response bytes; separate `reserved_connection` guards table/context/control ownership and a cursor linked to the reserved context |
+| Unrelated operations | Shell supports serialized stream events | Guarded lookup/open/close require no response ownership. Open preserves active contexts and duplicate/full rejection. Close rejects the reserved ID; otherwise first-match close updates the reservation cursor as needed |
+| Mismatch | Tested C single-slot rejection; no new runtime theorem | Returns false with exactly the same buffer and guarded-connection resources |
+| Completion/drop | Stable completion has a weak postcondition; external callback trusted | Matching modeled ID removes the originally reserved context using its current cursor, not a fresh first-ID lookup. Returns bytes/slot/table ownership and preserves all current context values, including unrelated updates |
+| Concurrency/domain | Serialized runtime supports other stream events subject to shell rules | One pending send per guarded connection; only guarded serialized table APIs are exposed, not arbitrary context writes, new ingress/worker APIs, multi-send or parallel synchronization. All contexts sharing the reserved ID are protected from ID-based close until completion |
 | External release | Truthful MsQuic notification and no premature recycling required | Still required: matching ID is not quiescence evidence, and no same-ID replay/generation protection is proved |
 
 Positive regressions compose framing with exact descriptor inspection, missing-ID
 and mismatched-completion rejection, both outcomes, table permutation, unchanged
 contexts/input/tail, unrelated framed storage, and writable response reuse.
+Reservation regressions cover close/reopen of another stream while pending,
+movement of the reserved context, unchanged descriptor/bytes, full/duplicate/
+missing/reserved-ID rejection and a duplicate ID moved ahead of the reservation.
 Expected-error clients check that direct response writes, table close and a
 second begin cannot consume sealed resources, and that idle resources cannot
-complete another send. These are test-only negative checks, not admissions.
+complete another send; raw reserved-context/control mutation is also rejected.
+These are test-only negative checks, not admissions.
 No new runtime adapter or axiom is introduced; stable/mixed runtime paths remain
-unchanged. Refine per-stream reservations and notification identity before send
+unchanged. Address notification identity/replay before send
 C extraction/integration and asynchronous lifetime claims.
 
 ## M4 response framing contract correspondence
@@ -603,3 +610,46 @@ freedom or full DNS semantics. M4/M5 remain open.
   No send C code or adapter is selected, and runtime unit borrow tokens are not
   replaced. Per-stream reservation refinement and runtime integration remain next;
   M4/M5 and end-to-end asynchronous lifetime guarantees are not complete.
+
+## M4 per-stream reservation proof evidence (2026-10-03)
+
+- Pinned-container `make candidate-check
+  CANDIDATE_LANE=candidate-v2026.09.13-reservation-final` passed, including all
+  shared models, pilots, send roots, strict C extraction and stream/table/response
+  smokes. Existing C tests retain 15,520 direct table comparisons and 240 response
+  byte comparisons; all three handoff manifests were regenerated for this build.
+- The checked send interface/implementation and both client modules pass with
+  the pinned candidate bundle. `pending` retains response bytes separately from
+  `reserved_connection`; table operations require only the latter. Production
+  proofs retain the default SMT resource limit; the new interleaving regressions
+  use 100, as do the existing send/table sequence tests. No admissions added.
+- Existing framing-to-send, mismatch, completion/drop, reuse and four negative
+  ownership regressions remain checked. New interleavings cover a reserved last
+  slot moving on unrelated close, repeated close/reopen while the send waits,
+  full/duplicate/missing/reserved-ID rejection, unchanged descriptor/response,
+  exact retirement and preservation of the other stream's updated ID/phase/buffer.
+- A three-context regression starts with `[other, reserved, duplicate-ID]`,
+  closes `other`, and checks that completion removes `reserved` from
+  `[duplicate-ID, reserved, other]`. The duplicate remains active; both completion
+  and drop outcomes are verified. This tests exact context identity, not a
+  strengthened unique-ID precondition or a fresh first-ID lookup on completion.
+- Two additional expected-error clients reject raw reserved-context writes and
+  direct reservation-slot mutation. Removing their expected-error annotations in
+  temporary audit clients confirms missing reference ownership (error 228), not
+  syntax errors. All six negative clients are test-only and never extracted.
+- Stable `make verify`, `make extract`, EverParse and both C smoke gates passed.
+  Shell/response/protocol public header body hashes remain unchanged, excluding
+  generation banners. Existing extraction warning 250/15 and macro redefinition
+  debt remains. Neither the extracted multiplexer nor any C adapter was modified.
+- All six default MsQuic gates and all three mixed integration lanes passed
+  against the regenerated candidate archives, including live loopback send and
+  completion. The mixed lanes retain 1,071 stream comparisons each, 32,832 table
+  comparisons in the table/response lanes, and 1,440 response comparisons plus
+  descriptor handoff checks in the response lane. These exercise existing runtime
+  code, not a Pulse send ABI; no new runtime-lifetime guarantee is claimed.
+- The inventory covers 55 files and 18 candidate roots. All four send roots are
+  required and proof-only; all 53 migration guard tests and `git diff --check`
+  pass. DR-0026 records serialized, guarded lifecycle access—not arbitrary context
+  writes, new ingress/worker APIs, concurrent synchronization or runtime ownership.
+  Notification identity/replay, transport quiescence and send C integration remain
+  open; the stable toolchain and runtime selection are unchanged.

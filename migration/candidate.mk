@@ -35,7 +35,8 @@ CANDIDATE_RESPONSE_MODULES = DNS.QUIC.StreamModel DNS.QUIC.ResponseModel DNS.Mig
 # by a checked implementation before checking clients. No send C archive yet.
 CANDIDATE_SEND_FILES = migration/DNS.Migration.PulseSend.fsti \
                        migration/DNS.Migration.PulseSend.fst \
-                       migration/DNS.Migration.PulseSend.Tests.fst
+                       migration/DNS.Migration.PulseSend.Tests.fst \
+                       migration/DNS.Migration.PulseSend.Reservation.Tests.fst
 .PHONY: candidate-send-verify
 candidate-send-verify: candidate-multiplexer-verify candidate-response-verify
 	@mkdir -p $(CANDIDATE_OBJ_DIR)/send
